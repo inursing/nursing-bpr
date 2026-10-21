@@ -1954,9 +1954,10 @@ let aiJob=null, aiJobText='', aiJobDone=false, aiJobError=null;
 function startBackgroundAnalysis(){
   if(!sampleFn||!state.conversation.some(m=>m.role==='nurse')) return;
   aiJobText=''; aiJobDone=false; aiJobError=null; state.aiRecord=null;
+  const t0=Date.now(); const el=()=>Math.round((Date.now()-t0)/1000);
   updateAiStatusChips('AI 分析進行中…');
-  aiJob=generateAiRecord(full=>{ aiJobText=full; updateAiStatusChips(`AI 分析進行中…（${full.length} 字）`); })
-    .then(t=>{ state.aiRecord=t; aiJobDone=true; updateAiStatusChips('✅ AI 分析完成'); return t; })
+  aiJob=generateAiRecord(full=>{ aiJobText=full; updateAiStatusChips(`AI 分析進行中…（${full.length} 字，${el()} 秒）`); })
+    .then(t=>{ state.aiRecord=t; aiJobDone=true; updateAiStatusChips(`✅ AI 分析完成（用時 ${el()} 秒）`); return t; })
     .catch(e=>{ aiJobError=e; aiJobDone=true; updateAiStatusChips('⚠️ AI 分析失敗：'+(e.message||'')); throw e; });
 }
 function updateAiStatusChips(msg){ document.querySelectorAll('.ai-status').forEach(el=>{ el.textContent=msg; }); }
