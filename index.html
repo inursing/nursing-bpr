@@ -761,7 +761,7 @@ input[type=text]:focus{border-color:var(--primary)}
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
       <div style="font-size:.75rem;color:var(--text2);margin-top:-6px">太短會在換氣時就把話送出；太長病人反應會變慢。建議 1.4–2.0 秒。</div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（預設開啟；若裝置有回音誤判可關閉）</label>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（電腦預設開啟；手機外放容易把病人的聲音當成護生，預設關閉，建議戴耳機再開）</label>
       <hr class="divider" style="margin:4px 0">
       <div style="font-weight:700;font-size:.9rem">⑥ 學生繳交（存到老師的 Google Drive）</div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 Google Apps Script 部署一個收件程式（<a href="https://github.com/inursing/nursing-bpr/blob/main/drive-inbox.gs" target="_blank" rel="noopener">程式與步驟</a>），把「網頁應用程式網址」貼在這裡；設定連結／QR 會一併帶給學生。學生在「產出報告」頁按「繳交練習」就會上傳到你的雲端硬碟。</div>
@@ -1174,9 +1174,10 @@ function checkSpeech(){
 async function checkVoice(){
   const m=document.getElementById('check-voice-msg'); const c=getCase()||CASES[0]; ensureAudioCtx();
   m.textContent='播放中…';
-  try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.textContent='✅ Azure 語音正常'; }
-       else { await browserSpeak('你好，我是今天住在這一床的病人。',c); m.textContent='✅ 使用瀏覽器內建語音（未設定 Azure）'; } }
-  catch(e){ m.textContent='⚠️ 語音失敗：'+(e.message||''); }
+  const who=`${c.name}（${c.gender}性，${c.age} 歲）`;
+  try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.innerHTML=`✅ Azure ${c.gender==='女'?'女聲':'男聲'} ${azureVoiceFor(c)}　病人：${who}`; }
+       else { const v=pickVoice(c.gender); await browserSpeak('你好，我是今天住在這一床的病人。',c); m.innerHTML=(v&&voiceGender(v)===c.gender?'✅ ':'⚠️ ')+`瀏覽器內建語音「${v?v.name:'無'}」　病人：${who}`+((!v||voiceGender(v)!==c.gender)?'<br><span style="color:var(--danger)">此裝置沒有符合病人性別的內建聲音（已用音高模擬）。請確認老師的語音代理已設定，或換用電腦／Android。</span>':''); } }
+  catch(e){ m.innerHTML='⚠️ Azure 語音失敗：'+escHtml(e.message||'')+'<br>會改用瀏覽器內建語音，聲音可能與病人性別不符。請檢查網路或向老師確認代理設定。'; }
 }
 
 // ===== PHASE 3: CONVERSATION =====
@@ -1291,7 +1292,7 @@ function openSettings(){
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-backchannel').checked=!!st.backchannel;
-  document.getElementById('set-bargein').checked=st.bargeIn!==false;
+  document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
   document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
   document.getElementById('set-ownkey').checked=!!st.ownKey;
   document.getElementById('set-drive').value=st.driveUrl||'';
@@ -1591,7 +1592,8 @@ function setupRecognition(){
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
   const commit=(t)=>{ t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return;
-    if(isSpeaking){ if(!bargeInOn()||isEcho(t)||t.length<2) return; interruptPatient(); }
+    if(isEcho(t)){ console.warn('忽略回音：',t); return; }
+    if(isSpeaking){ if(!bargeInOn()||t.length<2) return; interruptPatient(); }
     committedAt=Date.now(); committedText=t; pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); handleNurseSpeech(t); try{ recognition.stop(); }catch(e){} };
   recognition.onresult=(e)=>{
     let interim=''; let final='';
@@ -1600,7 +1602,7 @@ function setupRecognition(){
       else interim+=e.results[i][0].transcript;
     }
     const shown=(final+interim).trim();
-    if(isSpeaking&&(!bargeInOn()||isEcho(shown))){ document.getElementById('interim-text').textContent=''; return; }
+    if((isSpeaking&&!bargeInOn())||isEcho(shown)){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
     // 停頓超過設定秒數（預設 1.6 秒）才視為說完；中途換氣、想詞不會被送出
@@ -1625,10 +1627,17 @@ function setupRecognition(){
 }
 function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();}catch(e){} } }
 function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&(bargeInOn()||!isSpeaking)&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
-function bargeInOn(){ const st=getSettings(); return st.bargeIn!==false; }
+function bargeInOn(){ const st=getSettings(); return IS_MOBILE?st.bargeIn===true:st.bargeIn!==false; }
+let lastPatientText='', lastSpeakEnd=0;
 function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:1.6)*1000); }
 // 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
-function isEcho(t){ if(!curReply||!t) return false; const body=(curReply.body||'').replace(/[\s，。！？、…「」]/g,''); const x=t.replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return false; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1)>=0.5; }
+function _overlap(t,body){ body=(body||'').replace(/[\s，。！？、…「」]/g,''); const x=(t||'').replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return 0; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1); }
+function isEcho(t){
+  if(!t) return false;
+  if(curReply&&_overlap(t,curReply.body)>=0.5) return true;            // 病人正在說的話
+  if(Date.now()-lastSpeakEnd<4000&&_overlap(t,lastPatientText)>=0.8) return true;   // 病人剛說完 4 秒內的尾音
+  return false;
+}
 // 護生插話：立刻停止病人說話，把已說出的部分記為被打斷
 function interruptPatient(){
   const r=curReply; if(!r||r.done) return; r.done=true; convGen++; curReply=null;
@@ -1744,7 +1753,7 @@ async function handleNurseSpeech(text){
   bubble.textContent=response;
   const d=new Date(); liveEl.querySelector('.bubble-ts').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
   scrollConv();
-  state.conversation.push({role:'patient',text:response,ts:Date.now(),expr:parsed.expr,gest:parsed.gest});
+  state.conversation.push({role:'patient',text:response,ts:Date.now(),expr:parsed.expr,gest:parsed.gest}); lastPatientText=response;
   convHistory.push({role:'assistant',content:(parsedHeader||parsed).expr?`【表情：${EXPR_ZH_OUT[(parsedHeader||parsed).expr]||'平靜'}｜動作：${GEST_ZH_OUT[(parsedHeader||parsed).gest]||'無'}】`+response:response});
   // 剩餘未唸的部分
   const rest=response.slice(spokenUpTo).trim(); if(rest) speaker.push(rest);
@@ -1980,13 +1989,14 @@ class SentenceSpeaker{
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
       if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
-    this.playing=false; if(this.finished&&!this.cancelled&&!isSpeaking) resumeListening(); }
+    this.playing=false; lastSpeakEnd=Date.now(); if(this.finished&&!this.cancelled&&!isSpeaking) setTimeout(resumeListening,IS_MOBILE?900:300); }
 }
 let _curExpr='neutral';
 function currentExprName(){ return _curExpr; }
 const _origSetExpression=setExpression;
 setExpression=function(e){ _curExpr=e||'neutral'; return _origSetExpression(e); };
 function browserSpeak(text,c){
+  if(!browserSpeak._warned&&azureReady()){ browserSpeak._warned=true; toast('Azure 語音暫時無法使用，改用內建語音（聲音可能與病人性別不符）',5000); }
   return new Promise(resolve=>{
     if(!('speechSynthesis' in window)) return resolve();
     const spoken=text.replace(/[（(][^）)]*[）)]/g,'，').replace(/，{2,}/g,'，').replace(/^，|，$/g,'');
