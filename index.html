@@ -746,28 +746,33 @@ input[type=text]:focus{border-color:var(--primary)}
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（預設開啟；若裝置有回音誤判可關閉）</label>
       <hr class="divider" style="margin:4px 0">
-      <details id="adv-settings">
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">④ 進階：不用代理時直接填金鑰（一般不需要）</summary>
+      <details id="own-key-settings">
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">④ 學生課後練習：使用自己的金鑰</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
-          <div class="info-box info-warn" style="font-size:.78rem">這裡的金鑰只存在這台裝置的瀏覽器中。若已設定課程代理，這些欄位可留空。</div>
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課堂外想自己練習時，可以申請一把免費的 Gemini 金鑰（不需信用卡，約 2 分鐘）。金鑰只存在你自己的手機／電腦瀏覽器中。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用我自己的金鑰（勾選後不走老師的課程代理）</label>
+          <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
+          <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
+        </div>
+      </details>
+      <details id="adv-settings">
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑤ 進階（一般不需要）</summary>
+        <div style="display:grid;gap:12px;margin-top:10px">
           <div><label>AI 供應商</label>
             <select id="set-provider" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" onchange="toggleProviderFields()">
               <option value="gemini">Google Gemini（有免費額度）</option>
               <option value="anthropic">Anthropic Claude（需儲值）</option>
             </select></div>
-          <div id="prov-gemini">
-            <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-            <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
-            <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可。</div>
-          </div>
+          <div id="prov-gemini"><div><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div></div>
           <div id="prov-anthropic" class="hidden">
             <div><label>Anthropic API 金鑰</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
             <div style="margin-top:8px"><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div><label>Azure 語音金鑰</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
+            <div><label>Azure 語音金鑰（直接填，不經代理）</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
             <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia、japaneast"></div>
           </div>
+          <div style="font-size:.78rem;color:var(--text2)">沒有 Azure 金鑰且未使用代理時，病人會改用瀏覽器內建語音。</div>
           <div><label>男性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-m" placeholder="留空使用內建頭像"></div>
           <div><label>女性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-f" placeholder="留空使用內建頭像"></div>
         </div>
@@ -1244,7 +1249,7 @@ function applySetupFromHash(){
 }
 function openSettings(){
   const st=getSettings();
-  document.getElementById('set-provider').value=st.provider||'gemini'; document.getElementById('set-proxy').oninput=updateLinkHints;
+  document.getElementById('set-provider').value=st.provider||'gemini'; document.getElementById('set-proxy').oninput=updateLinkHints; document.getElementById('set-gkey').oninput=updateLinkHints;
   document.getElementById('set-gkey').value=st.gKey||'';
   document.getElementById('set-gmodel').value=st.gModel||'gemini-3.1-flash-lite';
   toggleProviderFields();
@@ -1259,26 +1264,33 @@ function openSettings(){
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-backchannel').checked=!!st.backchannel;
   document.getElementById('set-bargein').checked=st.bargeIn!==false;
+  document.getElementById('set-ownkey').checked=!!st.ownKey;
   document.getElementById('set-proxy').value=st.proxyUrl||'';
   document.getElementById('set-class').value=st.classCode||'';
   updateLinkHints();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,ownKey:document.getElementById('set-ownkey').checked,proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
 }
 function toggleProviderFields(){ const p=document.getElementById('set-provider').value; document.getElementById('prov-gemini').classList.toggle('hidden',p!=='gemini'); document.getElementById('prov-anthropic').classList.toggle('hidden',p!=='anthropic'); }
-function proxyOn(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
+function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
+// AI 是否走代理（學生勾選「用自己的金鑰」時不走）；語音只要有代理就一律走代理
+function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return proxyConfigured(); }
 function proxyHeaders(extra){ const st=getSettings(); return Object.assign({'X-Class-Code':st.classCode||''},extra||{}); }
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
   const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到下方「④ 進階」直接填金鑰。</span>';
-  document.getElementById('adv-settings').open=!on; document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
+  const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
+  const os=document.getElementById('ownkey-state'); os.innerHTML=own?(gk?'<span style="color:#1a7f37">✅ 使用自己的金鑰（AI 病人與 AI 記錄走你的 Gemini 額度；語音'+(on?'仍由老師代理提供':'用瀏覽器內建聲音')+'）</span>':'<span style="color:var(--danger)">請貼上你的 Gemini 金鑰，或取消勾選</span>'):'';
+  if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
+  document.getElementById('own-key-settings').open=own||(!on&&!!gk);
+  document.getElementById('adv-settings').open=false; document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
 async function testProxy(){
   saveSettings(); openSettings(); const msg=document.getElementById('proxy-msg'); const st=getSettings();
-  if(!proxyOn()){ msg.textContent='請先填代理網址'; return; }
+  if(!proxyConfigured()){ msg.textContent='請先填代理網址'; return; }
   msg.textContent='測試中…';
   try{
     const r=await fetch(st.proxyUrl+'/azure/token',{headers:proxyHeaders()}); const j=await r.json().catch(()=>({}));
@@ -1775,7 +1787,7 @@ function pickVoice(gender){
   const match=list=>list.find(v=>voiceGender(v)===gender);
   return match(tw)||tw[0]||match(other)||other[0]||null;
 }
-function azureReady(){ const st=getSettings(); return proxyOn()||!!(st.azKey&&st.azRegion); }
+function azureReady(){ const st=getSettings(); return proxyConfigured()||!!(st.azKey&&st.azRegion); }
 // 代理模式：向 Worker 取得 10 分鐘有效的短期 token（每 8 分鐘換新）
 let azTok=null;
 async function getAzToken(){
@@ -1814,7 +1826,7 @@ function getAzSyn(tok){
   return azSyn;
 }
 function azureSynthSDK(text,c,expr){
-  const run=async()=>{ const tok=proxyOn()?await getAzToken():null; return new Promise((resolve,reject)=>{
+  const run=async()=>{ const tok=proxyConfigured()?await getAzToken():null; return new Promise((resolve,reject)=>{
     const syn=getAzSyn(tok); azVisemes=[];
     const timer=setTimeout(()=>{ try{azSyn.close()}catch(e){} azSyn=null; reject(new Error('Azure 語音逾時')); },8000);
     syn.speakSsmlAsync(buildSSML(text,c,expr),r=>{
@@ -1833,7 +1845,7 @@ async function azureSynth(text,c,expr){
   let out;
   if(window.SpeechSDK){ try{ out=await azureSynthSDK(text,c,expr); }catch(e){ console.warn(e); } }
   if(!out){
-    const tok=proxyOn()?await getAzToken():null; const region=tok?tok.region:st.azRegion;
+    const tok=proxyConfigured()?await getAzToken():null; const region=tok?tok.region:st.azRegion;
     const auth=tok?{'Authorization':'Bearer '+tok.token}:{'Ocp-Apim-Subscription-Key':st.azKey};
     const res=await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,{
       method:'POST',headers:Object.assign(auth,{'Content-Type':'application/ssml+xml','X-Microsoft-OutputFormat':'audio-24khz-48kbitrate-mono-mp3','User-Agent':'nursing-bpr'}),

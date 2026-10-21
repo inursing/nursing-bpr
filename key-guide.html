@@ -1,0 +1,41 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>取得金鑰教學｜行為過程紀錄練習平台</title>
+<style>
+:root{--p:#1a6fa3;--t:#1f2a37;--t2:#5b6b7b;--bg:#f0f4f8;--s:#fff;--b:#d9e2ec}
+@media(prefers-color-scheme:dark){:root{--t:#e6edf3;--t2:#a7b4c2;--bg:#0f172a;--s:#1e293b;--b:#334155}}
+body{margin:0;font-family:system-ui,-apple-system,"Noto Sans TC","PingFang TC",sans-serif;background:var(--bg);color:var(--t);line-height:1.7}
+main{max-width:680px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:1.4rem;color:var(--p)}h2{font-size:1.1rem;margin-top:32px;border-left:4px solid var(--p);padding-left:10px}
+.card{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:16px 18px;margin:12px 0}
+ol li{margin:8px 0}code{background:rgba(26,111,163,.12);padding:2px 6px;border-radius:4px}
+.note{font-size:.88rem;color:var(--t2)}a{color:var(--p)}
+.btn{display:inline-block;background:var(--p);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600}
+</style></head><body><main>
+<h1>📖 取得金鑰的簡易教學</h1>
+<p>課堂上老師會用 QR Code 幫大家設定好，不用做這些。課後想自己練習時，只要有一把 <b>Gemini 金鑰</b>就可以（免費、不需信用卡）；病人聲音會用手機／電腦內建的語音。</p>
+
+<h2>步驟一：申請 Gemini 金鑰（約 2 分鐘）</h2>
+<div class="card"><ol>
+<li>用 Google 帳號登入 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></li>
+<li>第一次進入會請你同意條款，勾選後按「繼續」。</li>
+<li>按右上角 <b>「Create API key」</b>（建立 API 金鑰）。若問要選哪個 project，選預設的或按「Create project」隨便取個名字即可。</li>
+<li>出現一串以 <code>AIza</code> 開頭的金鑰，按旁邊的複製鈕。<br><span class="note">這串金鑰等於你的密碼，不要貼到群組或公開的地方。</span></li>
+</ol></div>
+
+<h2>步驟二：貼到練習平台</h2>
+<div class="card"><ol>
+<li>打開練習平台 → 右上角 <b>⚙ 設定</b>。</li>
+<li>展開 <b>「④ 學生課後練習：使用自己的金鑰」</b>。</li>
+<li>勾選「使用我自己的金鑰」，把金鑰貼到「我的 Gemini API 金鑰」。</li>
+<li>按 <b>儲存</b>。之後選個案、開始會談即可。</li>
+</ol>
+<p class="note">回到課堂要用老師的設定時，把「使用我自己的金鑰」取消勾選就好，老師的設定仍然保留。</p></div>
+
+<h2>常見問題</h2>
+<div class="card">
+<p><b>免費額度夠嗎？</b> 免費層每天可以練習很多次；一次 10 分鐘的會談加 AI 報告大約用掉 15–25 次請求。若出現「限流／429」，等幾分鐘再試。</p>
+<p><b>可以讓病人的聲音更自然嗎？</b> 可以，但要另外申請 Azure 語音服務（需 Microsoft 帳號並綁信用卡，有免費額度）。一般課後練習用內建語音就足夠；需要的話在「⑤ 進階」填入 Azure 金鑰與區域。</p>
+<p><b>金鑰會傳到哪裡？</b> 只存在你這台裝置的瀏覽器裡，平台不會上傳到任何伺服器；清除瀏覽器資料就會消失。</p>
+</div>
+<p style="margin-top:28px"><a class="btn" href="./index.html">← 回到練習平台</a></p>
+</main></body></html>
