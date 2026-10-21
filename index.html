@@ -1657,8 +1657,9 @@ async function geminiTTS(text,c,expr){
   }
   throw lastErr||new Error('Gemini TTS 失敗');
 }
-function gttsProgress(){ const el=document.getElementById('review-gtts-msg'); if(!el) return; const total=state.conversation.filter(m=>m.role==='patient').length; const done=state.conversation.filter((m,i)=>m.role==='patient'&&gttsCache.has(i)).length; el.textContent=total?(done>=total?'✅ 情緒語音已就緒':`情緒語音準備中 ${done}/${total}（未完成的句子先用一般語音）`):''; }
+function gttsProgress(){ const el=document.getElementById('review-gtts-msg'); if(!el) return; if(!getSettings().gttsReplay){ el.textContent=''; return; } const total=state.conversation.filter(m=>m.role==='patient').length; const done=state.conversation.filter((m,i)=>m.role==='patient'&&gttsCache.has(i)).length; el.textContent=total?(done>=total?'✅ 情緒語音已就緒':`情緒語音準備中 ${done}/${total}（未完成的句子先用一般語音）`):''; }
 async function prepareEmotionalVoices(){
+  if(!getSettings().gttsReplay) return; // 已停用：Gemini 語音會改動句子內容，回放須與會談一致
   if(!getSettings().gKey||gttsJob) return; const c=getCase(); if(!c) return;
   gttsJob=(async()=>{
     for(let i=0;i<state.conversation.length;i++){ const m=state.conversation[i]; if(m.role!=='patient'||gttsCache.has(i)) continue;
