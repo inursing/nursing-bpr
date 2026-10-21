@@ -370,6 +370,42 @@ input[type=text]:focus{border-color:var(--primary)}
 .rv-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;border-radius:10px;padding:2px}
 .rv-row.active{outline:2px solid var(--primary);background:var(--primary-light)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* --- 手機版面 --- */
+@media(max-width:640px){
+  #topbar{padding:8px 12px;gap:8px}
+  #topbar h1{font-size:1.05rem;line-height:1.2}
+  #topbar .sub{display:none}
+  .logo{width:30px;height:30px;font-size:1.05rem}
+  #steps{scroll-snap-type:x proximity}
+  .step{scroll-snap-align:center;white-space:nowrap}
+  h2{font-size:1.1rem}
+  .info-box{font-size:.82rem;padding:10px 12px}
+  /* 會談頁：病人畫面縮小，讓麥克風與狀態同一螢幕 */
+  .stage-box{aspect-ratio:1/1}
+  #conv-area{max-height:34vh;min-height:140px}
+  /* 記錄／分析表：每一句改成卡片直式排列 */
+  #record-table,#analysis-table{display:block}
+  #record-table thead,#analysis-table thead{display:none}
+  #record-table tbody,#analysis-table tbody,#record-table tr,#analysis-table tr,#record-table td,#analysis-table td{display:block;width:100%;box-sizing:border-box}
+  #record-table tr,#analysis-table tr{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;padding:8px 10px 10px;background:var(--surface);position:relative}
+  #record-table tr:nth-child(even) td,#analysis-table tr:nth-child(even) td{background:transparent}
+  #record-table td,#analysis-table td{border:none!important;padding:4px 0!important;background:transparent!important}
+  #record-table td.row-num,#analysis-table td.row-num{display:inline-block;width:auto;font-weight:800;color:var(--primary);font-size:.95rem;padding:0 0 4px!important}
+  #record-table td.row-num:first-child::before,#analysis-table td.row-num:first-child::before{content:'第 '}
+  #record-table td.row-num:first-child::after,#analysis-table td.row-num:first-child::after{content:' 句'}
+  #record-table td.row-num:last-child,#analysis-table td.row-num:last-child{position:absolute;top:6px;right:6px;padding:0!important}
+  #record-table td:has(> textarea[data-f])::before,#analysis-table td:has(> textarea[data-f])::before{display:block;font-size:.72rem;font-weight:700;color:var(--text2);margin:4px 0 2px;letter-spacing:.02em}
+  td:has(> textarea[data-f="nurseVerbal"])::before{content:'護生說的話'}
+  td:has(> textarea[data-f="nurseNonverbal"])::before{content:'護生的表情、動作'}
+  td:has(> textarea[data-f="patientVerbal"])::before{content:'病人說的話'}
+  td:has(> textarea[data-f="patientNonverbal"])::before{content:'病人的表情、動作、語氣'}
+  td:has(> textarea[data-f="techniques"])::before{content:'使用的溝通技巧'}
+  td:has(> textarea[data-f="analysis"])::before{content:'自我分析'}
+  .record-table td textarea{min-width:0;min-height:44px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:16px}
+  .tech-picker{gap:4px}
+  .tech-chip{font-size:.72rem;padding:3px 7px}
+}
+
 </style>
 
 <div id="app">
@@ -1431,8 +1467,9 @@ async function initConvPhase(){
   warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
-  (async()=>{ if(!camStream) await startCamera(); startRecording(); })();
+  (async()=>{ if(!camStream) await startCamera(); })();
   updateRecIndicator();
+  document.getElementById('cam-label').textContent='鏡頭（按麥克風後開始錄影）';
   // Setup speech recognition
   setupRecognition();
   // Load sample
@@ -1492,7 +1529,8 @@ function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();
 function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&!isSpeaking&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
 
 function toggleMic(){
-  ensureAudioCtx();
+  unlockAudio();
+  if(!(recorder&&recorder.state==='recording')){ (async()=>{ if(!camStream) await startCamera(); startRecording(); })(); }
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
   if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
@@ -1763,12 +1801,18 @@ async function azureSynth(text,c,expr){
 const AZ_VISEME=['viseme_sil','viseme_aa','viseme_aa','viseme_O','viseme_E','viseme_RR','viseme_I','viseme_U','viseme_O','viseme_aa','viseme_O','viseme_aa','viseme_kk','viseme_RR','viseme_nn','viseme_SS','viseme_CH','viseme_TH','viseme_FF','viseme_DD','viseme_kk','viseme_PP'];
 // 音訊播放 + 以音量驅動嘴型
 let audioCtx=null, analyser=null, curAudio=null, mouthRAF=null;
-function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); }
-function stopAudio(){ const ve=vidEngine(); if(ve) ve.clear(); if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
-function playBlob(blobOrObj,hint){
+function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state!=='running') audioCtx.resume().catch(()=>{}); }
+// 手機瀏覽器：音訊必須在使用者點擊當下解鎖；播一段無聲緩衝即可
+let audioUnlocked=false;
+function unlockAudio(){ ensureAudioCtx(); if(!audioCtx) return; try{ const b=audioCtx.createBuffer(1,1,22050); const src=audioCtx.createBufferSource(); src.buffer=b; src.connect(audioCtx.destination); src.start(0); audioUnlocked=true; }catch(e){} }
+async function resumeAudio(){ ensureAudioCtx(); if(audioCtx&&audioCtx.state!=='running'){ try{ await audioCtx.resume(); }catch(e){} } }
+const IS_MOBILE=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
+function stopAudio(){ const ve=vidEngine(); if(ve) ve.clear(); if(curAudio){ try{curAudio.pause(); if(curAudio instanceof HTMLMediaElement) curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
+async function playBlob(blobOrObj,hint){
   const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj; const visemes=blobOrObj&&blobOrObj.visemes||null;
+  await resumeAudio();
+  if(audioCtx&&audioCtx.state==='running'&&(IS_MOBILE||window.__forceBufferAudio)){ try{ return await playBlobBuffer(blob,visemes,hint); }catch(e){ console.warn('buffer play failed, fallback',e); } }
   return new Promise((resolve)=>{
-    ensureAudioCtx();
     const a=new Audio(URL.createObjectURL(blob)); curAudio=a;
     let vi=0;
     if(window.Avatar3D) Avatar3D.setSpeakHint(hint||null);
@@ -1782,6 +1826,21 @@ function playBlob(blobOrObj,hint){
     const done=()=>{ if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} if(window.Avatar3D){ Avatar3D.setMouthLevel(null); Avatar3D.setViseme(null); Avatar3D.setSpeakHint(null);} stopMouth(); URL.revokeObjectURL(a.src); if(curAudio===a) curAudio=null; resolve(); };
     a.onended=done; a.onerror=done;
     a.play().catch(()=>{ done(); });
+  });
+}
+// 手機用：用 AudioBufferSourceNode 播放（不受 <audio> 自動播放限制），用 token 取代 curAudio
+async function playBlobBuffer(blob,visemes,hint){
+  const buf=await audioCtx.decodeAudioData(await blob.arrayBuffer());
+  return new Promise(resolve=>{
+    const src=audioCtx.createBufferSource(); src.buffer=buf; src.connect(analyser||audioCtx.destination);
+    const token={pause(){ try{src.stop()}catch(e){} }, src}; curAudio=token;
+    let vi=0; const data=new Uint8Array(analyser?analyser.fftSize:0); const t0=audioCtx.currentTime;
+    if(window.Avatar3D) Avatar3D.setSpeakHint(hint||null);
+    const tick=()=>{ if(curAudio!==token) return; let lvl=0; if(analyser){ analyser.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const v=(data[i]-128)/128; sum+=v*v;} lvl=Math.min(1,Math.sqrt(sum/data.length)*6); }
+      if(window.Avatar3D){ Avatar3D.setMouthLevel(lvl); if(visemes&&visemes.length){ const t=audioCtx.currentTime-t0+0.04; while(vi<visemes.length-1&&visemes[vi+1].t<=t) vi++; Avatar3D.setViseme(AZ_VISEME[visemes[vi].id]||null); } }
+      mouthRAF=requestAnimationFrame(tick); };
+    const done=()=>{ if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} if(window.Avatar3D){ Avatar3D.setMouthLevel(null); Avatar3D.setViseme(null); Avatar3D.setSpeakHint(null);} stopMouth(); if(curAudio===token) curAudio=null; resolve(); };
+    src.onended=done; if(!analyser) startMouth(); tick(); src.start(0);
   });
 }
 // 逐句語音佇列：邊生成邊唸，並預先抓下一句
