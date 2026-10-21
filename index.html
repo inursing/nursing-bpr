@@ -629,8 +629,20 @@ input[type=text]:focus{border-color:var(--primary)}
     <h2>平台設定</h2>
     <div class="info-box info-warn" style="margin-bottom:14px;font-size:.8rem">金鑰只存在這台裝置的瀏覽器中，不會上傳到其他地方。建議由教師在共用電腦上設定一次。</div>
     <div style="display:grid;gap:12px">
-      <div><label>Anthropic API 金鑰（AI 病人與 AI 版記錄）</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
-      <div><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
+      <div><label>AI 供應商（AI 病人與 AI 版記錄）</label>
+        <select id="set-provider" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" onchange="toggleProviderFields()">
+          <option value="gemini">Google Gemini（有免費額度）</option>
+          <option value="anthropic">Anthropic Claude（需儲值）</option>
+        </select></div>
+      <div id="prov-gemini">
+        <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
+        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-2.5-flash"></div>
+        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可，免費層不需信用卡。</div>
+      </div>
+      <div id="prov-anthropic" class="hidden">
+        <div><label>Anthropic API 金鑰</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
+        <div style="margin-top:8px"><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
+      </div>
       <div><label>男性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-m" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
       <div><label>女性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-f" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
       <hr class="divider" style="margin:4px 0">
@@ -1011,6 +1023,10 @@ const SET_KEY='bpr-settings-v2';
 function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
 function openSettings(){
   const st=getSettings();
+  document.getElementById('set-provider').value=st.provider||'gemini';
+  document.getElementById('set-gkey').value=st.gKey||'';
+  document.getElementById('set-gmodel').value=st.gModel||'gemini-2.5-flash';
+  toggleProviderFields();
   document.getElementById('set-apikey').value=st.apiKey||'';
   document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
   document.getElementById('set-av-m').value=st.avM||'';
@@ -1022,13 +1038,44 @@ function openSettings(){
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
 }
+function toggleProviderFields(){ const p=document.getElementById('set-provider').value; document.getElementById('prov-gemini').classList.toggle('hidden',p!=='gemini'); document.getElementById('prov-anthropic').classList.toggle('hidden',p!=='anthropic'); }
+function aiReady(){ const st=getSettings(); return (st.provider||'gemini')==='gemini'?!!st.gKey:!!st.apiKey; }
+function toGemini(messages,system,maxTokens){
+  return {system_instruction:system?{parts:[{text:system}]}:undefined,
+    contents:messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),
+    generationConfig:{maxOutputTokens:maxTokens||1024,temperature:0.9}};
+}
+async function geminiSample(input,opts={}){
+  const st=getSettings(); const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${st.gModel||'gemini-2.5-flash'}:generateContent?key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(toGemini(messages,opts.system,opts.maxTokens))});
+  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('Gemini 錯誤 '+res.status+' '+t); }
+  const j=await res.json();
+  return {text:(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('')};
+}
+async function geminiSampleStream(input,opts={}){
+  const st=getSettings(); const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${st.gModel||'gemini-2.5-flash'}:streamGenerateContent?alt=sse&key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(toGemini(messages,opts.system,opts.maxTokens))});
+  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('Gemini 錯誤 '+res.status+' '+t); }
+  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop();
+    for(const line of lines){
+      if(!line.startsWith('data:')) continue;
+      try{ const j=JSON.parse(line.slice(5).trim()); const t=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join(''); if(t){ full+=t; opts.onDelta&&opts.onDelta(full,t); } }catch(e){}
+    }
+  }
+  return {text:full};
+}
 async function apiSample(input,opts={}){
   const st=getSettings();
+  if((st.provider||'gemini')==='gemini'){ if(!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰（右上角 ⚙ 設定）'),{code:'no_key'}); return geminiSample(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰（右上角 ⚙ 設定）'),{code:'no_key'});
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
   const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -1042,6 +1089,7 @@ async function apiSample(input,opts={}){
 }
 async function apiSampleStream(input,opts={}){
   const st=getSettings();
+  if((st.provider||'gemini')==='gemini'){ if(!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰'),{code:'no_key'}); return geminiSampleStream(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰'),{code:'no_key'});
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
   const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -1148,8 +1196,8 @@ async function initConvPhase(){
   // Setup speech recognition
   setupRecognition();
   // Load sample
-  sampleFn=getSettings().apiKey?apiSample:null;
-  if(!sampleFn) toast('尚未設定 API 金鑰，病人將使用內建的簡單回應（右上角 ⚙ 設定）');
+  sampleFn=aiReady()?apiSample:null;
+  if(!sampleFn) toast('尚未設定 AI 金鑰，病人將使用內建的簡單回應（右上角 ⚙ 設定）');
   // Welcome message
   addBubble('system','💬 會談開始。請按麥克風向個案說話。',Date.now());
   setStatus('按下麥克風開始說話');
