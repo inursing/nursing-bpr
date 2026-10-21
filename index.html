@@ -1491,6 +1491,11 @@ async function startCamera(){
   }
   const v=document.getElementById('cam-video'); v.srcObject=camStream; v.classList.remove('hidden');
   document.getElementById('cam-off').classList.add('hidden');
+  document.getElementById('cam-label').textContent='鏡頭預覽（尚未錄影）';
+}
+// 錄影只在會談真正開始時才啟動（會談前檢查只有預覽）
+function startRecording(){
+  if(!camStream||(recorder&&recorder.state==='recording')) return;
   try{
     const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
     recorder=new MediaRecorder(camStream,mime?{mimeType:mime}:{});
@@ -1568,7 +1573,7 @@ async function initConvPhase(){
   warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
-  if(!camStream) startCamera();
+  (async()=>{ if(!camStream) await startCamera(); startRecording(); })();
   updateRecIndicator();
   // Setup speech recognition
   setupRecognition();
