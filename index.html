@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1a6fa3">
-<!-- iOS 桌面圖示模式不支援語音辨識，故讓 iPhone 的主畫面圖示在 Safari 中開啟 -->
-<meta name="apple-mobile-web-app-capable" content="no">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="行為過程紀錄">
@@ -759,6 +758,12 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
       </div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。留空即用預設。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
+      <div><label>語音辨識來源</label>
+        <select id="set-stt" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+          <option value="auto">自動（電腦／Android／iPhone Safari 用免費內建辨識；iPhone 桌面 App 模式改用 Azure）</option>
+          <option value="browser">一律瀏覽器內建（免費；iPhone 需用 Safari 開）</option>
+          <option value="azure">一律 Azure 語音辨識（每月免費 5 小時，之後約 US$1／小時）</option>
+        </select></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
@@ -1125,7 +1130,7 @@ function startConv(){
   state.convDuration=0;
   openCheck();
 }
-let checkMicCtx=null, checkMicRAF=null;
+let checkMicCtx=null, checkMicRAF=null, checkMicStream=null;
 async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
@@ -1145,13 +1150,19 @@ async function openCheck(){
         document.getElementById('check-mic-fill').style.width=Math.round(lvl*100)+'%';
         document.getElementById('check-mic-msg').textContent=peak>0.08?'✅ 有收到聲音':'請說幾句話，看音量條有沒有跳動。'; checkMicRAF=requestAnimationFrame(tick); };
       tick();
-    } else document.getElementById('check-mic-msg').textContent=IS_IOS?'iPhone/iPad：麥克風保留給語音辨識（錄影只有畫面），請直接用下方「語音辨識測試」確認收音。':'未取得麥克風。';
+    } else if(IS_IOS){
+      // iPhone：鏡頭不含聲音；檢查時另外暫借麥克風做音量表，關閉檢查視窗時釋放
+      try{ checkMicStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); checkMicCtx=new (window.AudioContext||window.webkitAudioContext)(); const src=checkMicCtx.createMediaStreamSource(checkMicStream); const an=checkMicCtx.createAnalyser(); an.fftSize=512; src.connect(an); const data=new Uint8Array(an.fftSize); let peak=0;
+        const tick=()=>{ an.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const x=(data[i]-128)/128; sum+=x*x;} const lvl=Math.min(1,Math.sqrt(sum/data.length)*4); peak=Math.max(peak*0.97,lvl); document.getElementById('check-mic-fill').style.width=Math.round(lvl*100)+'%'; document.getElementById('check-mic-msg').textContent=peak>0.08?'✅ 有收到聲音':'請說幾句話，看音量條有沒有跳動。'; checkMicRAF=requestAnimationFrame(tick); }; tick();
+      }catch(e){ document.getElementById('check-mic-msg').textContent='未取得麥克風：'+(e.name==='NotAllowedError'?'請允許麥克風權限':(e.message||e.name)); }
+    } else document.getElementById('check-mic-msg').textContent='未取得麥克風。';
   }catch(e){}
 }
 function closeCheck(){
   document.getElementById('check-modal').classList.add('hidden');
   if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null}
   if(checkMicCtx){try{checkMicCtx.close()}catch(e){} checkMicCtx=null}
+  if(checkMicStream){ try{checkMicStream.getTracks().forEach(t=>t.stop());}catch(e){} checkMicStream=null; }
   const v=document.getElementById('check-video'); if(v) v.srcObject=null;
 }
 function cancelCheck(){ closeCheck(); stopCamera(); }
@@ -1162,13 +1173,15 @@ function confirmStartConv(){
   initConvPhase();
 }
 function checkSpeech(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition; const m=document.getElementById('check-sr-msg');
-  if(!SR){ m.innerHTML=IS_IOS&&IS_STANDALONE?'⚠️ 從桌面圖示開啟時 iPhone 不提供語音辨識，請改用 <b>Safari</b> 直接開啟網址。':'⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome（電腦／Android）或 Safari（iPhone）。'; return; }
+  const m=document.getElementById('check-sr-msg');
   if(checkSpeech._r){ try{checkSpeech._r.abort();}catch(e){} }
-  const r=new SR(); checkSpeech._r=r; r.lang='zh-TW'; r.interimResults=true; m.textContent='🎤 聆聽中…請說「我是護生」';
+  if(checkMicStream){ try{checkMicStream.getTracks().forEach(t=>t.stop());}catch(e){} checkMicStream=null; if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null} document.getElementById('check-mic-msg').textContent='（音量表已停止，改由語音辨識使用麥克風）'; }
+  const r=createRecognizer();
+  if(!r){ m.innerHTML=IS_IOS&&IS_STANDALONE?'⚠️ 從桌面圖示開啟時 iPhone 不提供內建語音辨識，且老師未設定 Azure 語音；請改用 <b>Safari</b> 直接開啟網址。':'⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome（電腦／Android）或 Safari（iPhone）。'; return; }
+  checkSpeech._r=r; r.lang='zh-TW'; r.interimResults=true; r.continuous=false; m.textContent='🎤 聆聽中…請說「我是護生」（'+sttName()+'）';
   let got=false; const help=IS_IOS?'<br>iPhone 排除方法：① 用 Safari 開（不要用桌面圖示）② 設定 → 一般 → 鍵盤 → 開啟「啟用聽寫」③ 設定 → Safari → 麥克風 → 允許 ④ 關閉其他正在使用麥克風的 App。':'<br>排除方法：確認網址列左邊的麥克風權限為「允許」、沒有其他程式占用麥克風；Chrome 需要能連到 Google 語音服務。';
   const timer=setTimeout(()=>{ if(!got){ try{r.abort();}catch(e){} m.innerHTML='⏱ 8 秒內沒有收到辨識結果。'+help; } },8000);
-  r.onresult=e=>{ got=true; const t=Array.from(e.results).map(x=>x[0].transcript).join(''); m.textContent=(e.results[e.results.length-1].isFinal?'✅ 辨識到：「':'…「')+t+'」'; if(e.results[e.results.length-1].isFinal){ clearTimeout(timer); } };
+  r.onresult=e=>{ got=true; const t=Array.from(e.results).map(x=>x[0].transcript).join(''); m.textContent=(e.results[e.results.length-1].isFinal?'✅ 辨識到：「':'…「')+t+'」（'+sttName()+'）'; if(e.results[e.results.length-1].isFinal){ clearTimeout(timer); try{ r.stop(); }catch(x){} } };
   r.onerror=e=>{ clearTimeout(timer); if(e.error==='aborted') return; m.innerHTML='辨識錯誤：'+e.error+(e.error==='not-allowed'?'（請允許麥克風）':e.error==='audio-capture'?'（麥克風被占用或無法取得）':e.error==='network'?'（連不到語音服務，請檢查網路）':'')+help; };
   r.onend=()=>{ clearTimeout(timer); if(m.textContent.startsWith('🎤')) m.innerHTML='沒有聽到聲音，請再試一次。'+help; };
   try{ r.start(); }catch(e){ clearTimeout(timer); m.innerHTML='無法啟動辨識：'+e.message+help; }
@@ -1246,6 +1259,7 @@ function makeSetupLink(){
   if(proxyOn()){ cfg.proxyUrl=st.proxyUrl; cfg.classCode=st.classCode; cfg.gKey=''; cfg.azKey=''; cfg.azRegion=''; }
   if(st.driveUrl) cfg.driveUrl=st.driveUrl;
   if(st.pauseSec) cfg.pauseSec=st.pauseSec;
+  if(st.stt&&st.stt!=='auto') cfg.stt=st.stt;
   else { cfg.azKey=st.azKey; cfg.azRegion=st.azRegion; if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey; }
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1267,7 +1281,7 @@ function downloadQr(){
   img.onload=()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=1104; const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,1104,1104); ctx.drawImage(img,40,40); const a=document.createElement('a'); a.download='行為過程紀錄練習_設定QR.png'; a.href=cv.toDataURL('image/png'); a.click(); };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
+window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE&&!azureReady()&&!(window.SpeechRecognition||window.webkitSpeechRecognition)) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
 function applySetupFromHash(){
   try{
     const m=location.hash.match(/^#setup=([A-Za-z0-9+/=]+)/); if(!m) return;
@@ -1294,6 +1308,7 @@ function openSettings(){
   document.getElementById('set-az-vm').value=st.azVM||'';
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
+  document.getElementById('set-stt').value=st.stt||'auto';
   document.getElementById('set-backchannel').checked=!!st.backchannel;
   document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
   document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
@@ -1306,7 +1321,7 @@ function openSettings(){
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:document.getElementById('set-drive').value.trim(),teacherToken:document.getElementById('set-teacher').value.trim(),proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,stt:document.getElementById('set-stt').value,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:document.getElementById('set-drive').value.trim(),teacherToken:document.getElementById('set-teacher').value.trim(),proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1580,17 +1595,47 @@ async function initConvPhase(){
 
 // 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
 let listenWanted=false, pendingFinal='', finalTimer=null;
+// ===== 語音辨識來源：瀏覽器內建（免費）或 Azure（iPhone 桌面 App 模式用）=====
+function useAzureSTT(){ const st=getSettings(); if(!window.SpeechSDK||!azureReady()) return false; if(st.stt==='azure') return true; if(st.stt==='browser') return false; const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return (IS_IOS&&IS_STANDALONE)||!SR; }
+// 介面仿 Web Speech API：lang / continuous / interimResults / onstart / onresult / onerror / onend / start() / stop() / abort()
+class AzureRecognizer{
+  constructor(){ this.lang='zh-TW'; this.continuous=true; this.interimResults=true; this.onstart=null; this.onresult=null; this.onerror=null; this.onend=null; this._rec=null; this._active=false; this._results=[]; }
+  async _build(){
+    const st=getSettings(); const tok=proxyConfigured()?await getAzToken():null;
+    const cfg=tok?SpeechSDK.SpeechConfig.fromAuthorizationToken(tok.token,tok.region):SpeechSDK.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
+    cfg.speechRecognitionLanguage=this.lang||'zh-TW';
+    try{ cfg.setProperty(SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs,String(pauseMs())); }catch(e){}
+    try{ cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,'60000'); }catch(e){}
+    const rec=new SpeechSDK.SpeechRecognizer(cfg,SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
+    const emit=()=>{ if(this.onresult) this.onresult({results:this._results.map(r=>Object.assign([{transcript:r.text}],{isFinal:r.final}))}); };
+    rec.recognizing=(x,e)=>{ if(!this._active) return; const t=e.result.text||''; const last=this._results[this._results.length-1]; if(last&&!last.final) last.text=t; else this._results.push({text:t,final:false}); emit(); };
+    rec.recognized=(x,e)=>{ if(!this._active) return; if(e.result.reason!==SpeechSDK.ResultReason.RecognizedSpeech||!e.result.text) { const last=this._results[this._results.length-1]; if(last&&!last.final) this._results.pop(); return; } const last=this._results[this._results.length-1]; if(last&&!last.final){ last.text=e.result.text; last.final=true; } else this._results.push({text:e.result.text,final:true}); emit(); };
+    rec.canceled=(x,e)=>{ const d=e.errorDetails||''; this._active=false; if(e.reason===SpeechSDK.CancellationReason.Error&&this.onerror) this.onerror({error:/permission|microphone/i.test(d)?'not-allowed':/network|connect|1006|1002/i.test(d)?'network':'azure',message:d}); if(this.onend) this.onend(); };
+    rec.sessionStopped=()=>{ if(this._active){ this._active=false; if(this.onend) this.onend(); } };
+    return rec;
+  }
+  start(){
+    if(this._active) throw new Error('InvalidStateError: already started');
+    this._active=true; this._results=[];
+    (async()=>{ try{ if(!this._rec) this._rec=await this._build(); else if(proxyConfigured()){ const tok=await getAzToken(); this._rec.authorizationToken=tok.token; }
+      await new Promise((res,rej)=>this._rec.startContinuousRecognitionAsync(res,rej)); if(this._active&&this.onstart) this.onstart(); }
+      catch(e){ this._active=false; if(this.onerror) this.onerror({error:'azure',message:String(e&&e.message||e)}); if(this.onend) this.onend(); } })();
+  }
+  stop(){ if(!this._active) return; this._active=false; const r=this._rec; if(r) r.stopContinuousRecognitionAsync(()=>{ if(this.onend) this.onend(); },()=>{ if(this.onend) this.onend(); }); else if(this.onend) this.onend(); }
+  abort(){ this.stop(); }
+}
+function createRecognizer(){ if(useAzureSTT()) return new AzureRecognizer(); const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return SR?new SR():null; }
+function sttName(){ return useAzureSTT()?'Azure 語音辨識':'瀏覽器內建辨識'; }
 function setupRecognition(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ 桌面圖示模式沒有語音辨識，請用 Safari 開啟網址':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
-  recognition=new SR();
+  recognition=createRecognizer();
+  if(!recognition){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ 桌面圖示模式沒有語音辨識，且未設定 Azure，請用 Safari 開啟網址':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
   recognition.lang='zh-TW';
   recognition.continuous=true;
   recognition.interimResults=true;
   recognition.onstart=()=>{
     isRecording=true;
     document.getElementById('mic-btn').classList.add('recording');
-    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
+    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出'+(useAzureSTT()?'（Azure）':''));
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
