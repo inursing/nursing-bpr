@@ -681,6 +681,7 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
       </div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
       <hr class="divider" style="margin:4px 0">
       <div style="font-weight:700;font-size:.9rem">病人引擎（V3）</div>
       <select id="set-engine" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
@@ -1354,6 +1355,7 @@ function openSettings(){
   document.getElementById('set-az-vm').value=st.azVM||'';
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
+  document.getElementById('set-backchannel').checked=!!st.backchannel;
   document.getElementById('set-engine').value=st.engine||'3d';
   document.getElementById('set-simli-key').value=st.simliKey||'';
   document.getElementById('set-simli-m').value=st.simliM||'';
@@ -1364,7 +1366,7 @@ function openSettings(){
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim(),laKey:document.getElementById('set-la-key').value.trim(),laM:document.getElementById('set-la-m').value.trim(),laF:document.getElementById('set-la-f').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim(),laKey:document.getElementById('set-la-key').value.trim(),laM:document.getElementById('set-la-m').value.trim(),laF:document.getElementById('set-la-f').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1720,10 +1722,13 @@ async function handleNurseSpeech(text){
 const EXPR_ZH_OUT={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
 const GEST_ZH_OUT={nod:'點頭',down:'低頭',away:'別過頭',chest:'手按胸口',sigh:'嘆氣',wave:'揮手',shake:'搖頭',cover:'擦眼淚','':'無'};
 function pickBackchannel(c,nurseText){
-  if(!azureReady()) return null;
+  if(!azureReady()||!getSettings().backchannel) return null;   // 預設關閉：多數情況下直接回答比較自然
+  if(nurseText.trim().length<12) return null;
+  if(pickBackchannel._last&&Date.now()-pickBackchannel._last<60000) return null;
+  pickBackchannel._last=Date.now();
   const q=/[嗎呢？?]$/.test(nurseText.trim());
   const pool=q?['嗯…','嗯。','這個喔…']:['嗯。','嗯嗯。','好。'];
-  if(Math.random()<0.35) return null; // 不是每句都有
+  if(Math.random()<0.6) return null; // 偶爾才有
   return pool[Math.floor(Math.random()*pool.length)];
 }
 
@@ -1744,7 +1749,7 @@ function buildPatientSystem(c){
 【扮演規則】
 1. 完全以第一人稱回應，真實扮演這個病患，絕不跳出角色、不解釋自己是AI。
 2. 用台灣人平常說話的自然語氣和用詞（例如「不好意思」「麻煩你」「醫生說…」「我是想說…」），像真人在病房裡講話。不要用書面語，不要用中國大陸用語（如「挺好的」「搞定」「打針兒」）。不要夾雜台語或方言字，不要堆疊語助詞（不要一直「喔」「啦」「唉唷」），文字會被朗讀出來，要念起來順。
-2-1. 回應必須針對護生那句話的內容，像真人一樣有來有往：被打招呼就回打招呼、被問名字就回答、被問痛不痛就說痛的情形。不要用「還好啦」「嗯」這種敷衍詞當開場，除非規則3說明你刻意在防衛。
+2-1. 不要用「嗯」「好」「喔」「嗯嗯」這類語助詞當句子的開頭；直接從內容開始說（例如護生問「睡得好嗎？」就回「沒有，差不多兩三點才睡著。」）。回應必須針對護生那句話的內容，像真人一樣有來有往：被打招呼就回打招呼、被問名字就回答、被問痛不痛就說痛的情形。不要用「還好啦」「嗯」這種敷衍詞當開場，除非規則3說明你刻意在防衛。
 2-2. 第一次見面的回應要合理，例如護生說「您好，我是護生○○」，你可以回「你好。」「好，麻煩你了。」
 2-3. 【先接話，再說自己的】每句回應的第一句必須直接承接護生剛說的內容（回答她的問題、回應她的關心、或對她說的話表達感受），之後才可以帶出自己想說的。不要自顧自地講和護生那句話無關的事。
 2-4. 【記得脈絡】記住這段會談前面說過什麼：護生已經問過的不要當作沒問過，自己已經說過的擔心不要原封不動再講一次；可以延續、深化，或帶出新的面向。
