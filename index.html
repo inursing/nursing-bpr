@@ -1390,8 +1390,8 @@ function toGemini(messages,system,maxTokens){
     generationConfig:{maxOutputTokens:maxTokens||1024,temperature:0.9}};
 }
 // 會談：快為主（flash-lite，約 1 秒）；報告：品質為主（可以慢）。逾時或錯誤自動換下一個模型。
-const GEMINI_CHAT_MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
-const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-2.5-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
+const GEMINI_CHAT_MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite','gemini-3.5-flash','gemini-3.7-flash'];
+const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
 let geminiModelOverride=null;
 function geminiModels(kind){ const st=getSettings(); const base=kind==='report'?GEMINI_REPORT_MODELS:GEMINI_CHAT_MODELS; const m=kind==='report'?base[0]:(geminiModelOverride||st.gModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
 function geminiUrl(model,method){ const st=getSettings(); const q=method.includes('stream')?'?alt=sse':''; if(proxyOn()) return `${st.proxyUrl}/gemini/${model}:${method}${q}`; return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${q?q+'&':'?'}key=${encodeURIComponent(st.gKey)}`; }
@@ -1760,7 +1760,7 @@ async function handleNurseSpeech(text){
   }catch(e){
     console.error(e);
     if(e&&e.code==='quota'){ toast(e.message,8000); bubble.textContent='（'+e.message+'）'; liveEl.querySelector('.bubble-ts').textContent=''; reply.done=true; curReply=null; isSpeaking=false; if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; } document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤'; setStatus('⚠ '+e.message); state.conversation.pop(); convHistory.pop(); return; }
-    toast('AI 回應失敗：'+(e.message||''));
+    { const m=String(e.message||''); toast(/quota|429/i.test(m)?'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費':/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
     response=fallbackPatientResponse(c,text);
   }
   if(gen!==convGen||reply.done) return;   // 已被護生打斷
