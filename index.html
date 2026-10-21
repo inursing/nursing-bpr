@@ -361,7 +361,10 @@ input[type=text]:focus{border-color:var(--primary)}
 .ts-chip:hover{border-color:var(--primary);color:var(--primary)}
 .ts-chip b{font-variant-numeric:tabular-nums;color:var(--primary)}
 #rec-video{width:100%;max-height:420px;background:#000;border-radius:8px}
-@media(max-width:720px){#review-stage{grid-template-columns:1fr}}
+@media(max-width:720px){#review-stage{grid-template-columns:1fr}#check-grid{grid-template-columns:1fr}}
+#stage.solo{grid-template-columns:1fr;max-width:640px;margin-left:auto;margin-right:auto}
+#stage.solo #cam-wrap{display:none}
+#rec-indicator{position:absolute;top:8px;right:10px;z-index:2;font-size:.72rem;color:#fff;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:12px}
 .rv-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;border-radius:10px;padding:2px}
 .rv-row.active{outline:2px solid var(--primary);background:var(--primary-light)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -446,6 +449,7 @@ input[type=text]:focus{border-color:var(--primary)}
           <div id="stage">
             <div class="stage-box" id="avatar-wrap">
               <div class="stage-label" id="avatar-label">病人</div>
+              <div id="rec-indicator" class="hidden"><span class="rec-dot"></span>錄影中</div>
               <div id="avatar-3d" style="position:absolute;inset:0"></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
             </div>
             <div class="stage-box" id="cam-wrap">
@@ -623,6 +627,24 @@ input[type=text]:focus{border-color:var(--primary)}
 </div>
 
 <div id="toast" role="status"></div>
+<div class="modal-overlay hidden" id="check-modal">
+  <div class="modal" style="max-width:720px">
+    <h2>會談前檢查</h2>
+    <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">請確認鏡頭能看到您的臉與上半身、麥克風有收到聲音，再開始會談。會談進行中畫面只會顯示病人，鏡頭會在背景持續錄影。</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="check-grid">
+      <div class="stage-box" style="background:#111"><div class="stage-label">鏡頭預覽</div><video id="check-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1)"></video><div id="check-cam-msg" style="position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:.85rem;text-align:center;padding:16px">正在開啟鏡頭…</div></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風音量</div><div class="progress-bar" style="height:12px"><div class="progress-fill" id="check-mic-fill" style="width:0%"></div></div><div id="check-mic-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px">請說幾句話，看音量條有沒有跳動。</div></div>
+        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 按下後說「我是護生」</button><div id="check-sr-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
+        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
+      </div>
+    </div>
+    <div class="row-actions" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="cancelCheck()">取消</button>
+      <button class="btn btn-primary" id="check-start-btn" onclick="confirmStartConv()">一切正常，開始會談 →</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="settings-modal" onclick="if(event.target.id==='settings-modal')this.classList.add('hidden')">
   <div class="modal">
     <button class="modal-close" onclick="document.getElementById('settings-modal').classList.add('hidden')">✕</button>
@@ -961,9 +983,58 @@ function startConv(){
   state.aiRecord=null;
   state.convStart=null;
   state.convDuration=0;
+  openCheck();
+}
+let checkMicCtx=null, checkMicRAF=null;
+async function openCheck(){
+  document.getElementById('check-modal').classList.remove('hidden');
+  document.getElementById('check-sr-msg').textContent=''; document.getElementById('check-voice-msg').textContent='';
+  // camera (shared stream, reused for recording)
+  const msg=document.getElementById('check-cam-msg');
+  if(!camStream){ await startCamera(); }
+  if(camStream){ const v=document.getElementById('check-video'); v.srcObject=camStream; msg.classList.add('hidden'); }
+  else { msg.textContent='鏡頭無法開啟：請在網址列允許鏡頭與麥克風後重新整理。沒有鏡頭也可以會談，但不會有錄影與表情分析。'; }
+  // mic level meter
+  try{
+    if(camStream&&camStream.getAudioTracks().length){
+      checkMicCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const src=checkMicCtx.createMediaStreamSource(camStream); const an=checkMicCtx.createAnalyser(); an.fftSize=512; src.connect(an);
+      const data=new Uint8Array(an.fftSize); let peak=0;
+      const tick=()=>{ an.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const x=(data[i]-128)/128; sum+=x*x;} const lvl=Math.min(1,Math.sqrt(sum/data.length)*4); peak=Math.max(peak*0.97,lvl);
+        document.getElementById('check-mic-fill').style.width=Math.round(lvl*100)+'%';
+        document.getElementById('check-mic-msg').textContent=peak>0.08?'✅ 有收到聲音':'請說幾句話，看音量條有沒有跳動。'; checkMicRAF=requestAnimationFrame(tick); };
+      tick();
+    } else document.getElementById('check-mic-msg').textContent='未取得麥克風。';
+  }catch(e){}
+}
+function closeCheck(){
+  document.getElementById('check-modal').classList.add('hidden');
+  if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null}
+  if(checkMicCtx){try{checkMicCtx.close()}catch(e){} checkMicCtx=null}
+  const v=document.getElementById('check-video'); if(v) v.srcObject=null;
+}
+function cancelCheck(){ closeCheck(); stopCamera(); }
+function confirmStartConv(){
+  closeCheck();
   document.getElementById('step-conv').classList.add('done');
   renderPhase('conv');
   initConvPhase();
+}
+function checkSpeech(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition; const m=document.getElementById('check-sr-msg');
+  if(!SR){ m.textContent='⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome 或 Safari。'; return; }
+  const r=new SR(); r.lang='zh-TW'; r.interimResults=false; m.textContent='🎤 聆聽中…';
+  r.onresult=e=>{ m.textContent='✅ 辨識到：「'+e.results[0][0].transcript+'」'; };
+  r.onerror=e=>{ m.textContent='辨識錯誤：'+e.error+(e.error==='not-allowed'?'（請允許麥克風）':''); };
+  r.onend=()=>{ if(m.textContent.startsWith('🎤')) m.textContent='沒有聽到聲音，請再試一次。'; };
+  try{ r.start(); }catch(e){ m.textContent='無法啟動辨識：'+e.message; }
+}
+async function checkVoice(){
+  const m=document.getElementById('check-voice-msg'); const c=getCase()||CASES[0]; ensureAudioCtx();
+  m.textContent='播放中…';
+  try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.textContent='✅ Azure 語音正常'; }
+       else { await browserSpeak('你好，我是今天住在這一床的病人。',c); m.textContent='✅ 使用瀏覽器內建語音（未設定 Azure）'; } }
+  catch(e){ m.textContent='⚠️ 語音失敗：'+(e.message||''); }
 }
 
 // ===== PHASE 3: CONVERSATION =====
@@ -1162,7 +1233,7 @@ async function startCamera(){
     recChunks=[]; recBlob=null;
     recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
     recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); };
-    recorder.start(1000); recStart=Date.now();
+    recorder.start(1000); recStart=Date.now(); updateRecIndicator();
     document.getElementById('cam-label').innerHTML='<span class="rec-dot"></span>錄影中';
   }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; }
 }
@@ -1171,6 +1242,7 @@ function camUnavailable(msg){
   off.innerHTML=`<div>${escHtml(msg)}</div><div style="font-size:.72rem;opacity:.75;margin-top:6px">不影響會談；仍可進行語音或文字會談。</div>`;
   toast(msg);
 }
+function updateRecIndicator(){ const el=document.getElementById('rec-indicator'); if(el) el.classList.toggle('hidden',!(recorder&&recorder.state==='recording')); }
 function stopCamera(){
   try{ if(recorder&&recorder.state!=='inactive') recorder.stop(); }catch(e){}
   try{ camStream&&camStream.getTracks().forEach(t=>t.stop()); }catch(e){}
@@ -1178,6 +1250,7 @@ function stopCamera(){
   const v=document.getElementById('cam-video'); if(v){v.srcObject=null;v.classList.add('hidden')}
   document.getElementById('cam-off').classList.remove('hidden');
   document.getElementById('cam-label').textContent='護生鏡頭';
+  updateRecIndicator();
 }
 function renderRecordingPlayback(){
   const card=document.getElementById('rec-card'); if(!card) return;
@@ -1222,7 +1295,9 @@ async function initConvPhase(){
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
   loadAvatarFor(c);
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
+  document.getElementById('stage').classList.add('solo');
   if(!camStream) startCamera();
+  updateRecIndicator();
   // Setup speech recognition
   setupRecognition();
   // Load sample
