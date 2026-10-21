@@ -170,6 +170,7 @@ textarea,input,select{font-family:inherit;font-size:inherit}
 .btn-record.recording{animation:pulse 1.2s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 12px rgba(220,38,38,.0)}}
 .btn-record.waiting{background:var(--accent)}
+.btn-record.on{background:var(--primary)}
 
 /* --- Form fields --- */
 label{font-size:.85rem;font-weight:500;color:var(--text2);display:block;margin-bottom:4px}
@@ -477,7 +478,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('end-confirm').classList.add('hidden')">繼續會談</button>
           </div>
           <div class="info-box info-warn" style="margin-top:12px;font-size:.8rem">
-            💡 點麥克風說話，病人會以語音、表情與動作回應。右側鏡頭會錄下您的表情與姿勢，會談結束後可在「回顧會談」同步回放。請允許麥克風與鏡頭權限。
+            💡 按一次麥克風後會持續聆聽：說完稍停一下就送出，病人說話時自動暫停、說完自動恢復；再按一次可暫停。建議戴耳機，避免病人的聲音被麥克風收進去。
           </div>
         </div>
         <div id="conv-side" class="hidden" style="margin-top:16px">
@@ -1447,6 +1448,7 @@ async function initConvPhase(){
   `;
   document.getElementById('conv-goals-display').textContent=state.goals;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  listenWanted=false; pendingFinal=''; document.getElementById('mic-btn').classList.remove('on','recording'); document.getElementById('mic-btn').textContent='🎤';
   state.convStart=null; state.convDuration=0;
   document.getElementById('timer-display').textContent='00:00'; document.getElementById('timer-fill').style.width='0%'; document.getElementById('timer-fill').classList.remove('done'); document.getElementById('timer-pct').textContent='最少10分鐘';
   document.getElementById('end-confirm').classList.add('hidden');
@@ -1466,22 +1468,24 @@ async function initConvPhase(){
   sampleFn=aiReady()?apiSample:null;
   if(!sampleFn) toast('尚未設定 AI 金鑰，病人將使用內建的簡單回應（右上角 ⚙ 設定）');
   // Welcome message
-  addBubble('system','💬 會談開始。請按麥克風向個案說話。',Date.now());
-  setStatus('按下麥克風開始說話');
+  addBubble('system','💬 會談開始。按一次麥克風開始聆聽，之後直接說話即可。',Date.now());
+  setStatus('按下麥克風開始聆聽');
   document.getElementById('end-conv-btn').disabled=true;
 }
 
+// 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
+let listenWanted=false, pendingFinal='', finalTimer=null;
 function setupRecognition(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){setStatus('⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome');return}
   recognition=new SR();
   recognition.lang='zh-TW';
-  recognition.continuous=false;
+  recognition.continuous=true;
   recognition.interimResults=true;
   recognition.onstart=()=>{
     isRecording=true;
     document.getElementById('mic-btn').classList.add('recording');
-    setStatus('🎤 正在聆聽…');
+    setStatus('🎤 聆聽中…說完稍停一下就會送出');
     startTimer();
   };
   recognition.onresult=(e)=>{
@@ -1491,27 +1495,38 @@ function setupRecognition(){
       else interim+=e.results[i][0].transcript;
     }
     document.getElementById('interim-text').textContent=interim||final;
-    if(final) handleNurseSpeech(final.trim());
+    if(final){
+      // 把短時間內連續的 final 片段合併成一句（避免被切成兩段）
+      pendingFinal+=final.trim();
+      clearTimeout(finalTimer);
+      finalTimer=setTimeout(()=>{ const t=pendingFinal.trim(); pendingFinal=''; if(t) handleNurseSpeech(t); },700);
+    }
   };
   recognition.onerror=(e)=>{
     isRecording=false;
     document.getElementById('mic-btn').classList.remove('recording');
-    if(e.error!=='aborted') setStatus('識別錯誤：'+e.error+'。請再試一次。');
+    if(e.error==='not-allowed'){ listenWanted=false; setStatus('麥克風權限被拒絕，請在網址列允許後重新整理'); }
+    else if(e.error!=='aborted'&&e.error!=='no-speech') setStatus('識別錯誤：'+e.error);
   };
   recognition.onend=()=>{
     isRecording=false;
     document.getElementById('mic-btn').classList.remove('recording');
     document.getElementById('interim-text').textContent='';
-    if(!isSpeaking) setStatus('按下麥克風說話');
+    // 瀏覽器會自行結束 continuous 聆聽；若仍要聆聽且病人沒在說話，就自動重啟
+    if(listenWanted&&!isSpeaking&&state.phase==='conv'){ setTimeout(()=>{ if(listenWanted&&!isSpeaking&&!isRecording) try{recognition.start();}catch(e){} },250); }
+    else if(!isSpeaking) setStatus(listenWanted?'（已暫停聆聽）':'按下麥克風開始聆聽');
   };
 }
+function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();}catch(e){} } }
+function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&!isSpeaking&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
 
 function toggleMic(){
   ensureAudioCtx();
   if(!recognition) setupRecognition();
-  if(isSpeaking) return;
-  if(isRecording){recognition.stop();return}
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
+  if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
+  listenWanted=true; document.getElementById('mic-btn').classList.add('on'); document.getElementById('mic-btn').textContent='⏸';
+  if(isSpeaking){ setStatus('病人說完後會自動開始聆聽'); return; }
   try{recognition.start();}catch(e){recognition.stop();setTimeout(()=>recognition.start(),300)}
 }
 
@@ -1549,7 +1564,7 @@ async function handleNurseSpeech(text){
   setTimeout(()=>{ const f1=captureNurseFrame(); if(f1) entry.frames.push(f1); },2500);
   convHistory.push({role:'user',content:`護生說：「${text}」`});
   setStatus('病人正在回應…');
-  isSpeaking=true;
+  isSpeaking=true; pauseListening();
   document.getElementById('mic-btn').classList.add('waiting');
   document.getElementById('mic-btn').textContent='⏳';
   const c=getCase();
@@ -1600,8 +1615,9 @@ async function handleNurseSpeech(text){
   document.getElementById('mic-btn').classList.remove('waiting');
   document.getElementById('mic-btn').textContent='🎤';
   document.getElementById('end-conv-btn').disabled=false;
-  setStatus('按下麥克風繼續說話');
+  setStatus(listenWanted?'病人說完後會自動繼續聆聽':'按下麥克風繼續說話');
   saveState();
+  if(!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) resumeListening();
 }
 const EXPR_ZH_OUT={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
 const GEST_ZH_OUT={nod:'點頭',down:'低頭',away:'別過頭',chest:'手按胸口',sigh:'嘆氣',wave:'揮手',shake:'搖頭',cover:'擦眼淚','':'無'};
@@ -1778,7 +1794,7 @@ class SentenceSpeaker{
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
       if(blob&&simli&&simli.ready) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
-    this.playing=false; }
+    this.playing=false; if(this.finished&&!this.cancelled&&!isSpeaking) resumeListening(); }
 }
 let _curExpr='neutral';
 function currentExprName(){ return _curExpr; }
@@ -1895,7 +1911,7 @@ function endConv(force){
     return;
   }
   document.getElementById('end-confirm').classList.add('hidden');
-  if(recognition) try{recognition.stop()}catch(e){}
+  listenWanted=false; if(recognition) try{recognition.stop()}catch(e){}
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   stopAudio(); stopMouth(); stopBlink(); stopCamera(); stopSimli();
