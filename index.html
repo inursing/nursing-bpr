@@ -636,7 +636,7 @@ input[type=text]:focus{border-color:var(--primary)}
         </select></div>
       <div id="prov-gemini">
         <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-2.5-flash"></div>
+        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.7-flash"></div>
         <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可，免費層不需信用卡。</div>
       </div>
       <div id="prov-anthropic" class="hidden">
@@ -653,6 +653,7 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>男性聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
         <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
       </div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
       <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
@@ -1011,12 +1012,9 @@ function loadAvatarFor(c){
   };
   tryLoad();
 }
-const DEFAULT_AVATARS={
-  f:'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb',
-  m:'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb'
-};
+const DEFAULT_AVATARS={ f:'./patient_f.glb', m:'./patient_m.glb' };
 // 最後備援：TalkingHead 專案附的 Ready Player Me 範例頭像（含 ARKit 表情與 visemes）
-const FALLBACK_AVATARS=['https://raw.githubusercontent.com/met4citizen/TalkingHead/main/avatars/brunette.glb','https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/brunette.glb'];
+const FALLBACK_AVATARS=['./patient_f2.glb','https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/brunette.glb'];
 
 // ===== SETTINGS / API =====
 const SET_KEY='bpr-settings-v2';
@@ -1025,7 +1023,7 @@ function openSettings(){
   const st=getSettings();
   document.getElementById('set-provider').value=st.provider||'gemini';
   document.getElementById('set-gkey').value=st.gKey||'';
-  document.getElementById('set-gmodel').value=st.gModel||'gemini-2.5-flash';
+  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.7-flash';
   toggleProviderFields();
   document.getElementById('set-apikey').value=st.apiKey||'';
   document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
@@ -1035,32 +1033,48 @@ function openSettings(){
   document.getElementById('set-az-region').value=st.azRegion||'';
   document.getElementById('set-az-vm').value=st.azVM||'';
   document.getElementById('set-az-vf').value=st.azVF||'';
+  document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
 }
 function toggleProviderFields(){ const p=document.getElementById('set-provider').value; document.getElementById('prov-gemini').classList.toggle('hidden',p!=='gemini'); document.getElementById('prov-anthropic').classList.toggle('hidden',p!=='anthropic'); }
 function aiReady(){ const st=getSettings(); return (st.provider||'gemini')==='gemini'?!!st.gKey:!!st.apiKey; }
+// 訊息格式：{role, content:string} 或 {role, parts:[{text}|{image:dataURL}]}
+function msgParts(m){ return m.parts||[{text:m.content}]; }
 function toGemini(messages,system,maxTokens){
   return {system_instruction:system?{parts:[{text:system}]}:undefined,
-    contents:messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),
+    contents:messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:msgParts(m).map(p=>p.image?{inline_data:{mime_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{text:p.text||''})})),
     generationConfig:{maxOutputTokens:maxTokens||1024,temperature:0.9}};
 }
+const GEMINI_FALLBACKS=['gemini-3.7-flash','gemini-3.8-flash','gemini-3.5-flash','gemini-2.5-flash','gemini-flash-latest'];
+let geminiModelOverride=null;
+function geminiModels(){ const st=getSettings(); const m=geminiModelOverride||st.gModel||'gemini-3.7-flash'; return [m,...GEMINI_FALLBACKS.filter(x=>x!==m)]; }
+async function geminiFetch(method,body){
+  const st=getSettings(); let lastErr=null;
+  for(const model of geminiModels()){
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${method.includes('stream')?'?alt=sse&':'?'}key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    if(res.ok){ if(model!==(st.gModel||'gemini-3.7-flash')){ geminiModelOverride=model; console.warn('Gemini 改用模型',model); } return res; }
+    let t=''; try{t=(await res.json()).error?.message||''}catch(e){}
+    lastErr=new Error('Gemini 錯誤 '+res.status+' '+t);
+    if(![404,429,503,400].includes(res.status)) break;   // 其他錯誤（如金鑰無效）不再換模型
+    if(res.status===400&&!/model/i.test(t)) break;
+  }
+  throw lastErr||new Error('Gemini 無法連線');
+}
 async function geminiSample(input,opts={}){
-  const st=getSettings(); const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${st.gModel||'gemini-2.5-flash'}:generateContent?key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(toGemini(messages,opts.system,opts.maxTokens))});
-  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('Gemini 錯誤 '+res.status+' '+t); }
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await geminiFetch('generateContent',toGemini(messages,opts.system,opts.maxTokens));
   const j=await res.json();
   return {text:(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('')};
 }
 async function geminiSampleStream(input,opts={}){
-  const st=getSettings(); const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${st.gModel||'gemini-2.5-flash'}:streamGenerateContent?alt=sse&key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(toGemini(messages,opts.system,opts.maxTokens))});
-  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('Gemini 錯誤 '+res.status+' '+t); }
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await geminiFetch('streamGenerateContent',toGemini(messages,opts.system,opts.maxTokens));
   const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
   while(true){
     const {value,done}=await reader.read(); if(done) break;
@@ -1077,7 +1091,7 @@ async function apiSample(input,opts={}){
   const st=getSettings();
   if((st.provider||'gemini')==='gemini'){ if(!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰（右上角 ⚙ 設定）'),{code:'no_key'}); return geminiSample(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰（右上角 ⚙ 設定）'),{code:'no_key'});
-  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -1117,6 +1131,15 @@ function saveBlob(filename,blob){
 
 // ===== CAMERA RECORDING =====
 let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null;
+function captureNurseFrame(){
+  try{
+    const v=document.getElementById('cam-video'); if(!camStream||!v||v.readyState<2||!v.videoWidth) return null;
+    const c=captureNurseFrame._c||(captureNurseFrame._c=document.createElement('canvas'));
+    const w=320, h=Math.round(320*v.videoHeight/v.videoWidth); c.width=w; c.height=h;
+    const ctx=c.getContext('2d'); ctx.translate(w,0); ctx.scale(-1,1); ctx.drawImage(v,0,0,w,h);
+    return c.toDataURL('image/jpeg',0.6);
+  }catch(e){ return null; }
+}
 async function startCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camUnavailable('此環境不支援鏡頭'); return; }
   try{
@@ -1274,8 +1297,10 @@ async function handleNurseSpeech(text){
   const ts=Date.now();
   addBubble('nurse',text,ts);
   playGesture('g-nod');
-  const entry={role:'nurse',text,ts};
+  const entry={role:'nurse',text,ts,frames:[]};
+  const f0=captureNurseFrame(); if(f0) entry.frames.push(f0);
   state.conversation.push(entry);
+  setTimeout(()=>{ const f1=captureNurseFrame(); if(f1) entry.frames.push(f1); },2500);
   convHistory.push({role:'user',content:`護生說：「${text}」`});
   setStatus('病人正在回應…');
   isSpeaking=true;
@@ -1764,12 +1789,21 @@ ${studentText||'（學生未填寫）'}
 技巧名稱請只使用以下清單：${TECHNIQUES.join('、')}。若護生的回應屬於非治療性（例如：不當保證、說教、改變話題、一次問多個問題、批判、忽略感受），請在技巧欄標示「非治療性：○○」。
 
 請直接輸出 HTML（不要 markdown、不要 <html>/<body> 標籤），結構如下：
-1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（依語句合理推測，前加「推測：」）｜病人語言反應（引用原文）｜病人非語言反應（依診斷、情境、語句合理推測）｜使用技巧（用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">）｜教師分析與建議（針對這一句：做得好的地方、病人反應透露什麼、可以怎麼說更好，並給一句示範語句）
+1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（若有提供該句的鏡頭畫面則依畫面描述並前加「畫面：」，否則依語句合理推測並前加「推測：」）｜病人語言反應（引用原文）｜病人非語言反應（依診斷、情境、語句合理推測）｜使用技巧（用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">）｜教師分析與建議（針對這一句：做得好的地方、病人反應透露什麼、可以怎麼說更好，並給一句示範語句）
 2. 一個 <h4>整體評估</h4> 段落，包含：會談整體優點（2-3點）、建議加強之處（2-3點）、會談目的達成程度、學生記憶版本與實際逐字稿的落差（若有）。
 
 全部使用繁體中文、台灣護理用語，稱呼對方為「病人」，不要用「案主」或「個案」。`;
 
-  const res=await sampleFn(prompt,{maxTokens:6000});
+  // 護生鏡頭截圖（每句最多 2 張，總數上限 40 張）
+  const parts=[{text:prompt}];
+  let nImg=0, k=0;
+  for(const m of state.conversation){ if(m.role!=='nurse') continue; k++;
+    const fr=(m.frames||[]).slice(0,2); if(!fr.length) continue;
+    parts.push({text:`\n[護生第${k}句「${m.text.slice(0,30)}」當下的鏡頭畫面，第一張是說話時、第二張是聽病人回應時]`});
+    for(const img of fr){ if(nImg>=40) break; parts.push({image:img}); nImg++; }
+  }
+  if(nImg){ parts.push({text:`\n以上共 ${nImg} 張護生的鏡頭畫面。請務必根據畫面描述每一句的「護生非語言反應」（眼神是否看著病人、表情、頭部動作、身體姿勢、手部），有畫面的句子不要寫「推測」，而是寫「畫面：…」；並在整體評估最後新增一段「非語言行為回饋」，具體指出做得好的和需要調整的（例如低頭看稿、面無表情、身體後仰、缺乏點頭回應）。`}); }
+  const res=await sampleFn(nImg?[{role:'user',parts}]:prompt,{maxTokens:6000});
   return res.text;
 }
 
@@ -1977,7 +2011,8 @@ function toast(msg){
 const SAVE_KEY='bpr-practice-v1';
 function saveState(){
   try{
-    const {phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections}=state;
+    const {phase,caseId,studentName,goals,plannedTech,convDuration,processRecord,reflections}=state;
+    const conversation=state.conversation.map(m=>{const {frames,...rest}=m; return rest;});
     localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections,savedAt:Date.now()}));
   }catch(e){}
 }
@@ -2026,6 +2061,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const EXPR={
   neutral:{},
@@ -2038,6 +2074,27 @@ const EXPR={
 };
 const VISEMES=['viseme_aa','viseme_O','viseme_E','viseme_I','viseme_U','viseme_PP','viseme_FF','viseme_DD'];
 // 手勢：骨骼目標角度（弧度）。載入您自己的頭像後若手部位置不自然，調整這裡的數值即可。
+let rigType='rpm', cal={rAy:-1,rFx:-1,lAy:1,lFx:-1};
+let GESTURES_T={};
+function buildTposeGestures(){
+  GESTURES_T={
+    nod:   {bones:{Head:{x:.28}}, hold:.35, loop:2, period:.55},
+    shake: {bones:{Head:{y:.22}}, hold:.3, loop:2, period:.5, alternate:true},
+    down:  {bones:{Head:{x:.42},Neck:{x:.12}}, hold:5},
+    away:  {bones:{Head:{y:-.55,z:.08},Neck:{y:-.15}}, hold:5},
+    chest: {bones:{RightArm:{y:1.2*cal.rAy},RightForeArm:{x:2.6*cal.rFx}}, hold:6},
+    cover: {bones:{RightArm:{y:1.3*cal.rAy},RightForeArm:{x:2.95*cal.rFx},Head:{x:.22}}, hold:5},
+    sigh:  {bones:{Spine2:{x:-.1},Head:{x:-.12}}, hold:.9, loop:1, period:1.6},
+    wave:  {bones:{LeftArm:{y:1.2*cal.lAy,x:-.6},LeftForeArm:{x:2.2*cal.lFx}}, hold:2.5}
+  };
+}
+// 試四種彎法，挑手掌最接近目標點的符號組合
+function calibrateArm(arm,fore,hand,target){
+  const A=bones[arm],F=bones[fore],H=bones[hand]; if(!A||!F||!H) return {ay:1,fx:1};
+  const a0=A.rotation.y, f0=F.rotation.x, v=new THREE.Vector3(); let best=null;
+  for(const ay of [1,-1]) for(const fx of [1,-1]){ A.rotation.y=a0+1.2*ay; F.rotation.x=f0+2.6*fx; model.updateMatrixWorld(true); H.getWorldPosition(v); const d=v.distanceTo(target); if(!best||d<best.d) best={d,ay,fx}; }
+  A.rotation.y=a0; F.rotation.x=f0; model.updateMatrixWorld(true); return best;
+}
 const GESTURES={
   nod:   {bones:{Head:{x:.28}},                       hold:.35, loop:2, period:.55},
   shake: {bones:{Head:{y:.22}},                       hold:.3,  loop:2, period:.5, alternate:true},
@@ -2057,7 +2114,7 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1
 container.appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(28,4/3,.1,20);
-camera.position.set(0,1.52,1.05); camera.lookAt(0,1.47,0);
+camera.position.set(0,1.5,1.1); camera.lookAt(0,1.44,0);
 scene.add(new THREE.HemisphereLight(0xffffff,0x8899aa,1.1));
 const key=new THREE.DirectionalLight(0xfff4e6,1.6); key.position.set(1.2,2.4,1.6); scene.add(key);
 const fill=new THREE.DirectionalLight(0xdbe9ff,.7); fill.position.set(-1.5,1.6,1); scene.add(fill);
@@ -2081,7 +2138,8 @@ function allMorphNames(){ const set=new Set(); morphMeshes.forEach(m=>Object.key
 async function load(url,opts={}){
   if(model){ scene.remove(model); model=null; }
   morphMeshes=[]; bones={}; baseRot={}; exprCur={}; exprTarget={};
-  const loader=new GLTFLoader();
+  gest=null; mouthLevel=null; mouthOn=false;
+  const loader=new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
   const sep=url.includes('?')?'&':'?';
   const full=(!/^https?:/i.test(url)||url.includes('morphTargets='))?url:url+sep+'morphTargets=ARKit,Oculus%20Visemes&textureSizeLimit=1024&textureFormat=png';
   const gltf=await loader.loadAsync(full).catch(e=>{throw new Error(e&&e.message?e.message:(e&&e.target&&e.target.status?('HTTP '+e.target.status):'無法下載模型（網路、CORS 或網址錯誤）'))});
@@ -2090,6 +2148,21 @@ async function load(url,opts={}){
     if(o.isMesh&&o.morphTargetDictionary){ morphMeshes.push(o); o.frustumCulled=false; }
     if(o.isBone){ bones[o.name]=o; baseRot[o.name]=o.rotation.clone(); }
   });
+  // T 字站姿的模型（手與肩同高）→ 先把手臂放下，再當作基準姿勢
+  const rh=bones['RightHand'], rs=bones['RightShoulder'], lh=bones['LeftHand'];
+  if(rh&&rs){ const a=new THREE.Vector3(), b=new THREE.Vector3(); rh.getWorldPosition(a); rs.getWorldPosition(b);
+    rigType='rpm';
+    if(Math.abs(a.y-b.y)<0.2){ rigType='tpose';
+      // 逐隻手臂試 +x / -x，取讓手掌最低（放下）的方向
+      const lower=(arm,hand)=>{ const A=bones[arm],H=bones[hand]; if(!A||!H) return; const v=new THREE.Vector3(); const base=A.rotation.x; let best=null;
+        for(const d of [1.25,-1.25]){ A.rotation.x=base+d; model.updateMatrixWorld(true); H.getWorldPosition(v); if(!best||v.y<best.y) best={d,y:v.y}; }
+        A.rotation.x=base+best.d; A.userData.restSign=Math.sign(best.d); };
+      lower('RightArm','RightHand'); lower('LeftArm','LeftHand');
+      model.updateMatrixWorld(true); for(const n in bones) baseRot[n]=bones[n].rotation.clone();
+      const sp=new THREE.Vector3(); (bones['Spine2']||bones['Spine1']||bones['Spine']).getWorldPosition(sp);
+      const r=calibrateArm('RightArm','RightForeArm','RightHand',new THREE.Vector3(sp.x-0.05,sp.y+0.25,sp.z+0.12));
+      const l=calibrateArm('LeftArm','LeftForeArm','LeftHand',new THREE.Vector3(sp.x+0.35,sp.y+0.45,sp.z+0.05));
+      cal={rAy:r.ay,rFx:r.fx,lAy:l.ay,lFx:l.fx}; buildTposeGestures(); } }
   // 將模型置中：以頭骨位置對齊鏡頭
   const head=bones['Head'];
   if(head){ const p=new THREE.Vector3(); head.getWorldPosition(p); model.position.y+= (1.5-p.y); model.position.x-=p.x; }
@@ -2104,7 +2177,9 @@ function setExpression(name){
 function startMouth(){ mouthOn=true; }
 function stopMouth(){ mouthOn=false; }
 function gesture(name){
-  const g=GESTURES[name]; if(!g) return;
+  const handsOn=(()=>{try{return !!JSON.parse(localStorage.getItem('bpr-settings-v2')||'{}').hands}catch(e){return false}})();
+  if(!handsOn){ name=({chest:'sigh',cover:'down',wave:'nod'})[name]||name; }
+  const g=(rigType==='tpose'?GESTURES_T:GESTURES)[name]; if(!g) return;
   gest={def:g,t:0,done:false};
 }
 
@@ -2170,7 +2245,7 @@ function animate(){
 const mouthMorph={};
 animate();
 
-window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;}};
+window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;},_boneNames:()=>Object.keys(bones),_setBones:(c)=>{gest={def:{bones:c,hold:9999},t:5,done:false}},_handY:()=>{const h=bones['RightHand'],sh=bones['RightShoulder'];if(!h||!sh)return null;const a=new THREE.Vector3(),b=new THREE.Vector3();h.getWorldPosition(a);sh.getWorldPosition(b);return {hand:a.toArray().map(v=>+v.toFixed(2)),shoulder:b.toArray().map(v=>+v.toFixed(2))}}};
 </script>
 
 </body>
