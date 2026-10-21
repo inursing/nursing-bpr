@@ -587,6 +587,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <input type="range" id="review-seek" min="0" max="100" value="0" step="0.1" style="flex:1" oninput="replaySeek(+this.value)">
           </div>
           <label class="check-item" style="margin:0"><input type="checkbox" id="review-tts" checked> 播放病人語音</label>
+          <span id="review-gtts-msg" style="font-size:.75rem;color:var(--text2)"></span>
           <button class="btn btn-outline btn-sm" id="review-dl-btn" onclick="downloadRecording()">⬇ 下載錄影</button>
         </div>
       </div>
@@ -1537,29 +1538,57 @@ function buildSSML(text,c,expr){
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-TW"><voice name="${voice}">${useStyle?`<mstts:express-as style="${STYLE_MAP[expr]||'calm'}">${inner}</mstts:express-as>`:inner}</voice></speak>`;
 }
 const azCache=new Map();
+// 回傳 {blob, visemes:[{t,id}]}；有 SDK 時用 SDK 取得音素時間（嘴型精準），否則 REST
+function azureSynthSDK(text,c,expr){
+  return new Promise((resolve,reject)=>{
+    const st=getSettings();
+    const cfg=SpeechSDK.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
+    cfg.speechSynthesisOutputFormat=SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+    const syn=new SpeechSDK.SpeechSynthesizer(cfg,null);
+    const visemes=[];
+    syn.visemeReceived=(sdr,e)=>{ visemes.push({t:e.audioOffset/10000000,id:e.visemeId}); };
+    syn.speakSsmlAsync(buildSSML(text,c,expr),r=>{
+      syn.close();
+      if(r.reason===SpeechSDK.ResultReason.SynthesizingAudioCompleted) resolve({blob:new Blob([r.audioData],{type:'audio/mpeg'}),visemes});
+      else reject(new Error('Azure 語音失敗：'+(r.errorDetails||r.reason)));
+    },err=>{ syn.close(); reject(new Error('Azure 語音失敗：'+err)); });
+  });
+}
 async function azureSynth(text,c,expr){
   const st=getSettings(); const key=azureVoiceFor(c)+'|'+expr+'|'+text;
   if(azCache.has(key)) return azCache.get(key);
-  const res=await fetch(`https://${st.azRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,{
-    method:'POST',headers:{'Ocp-Apim-Subscription-Key':st.azKey,'Content-Type':'application/ssml+xml','X-Microsoft-OutputFormat':'audio-24khz-48kbitrate-mono-mp3','User-Agent':'nursing-bpr'},
-    body:buildSSML(text,c,expr)});
-  if(!res.ok) throw new Error('Azure 語音 '+res.status);
-  const blob=await res.blob(); if(azCache.size>60) azCache.delete(azCache.keys().next().value); azCache.set(key,blob); return blob;
+  let out;
+  if(window.SpeechSDK){ try{ out=await azureSynthSDK(text,c,expr); }catch(e){ console.warn(e); } }
+  if(!out){
+    const res=await fetch(`https://${st.azRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,{
+      method:'POST',headers:{'Ocp-Apim-Subscription-Key':st.azKey,'Content-Type':'application/ssml+xml','X-Microsoft-OutputFormat':'audio-24khz-48kbitrate-mono-mp3','User-Agent':'nursing-bpr'},
+      body:buildSSML(text,c,expr)});
+    if(!res.ok) throw new Error('Azure 語音 '+res.status);
+    out={blob:await res.blob(),visemes:null};
+  }
+  if(azCache.size>60) azCache.delete(azCache.keys().next().value); azCache.set(key,out); return out;
 }
+// Azure viseme id → Oculus viseme 名稱
+const AZ_VISEME=['viseme_sil','viseme_aa','viseme_aa','viseme_O','viseme_E','viseme_RR','viseme_I','viseme_U','viseme_O','viseme_aa','viseme_O','viseme_aa','viseme_kk','viseme_RR','viseme_nn','viseme_SS','viseme_CH','viseme_TH','viseme_FF','viseme_DD','viseme_kk','viseme_PP'];
 // 音訊播放 + 以音量驅動嘴型
 let audioCtx=null, analyser=null, curAudio=null, mouthRAF=null;
 function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); }
 function stopAudio(){ if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
-function playBlob(blob){
+function playBlob(blobOrObj,hint){
+  const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj; const visemes=blobOrObj&&blobOrObj.visemes||null;
   return new Promise((resolve)=>{
     ensureAudioCtx();
     const a=new Audio(URL.createObjectURL(blob)); curAudio=a;
+    let vi=0;
+    if(window.Avatar3D) Avatar3D.setSpeakHint(hint||null);
     let src=null;
     try{ if(audioCtx){ src=audioCtx.createMediaElementSource(a); src.connect(analyser); } }catch(e){}
     const data=new Uint8Array(analyser?analyser.fftSize:0);
-    const tick=()=>{ if(curAudio!==a) return; let lvl=0; if(analyser){ analyser.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const v=(data[i]-128)/128; sum+=v*v;} lvl=Math.min(1,Math.sqrt(sum/data.length)*6); } if(window.Avatar3D) Avatar3D.setMouthLevel(lvl); mouthRAF=requestAnimationFrame(tick); };
+    const tick=()=>{ if(curAudio!==a) return; let lvl=0; if(analyser){ analyser.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const v=(data[i]-128)/128; sum+=v*v;} lvl=Math.min(1,Math.sqrt(sum/data.length)*6); }
+      if(window.Avatar3D){ Avatar3D.setMouthLevel(lvl); if(visemes&&visemes.length){ const t=a.currentTime+0.04; while(vi<visemes.length-1&&visemes[vi+1].t<=t) vi++; Avatar3D.setViseme(AZ_VISEME[visemes[vi].id]||null); } }
+      mouthRAF=requestAnimationFrame(tick); };
     a.onplay=()=>{ if(!analyser) startMouth(); tick(); };
-    const done=()=>{ if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} if(window.Avatar3D) Avatar3D.setMouthLevel(null); stopMouth(); URL.revokeObjectURL(a.src); if(curAudio===a) curAudio=null; resolve(); };
+    const done=()=>{ if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} if(window.Avatar3D){ Avatar3D.setMouthLevel(null); Avatar3D.setViseme(null); Avatar3D.setSpeakHint(null);} stopMouth(); URL.revokeObjectURL(a.src); if(curAudio===a) curAudio=null; resolve(); };
     a.onended=done; a.onerror=done;
     a.play().catch(()=>{ done(); });
   });
@@ -1572,7 +1601,7 @@ class SentenceSpeaker{
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
-      if(blob) await playBlob(blob); else await browserSpeak(item.t,this.c); }
+      if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
     this.playing=false; }
 }
 let _curExpr='neutral';
@@ -1602,6 +1631,47 @@ function speakTTS(text){
 async function speakBackchannel(t){
   const c=getCase(); if(!azureReady()) return;
   try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; await playBlob(blob); }catch(e){}
+}
+// ===== 回放用：Gemini 情緒語音（會談結束後背景合成） =====
+const gttsCache=new Map(); let gttsJob=null;
+function gttsDirection(c,expr){
+  const mood={sad:'sad, subdued, slightly tearful',anxious:'anxious, uneasy, a bit hurried',pain:'in physical pain, strained, pausing to wince',angry:'irritated and defensive',tired:'exhausted, breathy, slow',smile:'relieved, gently warm',neutral:'calm, quiet'}[expr||'neutral'];
+  const age=c.age>=70?'elderly':c.age>=55?'middle-aged':'adult';
+  return `Voice direction: a ${age} Taiwanese ${c.gender==='女'?'woman':'man'} (${c.age} years old) lying in a hospital bed, ${c.dx}. Mood: ${mood}. Natural conversational Taiwanese Mandarin, not announcer-like. Speak ONLY the following line, nothing else:\n`;
+}
+async function geminiTTS(text,c,expr){
+  const st=getSettings(); if(!st.gKey) throw new Error('no gemini key');
+  const voice=c.gender==='女'?'Kore':'Charon';
+  const body={contents:[{parts:[{text:gttsDirection(c,expr)+text.replace(/[（(][^）)]*[）)]/g,'')}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}};
+  let lastErr;
+  for(const model of ['gemini-3.8-flash-lite-tts','gemini-3.8-flash-tts','gemini-2.5-flash-preview-tts']){
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ lastErr=new Error('Gemini TTS '+r.status); if([404,429,503].includes(r.status)) continue; throw lastErr; }
+    const j=await r.json(); const p=j.candidates?.[0]?.content?.parts?.find(p=>p.inlineData); if(!p) throw new Error('no audio');
+    const b=atob(p.inlineData.data); const u8=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u8[i]=b.charCodeAt(i);
+    let blob;
+    if(b.startsWith('RIFF')) blob=new Blob([u8],{type:'audio/wav'});
+    else { const rate=parseInt((p.inlineData.mimeType.match(/rate=(\d+)/)||[])[1]||'24000'); const wav=new ArrayBuffer(44+u8.length); const dv=new DataView(wav); const W=(o,str)=>{for(let i=0;i<str.length;i++)dv.setUint8(o+i,str.charCodeAt(i))};
+      W(0,'RIFF');dv.setUint32(4,36+u8.length,true);W(8,'WAVE');W(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,rate,true);dv.setUint32(28,rate*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);W(36,'data');dv.setUint32(40,u8.length,true);new Uint8Array(wav,44).set(u8); blob=new Blob([wav],{type:'audio/wav'}); }
+    return blob;
+  }
+  throw lastErr||new Error('Gemini TTS 失敗');
+}
+function gttsProgress(){ const el=document.getElementById('review-gtts-msg'); if(!el) return; const total=state.conversation.filter(m=>m.role==='patient').length; const done=state.conversation.filter((m,i)=>m.role==='patient'&&gttsCache.has(i)).length; el.textContent=total?(done>=total?'✅ 情緒語音已就緒':`情緒語音準備中 ${done}/${total}（未完成的句子先用一般語音）`):''; }
+async function prepareEmotionalVoices(){
+  if(!getSettings().gKey||gttsJob) return; const c=getCase(); if(!c) return;
+  gttsJob=(async()=>{
+    for(let i=0;i<state.conversation.length;i++){ const m=state.conversation[i]; if(m.role!=='patient'||gttsCache.has(i)) continue;
+      try{ gttsCache.set(i,await geminiTTS(m.text,c,m.expr)); }catch(e){ console.warn('Gemini TTS',e.message); if(/429/.test(e.message)) await new Promise(r=>setTimeout(r,8000)); }
+      gttsProgress(); await new Promise(r=>setTimeout(r,1500)); }
+    gttsJob=null; gttsProgress();
+  })();
+}
+async function speakPatientLine(e){
+  stopAudio(); window.speechSynthesis&&speechSynthesis.cancel();
+  const blob=gttsCache.get(e.i);
+  if(blob){ SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); await playBlob(blob,/[？?]\s*$/.test(e.text)?'question':'statement'); }
+  else speakTTS(e.text);
 }
 async function testAzureVoice(){
   saveSettings(); openSettings();
@@ -1652,6 +1722,7 @@ function endConv(force){
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   stopAudio(); stopMouth(); stopBlink(); stopCamera();
+  gttsCache.clear(); prepareEmotionalVoices();
   addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
   buildProcessRecord();
   document.getElementById('step-record').classList.add('done');
@@ -1976,6 +2047,7 @@ const replay={events:[],base:0,duration:0,playing:false,timer:null,clockStart:0,
 function fmtSec(sec){sec=Math.max(0,Math.round(sec));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 function renderReviewPhase(){
   document.getElementById('step-review').classList.add('done');
+  prepareEmotionalVoices(); setTimeout(gttsProgress,50);
   replayStop();
   const c=getCase(); const conv=state.conversation;
   const hasVideo=(typeof recBlob!=='undefined')&&!!recBlob&&!!recStart;
@@ -2061,7 +2133,7 @@ function replayTick(sec){
     highlightRow(e.i); showSubtitle(e);
     if(e.role==='patient'){
       setExpression(e.expr||'neutral'); if(e.gest) playGesture(e.gest);
-      if(document.getElementById('review-tts').checked) speakTTS(e.text);
+      if(document.getElementById('review-tts').checked) speakPatientLine(e);
     } else { playGesture(GEST_MAP['點頭']||'nod'); }
   }
 }
@@ -2137,6 +2209,7 @@ renderResumeBanner();
 if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices(); window.speechSynthesis.getVoices(); }
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
@@ -2162,7 +2235,7 @@ function buildTposeGestures(){
   GESTURES_T={
     nod:   {bones:{Head:{x:.28}}, hold:.35, loop:2, period:.55},
     shake: {bones:{Head:{y:.22}}, hold:.3, loop:2, period:.5, alternate:true},
-    down:  {bones:{Head:{x:.42},Neck:{x:.12}}, hold:5},
+    down:  {bones:{Head:{x:.3},Neck:{x:.08}}, hold:4},
     away:  {bones:{Head:{y:-.55,z:.08},Neck:{y:-.15}}, hold:5},
     chest: {bones:{RightArm:{y:1.2*cal.rAy},RightForeArm:{x:2.6*cal.rFx}}, hold:6},
     cover: {bones:{RightArm:{y:1.3*cal.rAy},RightForeArm:{x:2.95*cal.rFx},Head:{x:.22}}, hold:5},
@@ -2204,6 +2277,9 @@ const rim=new THREE.DirectionalLight(0xffffff,.5); rim.position.set(0,2,-2); sce
 
 let model=null, morphMeshes=[], bones={}, baseRot={};
 let exprTarget={}, exprCur={}, mouthOn=false, visemeCur=null, visemeNext=0, blinkAt=2, blinkPhase=0, mouthLevel=null, mouthSmooth=0;
+let exprName='neutral', visemeOverride=null, speakHint=null, gaze={x:0,y:0,tx:0,ty:0,next:1.5}, micro={t:0,next:3,active:null,until:0}, blinkLen=.22;
+const HEAD_POSE={neutral:{},sad:{x:.08,z:.05},anxious:{x:-.03,y:.04},pain:{x:.06,z:-.05},angry:{x:-.06},tired:{x:.1,z:.03},smile:{z:.04}};
+const GAZE_MORPHS=['eyeLookUpLeft','eyeLookUpRight','eyeLookDownLeft','eyeLookDownRight','eyeLookInLeft','eyeLookInRight','eyeLookOutLeft','eyeLookOutRight'];
 let gest=null, clock=new THREE.Clock();
 
 function resize(){
@@ -2254,8 +2330,13 @@ async function load(url,opts={}){
 }
 
 function setExpression(name){
-  exprTarget=Object.assign({},EXPR[name]||{});
+  exprName=name||'neutral';
+  const e=EXPR[exprName]||{}; exprTarget={}; for(const k in e) exprTarget[k]=Math.min(1,e[k]*1.25);
+  blinkLen=exprName==='tired'?.4:.22;
+  micro.next=1+Math.random()*2;
 }
+function setViseme(n){ visemeOverride=n; }
+function setSpeakHint(h){ speakHint=h; }
 function startMouth(){ mouthOn=true; }
 function stopMouth(){ mouthOn=false; }
 function gesture(name){
@@ -2277,22 +2358,45 @@ function animate(){
       const tgt=exprTarget[k]||0; const cur=exprCur[k]||0;
       exprCur[k]=lerp(cur,tgt,1-Math.pow(.001,dt));
     }
-    // blink
+    // blink（疲憊時較慢較頻繁）
     blinkAt-=dt;
-    if(blinkAt<=0){ blinkPhase=.22; blinkAt=2.2+Math.random()*3; }
+    if(blinkAt<=0){ blinkPhase=blinkLen; blinkAt=(exprName==='tired'?1.6:2.2)+Math.random()*3; }
     let blink=0;
-    if(blinkPhase>0){ blinkPhase-=dt; blink=Math.sin(Math.PI*Math.max(0,blinkPhase)/.22); }
+    if(blinkPhase>0){ blinkPhase-=dt; blink=Math.sin(Math.PI*Math.max(0,blinkPhase)/blinkLen); }
+    // 情緒性小動作（難過：垂眼＋眉心上揚；疼痛：皺眉抽動；焦慮：眼神飄移＋睜眼）
+    micro.next-=dt; const add={};
+    if(micro.active&&t<micro.until){ Object.assign(add,micro.active); }
+    else if(micro.next<=0){
+      micro.next=3+Math.random()*5; micro.until=t+(exprName==='pain'?.6:1.4);
+      micro.active=exprName==='sad'?{browInnerUp:.2}:exprName==='pain'?{eyeSquintLeft:.25,eyeSquintRight:.25,browDownLeft:.2,browDownRight:.2,noseSneerLeft:.15,noseSneerRight:.15}:exprName==='anxious'?{eyeWideLeft:.2,eyeWideRight:.2}:exprName==='angry'?{mouthPressLeft:.2,mouthPressRight:.2}:null;
+      if(exprName==='sad'){ gaze.tx=0; gaze.ty=-.6; gaze.next=1.6; }
+      if(exprName==='anxious'){ gaze.tx=(Math.random()<.5?-1:1)*.6; gaze.ty=0; gaze.next=.8; }
+    }
+    if(speakHint==='question'){ add.browInnerUp=(add.browInnerUp||0)+.22; }
     for(const k of EXPR_KEYS){
-      let v=exprCur[k];
+      let v=Math.min(1,(exprCur[k]||0)+(add[k]||0));
       if(k==='eyeBlinkLeft'||k==='eyeBlinkRight') v=Math.max(v,blink);
       setMorph(k,v);
     }
+    // 眼神：平時看向鏡頭（護生），偶爾小幅飄移
+    gaze.next-=dt;
+    if(gaze.next<=0){ gaze.next=2+Math.random()*3; gaze.tx=(Math.random()-.5)*.3; gaze.ty=(Math.random()-.5)*.2; if(exprName==='sad'&&Math.random()<.5){gaze.ty=-.5;} }
+    if(gest&&gest.def&&gest.def.bones.Head&&gest.def.bones.Head.y){ gaze.tx=-.7; }
+    gaze.x=lerp(gaze.x,gaze.tx,1-Math.pow(.02,dt)); gaze.y=lerp(gaze.y,gaze.ty,1-Math.pow(.02,dt));
+    setMorph('eyeLookUpLeft',Math.max(0,gaze.y)); setMorph('eyeLookUpRight',Math.max(0,gaze.y));
+    setMorph('eyeLookDownLeft',Math.max(0,-gaze.y)); setMorph('eyeLookDownRight',Math.max(0,-gaze.y));
+    setMorph('eyeLookOutLeft',Math.max(0,gaze.x)); setMorph('eyeLookInRight',Math.max(0,gaze.x));
+    setMorph('eyeLookInLeft',Math.max(0,-gaze.x)); setMorph('eyeLookOutRight',Math.max(0,-gaze.x));
     // mouth / visemes
     if(mouthLevel!==null){
       mouthSmooth=lerp(mouthSmooth,mouthLevel,1-Math.pow(.0001,dt));
-      visemeNext-=dt; if(visemeNext<=0){ visemeCur=VISEMES[Math.floor(Math.random()*VISEMES.length)]; visemeNext=.08+Math.random()*.08; }
-      for(const v of VISEMES){ const cur=mouthMorph[v]||0; mouthMorph[v]=lerp(cur,v===visemeCur?mouthSmooth*.9:0,1-Math.pow(.0005,dt)); setMorph(v,mouthMorph[v]); }
-      const jaw=lerp(mouthMorph.jaw||0,mouthSmooth*.55,1-Math.pow(.0003,dt)); mouthMorph.jaw=jaw;
+      if(visemeOverride){ visemeCur=visemeOverride==='viseme_sil'?null:visemeOverride; }
+      else { visemeNext-=dt; if(visemeNext<=0){ visemeCur=VISEMES[Math.floor(Math.random()*VISEMES.length)]; visemeNext=.08+Math.random()*.08; } }
+      const ALLV=['viseme_aa','viseme_O','viseme_E','viseme_I','viseme_U','viseme_PP','viseme_FF','viseme_DD','viseme_RR','viseme_kk','viseme_nn','viseme_SS','viseme_CH','viseme_TH'];
+      const amp=visemeOverride?Math.max(mouthSmooth,.45):mouthSmooth;
+      for(const v of ALLV){ const cur=mouthMorph[v]||0; mouthMorph[v]=lerp(cur,v===visemeCur?amp*.95:0,1-Math.pow(.0003,dt)); setMorph(v,mouthMorph[v]); }
+      const openV=visemeCur==='viseme_aa'||visemeCur==='viseme_O'||visemeCur==='viseme_E';
+      const jaw=lerp(mouthMorph.jaw||0,(openV?.5:.25)*Math.max(mouthSmooth,visemeOverride?.5:0),1-Math.pow(.0003,dt)); mouthMorph.jaw=jaw;
       setMorph('jawOpen',Math.max(exprCur.jawOpen||0,jaw));
     } else if(mouthOn){
       visemeNext-=dt;
@@ -2301,11 +2405,12 @@ function animate(){
       const jaw=lerp(mouthMorph.jaw||0,(visemeCur==='viseme_aa'||visemeCur==='viseme_O')?.35:.12,1-Math.pow(.0005,dt)); mouthMorph.jaw=jaw;
       setMorph('jawOpen',Math.max(exprCur.jawOpen||0,jaw));
     } else {
-      for(const v of VISEMES){ const cur=mouthMorph[v]||0; if(cur>0.001){ mouthMorph[v]=lerp(cur,0,1-Math.pow(.001,dt)); setMorph(v,mouthMorph[v]); } }
+      for(const v of Object.keys(mouthMorph)){ if(v==='jaw') continue; const cur=mouthMorph[v]||0; if(cur>0.001){ mouthMorph[v]=lerp(cur,0,1-Math.pow(.001,dt)); setMorph(v,mouthMorph[v]); } }
       mouthMorph.jaw=lerp(mouthMorph.jaw||0,0,1-Math.pow(.001,dt));
     }
     // idle motion + gestures (bones)
-    const idle={Head:{x:Math.sin(t*.6)*.025,y:Math.sin(t*.37)*.05,z:Math.sin(t*.45)*.015},Spine2:{x:Math.sin(t*1.1)*.012},Spine1:{x:Math.sin(t*1.1)*.01}};
+    const hp=HEAD_POSE[exprName]||{}; const spk=(mouthLevel!==null)?mouthSmooth:0;
+    const idle={Head:{x:Math.sin(t*.6)*.025+(hp.x||0)+spk*.05+(speakHint==='question'?-.05:0),y:Math.sin(t*.37)*.05+(hp.y||0),z:Math.sin(t*.45)*.015+(hp.z||0)+Math.sin(t*2.3)*spk*.02},Spine2:{x:Math.sin(t*1.1)*.012+spk*.015},Spine1:{x:Math.sin(t*1.1)*.01}};
     const target={};
     for(const b in idle) target[b]=Object.assign({},idle[b]);
     if(gest){
@@ -2327,7 +2432,7 @@ function animate(){
 const mouthMorph={};
 animate();
 
-window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;},_boneNames:()=>Object.keys(bones),_setBones:(c)=>{gest={def:{bones:c,hold:9999},t:5,done:false}},_handY:()=>{const h=bones['RightHand'],sh=bones['RightShoulder'];if(!h||!sh)return null;const a=new THREE.Vector3(),b=new THREE.Vector3();h.getWorldPosition(a);sh.getWorldPosition(b);return {hand:a.toArray().map(v=>+v.toFixed(2)),shoulder:b.toArray().map(v=>+v.toFixed(2))}}};
+window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setViseme,setSpeakHint,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;},_boneNames:()=>Object.keys(bones),_setBones:(c)=>{gest={def:{bones:c,hold:9999},t:5,done:false}},_handY:()=>{const h=bones['RightHand'],sh=bones['RightShoulder'];if(!h||!sh)return null;const a=new THREE.Vector3(),b=new THREE.Vector3();h.getWorldPosition(a);sh.getWorldPosition(b);return {hand:a.toArray().map(v=>+v.toFixed(2)),shoulder:b.toArray().map(v=>+v.toFixed(2))}}};
 </script>
 
 </body>
