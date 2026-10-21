@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1a6fa3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="行為過程紀錄">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjMWE2ZmEzIi8+PHRleHQgeD0iOTYiIHk9IjEyNCIgZm9udC1zaXplPSI5NiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+PpTwvdGV4dD48L3N2Zz4=">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjMWE2ZmEzIi8+PHRleHQgeD0iOTYiIHk9IjEyNCIgZm9udC1zaXplPSI5NiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+PpTwvdGV4dD48L3N2Zz4=">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIuihjOeCuumBjueoi+e0gOmMhOe3tOe/kuW5s+WPsCIsICJzaG9ydF9uYW1lIjogIuihjOeCuumBjueoi+e0gOmMhCIsICJzdGFydF91cmwiOiAiLi9pbmRleC5odG1sIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmMGY0ZjgiLCAidGhlbWVfY29sb3IiOiAiIzFhNmZhMyIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeE9USWdNVGt5SWo0OGNtVmpkQ0IzYVdSMGFEMGlNVGt5SWlCb1pXbG5hSFE5SWpFNU1pSWdjbmc5SWpRd0lpQm1hV3hzUFNJak1XRTJabUV6SWk4K1BIUmxlSFFnZUQwaU9UWWlJSGs5SWpFeU5DSWdabTl1ZEMxemFYcGxQU0k1TmlJZ2RHVjRkQzFoYm1Ob2IzSTlJbTFwWkdSc1pTSSs4SitQcFR3dmRHVjRkRDQ4TDNOMlp6ND0iLCAic2l6ZXMiOiAiMTkyeDE5MiIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLCAicHVycG9zZSI6ICJhbnkifV19">
+
+<style>:root{color-scheme:light dark}body{margin:0;font-family:system-ui,sans-serif;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>行為過程紀錄練習 V2（3D 擬真病人）</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@600&display=swap">
+<style>
+/* === TOKENS ===
+   Layout: stepped wizard, left sidebar case info + right main work area */
+:root {
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --surface2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text2: #64748b;
+  --primary: #1a6fa3;
+  --primary-light: #dbeafe;
+  --primary-dark: #155e8a;
+  --accent: #0e9f6e;
+  --accent-light: #d1fae5;
+  --warn: #d97706;
+  --warn-light: #fef3c7;
+  --danger: #dc2626;
+  --danger-light: #fee2e2;
+  --nurse-bubble: #dbeafe;
+  --patient-bubble: #f1f5f9;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+  --shadow: 0 4px 16px rgba(0,0,0,.1);
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #162032;
+    --border: #334155; --text: #f1f5f9; --text2: #94a3b8;
+    --primary: #3b82f6; --primary-light: #1e3a5f; --primary-dark: #60a5fa;
+    --accent: #10b981; --accent-light: #064e3b;
+    --warn: #fbbf24; --warn-light: #451a03;
+    --danger: #f87171; --danger-light: #450a0a;
+    --nurse-bubble: #1e3a5f; --patient-bubble: #263344;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.3); --shadow: 0 4px 16px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f172a; --surface: #1e293b; --surface2: #162032;
+  --border: #334155; --text: #f1f5f9; --text2: #94a3b8;
+  --primary: #3b82f6; --primary-light: #1e3a5f; --primary-dark: #60a5fa;
+  --accent: #10b981; --accent-light: #064e3b;
+  --warn: #fbbf24; --warn-light: #451a03;
+  --danger: #f87171; --danger-light: #450a0a;
+  --nurse-bubble: #1e3a5f; --patient-bubble: #263344;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3); --shadow: 0 4px 16px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Noto Sans TC',system-ui,sans-serif; font-size:15px;
+  padding-left:max(0px,env(safe-area-inset-left,0px));
+  padding-right:max(0px,env(safe-area-inset-right,0px));
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+h1,h2,h3,h4{font-family:'Noto Serif TC',serif; font-weight:600; margin:0}
+h1{font-size:1.5rem}h2{font-size:1.25rem}h3{font-size:1.05rem}h4{font-size:.95rem}
+p{margin:.5em 0}
+a{color:var(--primary)}
+button{cursor:pointer;font-family:inherit}
+textarea,input,select{font-family:inherit;font-size:inherit}
+
+/* --- Layout --- */
+#app{min-height:100%;display:flex;flex-direction:column}
+#topbar{
+  background:var(--primary); color:#fff;
+  padding:14px max(16px,env(safe-area-inset-left,0px));
+  padding-top:max(14px,env(safe-area-inset-top,0px));
+  display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:100;
+  box-shadow:var(--shadow-sm);
+}
+#topbar h1{font-size:1.1rem;color:#fff;flex:1}
+#topbar .sub{font-size:.8rem;opacity:.75;margin-top:2px}
+.logo{background:rgba(255,255,255,.2);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;font-size:1.3rem;flex-shrink:0}
+
+/* --- Steps indicator --- */
+#steps{
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 max(16px,env(safe-area-inset-left,0px));
+  display:flex;overflow-x:auto;gap:0;
+  position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:90;
+}
+.step{
+  padding:12px 16px;font-size:.8rem;white-space:nowrap;
+  color:var(--text2);border-bottom:3px solid transparent;cursor:default;
+  display:flex;align-items:center;gap:6px;
+}
+.step.done{color:var(--accent);cursor:pointer}
+.step.done:hover{background:var(--surface2)}
+.step.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:700}
+.step-num{
+  width:20px;height:20px;border-radius:50%;
+  background:var(--border);color:var(--text2);
+  font-size:.7rem;display:grid;place-items:center;flex-shrink:0;
+}
+.step.done .step-num{background:var(--accent-light);color:var(--accent)}
+.step.active .step-num{background:var(--primary);color:#fff}
+
+/* --- Main content --- */
+#main{flex:1;padding:20px max(16px,env(safe-area-inset-left,0px));max-width:1100px;margin:0 auto;width:100%}
+
+/* --- Cards --- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow-sm)}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.case-card{cursor:pointer;transition:box-shadow .15s,transform .15s;position:relative}
+.case-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.case-card.selected{border-color:var(--primary);background:var(--primary-light)}
+.dept-badge{
+  display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;
+}
+.dept-cardio{background:#fee2e2;color:#991b1b}
+.dept-endo{background:#fef3c7;color:#92400e}
+.dept-resp{background:#dbeafe;color:#1e40af}
+.dept-onco{background:#f3e8ff;color:#6b21a8}
+.dept-ortho{background:#d1fae5;color:#065f46}
+.dept-surg{background:#e0f2fe;color:#0369a1}
+.case-name{font-size:1.1rem;margin-bottom:4px}
+.case-meta{font-size:.8rem;color:var(--text2);margin-bottom:10px}
+.case-dx{font-size:.85rem;color:var(--text);background:var(--surface2);padding:6px 10px;border-radius:6px;border-left:3px solid var(--primary)}
+.case-problems{margin-top:8px}
+.np-tag{display:inline-block;padding:2px 8px;background:var(--warn-light);color:var(--warn);border-radius:4px;font-size:.73rem;margin:2px}
+
+/* --- Buttons --- */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:10px 18px;
+  border-radius:8px;border:none;font-size:.9rem;font-weight:500;
+  transition:opacity .15s,transform .1s;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{opacity:.88}
+.btn-success{background:var(--accent);color:#fff}
+.btn-success:hover{opacity:.88}
+.btn-outline{background:transparent;color:var(--primary);border:1px solid var(--primary)}
+.btn-outline:hover{background:var(--primary-light)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+.btn-record{
+  width:64px;height:64px;border-radius:50%;border:none;
+  background:var(--danger);color:#fff;font-size:1.6rem;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 0 rgba(220,38,38,.4);
+  transition:box-shadow .15s;
+}
+.btn-record.recording{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(220,38,38,.0)}}
+.btn-record.waiting{background:var(--accent)}
+
+/* --- Form fields --- */
+label{font-size:.85rem;font-weight:500;color:var(--text2);display:block;margin-bottom:4px}
+textarea{
+  width:100%;padding:10px;border:1px solid var(--border);
+  border-radius:8px;background:var(--surface);color:var(--text);
+  resize:vertical;min-height:80px;outline:none;line-height:1.6;
+}
+textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,111,163,.12)}
+input[type=text]{
+  width:100%;padding:9px 12px;border:1px solid var(--border);
+  border-radius:8px;background:var(--surface);color:var(--text);outline:none;
+}
+input[type=text]:focus{border-color:var(--primary)}
+.check-group{display:flex;flex-wrap:wrap;gap:8px}
+.check-item{
+  display:flex;align-items:center;gap:6px;padding:6px 12px;
+  border:1px solid var(--border);border-radius:6px;cursor:pointer;
+  font-size:.82rem;user-select:none;
+}
+.check-item input{margin:0}
+.check-item:has(input:checked){background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+
+/* --- Conversation --- */
+#conv-area{
+  flex:1;overflow-y:auto;padding:16px;
+  display:flex;flex-direction:column;gap:12px;
+  background:var(--surface2);border-radius:var(--r);
+  min-height:300px;max-height:420px;border:1px solid var(--border);
+}
+.bubble-wrap{display:flex;gap:10px;align-items:flex-end}
+.bubble-wrap.nurse{flex-direction:row-reverse}
+.avatar{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:1.1rem;
+  background:var(--border);
+}
+.bubble{
+  max-width:72%;padding:10px 14px;border-radius:14px;
+  font-size:.9rem;line-height:1.6;word-break:break-word;
+}
+.bubble-wrap.patient .bubble{background:var(--patient-bubble);border-bottom-left-radius:4px}
+.bubble-wrap.nurse .bubble{background:var(--nurse-bubble);border-bottom-right-radius:4px}
+.bubble-wrap.system .bubble{background:var(--warn-light);color:var(--warn);font-size:.8rem;border-radius:8px;margin:0 auto}
+.bubble-wrap.system{justify-content:center}
+.bubble-ts{font-size:.7rem;color:var(--text2);margin-top:3px;text-align:right}
+.typing{display:flex;gap:4px;padding:10px 14px;background:var(--patient-bubble);border-radius:14px;border-bottom-left-radius:4px;width:fit-content}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--text2);animation:bounce .8s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* --- Timer --- */
+#timer-bar{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:10px 16px;display:flex;align-items:center;gap:12px;
+}
+.timer-digit{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.05em}
+.timer-label{font-size:.75rem;color:var(--text2)}
+.progress-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:var(--primary);transition:width .5s}
+.progress-fill.done{background:var(--accent)}
+
+/* --- Process record table --- */
+.record-table{width:100%;border-collapse:collapse;font-size:.83rem}
+.record-table th{
+  background:var(--primary);color:#fff;padding:10px 12px;
+  text-align:center;font-weight:500;font-size:.78rem;
+}
+.record-table td{
+  border:1px solid var(--border);padding:8px;vertical-align:top;
+}
+.record-table tr:nth-child(even) td{background:var(--surface2)}
+.record-table td textarea{min-height:60px;border:none;background:transparent;resize:vertical;width:100%;padding:4px}
+.record-table td textarea:focus{background:var(--primary-light);border-radius:4px}
+.row-num{text-align:center;font-weight:700;color:var(--text2);font-size:.85rem;vertical-align:middle!important}
+.pre-filled{color:var(--text2);font-size:.82rem;line-height:1.5;padding:4px}
+.label-header{background:var(--primary-light)!important;color:var(--primary-dark)!important;font-weight:700!important;font-size:.75rem!important}
+
+/* --- AI output --- */
+.ai-record-row td{background:var(--surface)!important}
+.tech-tag{
+  display:inline-block;padding:2px 7px;border-radius:4px;font-size:.72rem;
+  margin:2px;background:var(--primary-light);color:var(--primary-dark);font-weight:500;
+}
+.tech-non{background:var(--warn-light);color:var(--warn)}
+.tech-picker{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.tech-chip{font-size:.68rem;padding:2px 6px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.tech-chip:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+
+/* --- Misc --- */
+.section-title{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.section-icon{font-size:1.3rem}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+.info-box{padding:12px 16px;border-radius:8px;font-size:.85rem;line-height:1.6}
+.info-primary{background:var(--primary-light);border-left:3px solid var(--primary);color:var(--text)}
+.info-warn{background:var(--warn-light);border-left:3px solid var(--warn);color:var(--text)}
+.info-success{background:var(--accent-light);border-left:3px solid var(--accent);color:var(--text)}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+  display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;
+}
+.modal{
+  background:var(--surface);border-radius:var(--r);max-width:680px;width:100%;
+  box-shadow:var(--shadow);padding:24px;position:relative;margin:auto;
+}
+.modal-close{
+  position:absolute;top:16px;right:16px;background:var(--surface2);border:none;
+  width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;color:var(--text2);
+}
+.modal h2{margin-bottom:16px}
+.medical-section{margin-bottom:16px}
+.medical-section h4{color:var(--primary-dark);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.medical-row{display:flex;gap:8px;margin-bottom:4px;font-size:.85rem}
+.medical-key{color:var(--text2);min-width:80px;flex-shrink:0}
+.medical-val{color:var(--text)}
+#status-msg{font-size:.82rem;color:var(--text2);min-height:20px;padding:4px 0}
+.split-view{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:720px){.split-view{grid-template-columns:1fr}}
+.sticky-case{position:sticky;top:calc(104px + env(safe-area-inset-top,0px));max-height:calc(100vh - 120px);overflow-y:auto}
+.hidden{display:none!important}
+@media(max-width:720px){
+  .sticky-case{position:static;max-height:none}
+  #conv-area{max-height:50vh;min-height:220px}
+  .record-table td textarea{min-width:120px}
+  .timer-digit{font-size:1.4rem}
+}
+#toast{
+  position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--text);color:var(--bg);padding:10px 18px;border-radius:8px;font-size:.85rem;
+  box-shadow:var(--shadow);z-index:300;max-width:90vw;text-align:center;opacity:0;transition:opacity .2s;pointer-events:none;
+}
+#toast.show{opacity:1}
+.inline-confirm{background:var(--danger-light);border:1px solid var(--danger);border-radius:8px;padding:12px;margin-top:12px;font-size:.85rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#text-fallback{display:flex;gap:8px;margin-top:10px}
+#text-fallback input{flex:1}
+/* --- Avatar stage --- */
+#stage{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:720px){#stage{grid-template-columns:1fr}}
+.stage-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:4/3;max-width:100%}
+.stage-label{position:absolute;top:8px;left:10px;font-size:.72rem;font-weight:700;letter-spacing:.04em;color:#fff;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:12px;z-index:2}
+#avatar-wrap{background:radial-gradient(120% 90% at 50% 20%,#eef3f8 0%,#cfdbe8 70%,#b9c9d9 100%)}
+#avatar-3d canvas{width:100%!important;height:100%!important;display:block}
+#avatar-caption{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:.8rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.55));min-height:34px}
+#cam-wrap{background:#111;display:flex;align-items:center;justify-content:center}
+#cam-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#cam-off{color:#bbb;font-size:.8rem;text-align:center;padding:16px;line-height:1.7}
+.rec-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:6px;animation:blinkdot 1s infinite}
+@keyframes blinkdot{50%{opacity:.2}}
+/* avatar animation */
+.av-head{transform-origin:200px 170px;transition:transform .5s ease}
+.av-body{transform-origin:200px 330px;animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{50%{transform:translateY(-3px)}}
+.av-eyelid{transform-origin:center;transform:scaleY(0);transition:transform .08s}
+.av.blink .av-eyelid{transform:scaleY(1)}
+.av-brow{transform-origin:center;transition:transform .5s ease}
+.av-mouth{transition:d .25s}
+.av-arm-r{transform-origin:270px 300px;transition:transform .6s ease}
+.av-arm-l{transform-origin:130px 300px;transition:transform .6s ease}
+/* expressions */
+.av.exp-sad .av-brow-l{transform:rotate(14deg) translateY(4px)}
+.av.exp-sad .av-brow-r{transform:rotate(-14deg) translateY(4px)}
+.av.exp-anxious .av-brow-l{transform:rotate(10deg) translateY(-3px)}
+.av.exp-anxious .av-brow-r{transform:rotate(-10deg) translateY(-3px)}
+.av.exp-pain .av-brow-l{transform:rotate(-12deg) translateY(4px)}
+.av.exp-pain .av-brow-r{transform:rotate(12deg) translateY(4px)}
+.av.exp-pain .av-eye{transform:scaleY(.45);transform-origin:center}
+.av.exp-angry .av-brow-l{transform:rotate(-18deg) translateY(6px)}
+.av.exp-angry .av-brow-r{transform:rotate(18deg) translateY(6px)}
+.av.exp-tired .av-eye{transform:scaleY(.6);transform-origin:center}
+.av.exp-tired .av-brow-l,.av.exp-tired .av-brow-r{transform:translateY(3px)}
+.av.exp-smile .av-eye{transform:scaleY(.8);transform-origin:center}
+/* gestures */
+.av.g-nod .av-head{animation:nod 1.1s ease}
+@keyframes nod{25%{transform:rotate(4deg) translateY(6px)}50%{transform:translateY(0)}75%{transform:rotate(3deg) translateY(5px)}}
+.av.g-down .av-head{transform:rotate(6deg) translateY(10px)}
+.av.g-away .av-head{transform:rotate(-9deg) translateX(-14px)}
+.av.g-away .av-pupil{transform:translateX(-5px)}
+.av.g-chest .av-arm-r{transform:rotate(-70deg) translate(-20px,10px)}
+.av.g-sigh .av-body{animation:sigh 1.6s ease}
+@keyframes sigh{30%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+.av.g-wave .av-arm-l{animation:wave 1.4s ease}
+@keyframes wave{25%{transform:rotate(60deg)}50%{transform:rotate(45deg)}75%{transform:rotate(65deg)}}
+.av.g-shake .av-head{animation:shake 1s ease}
+@keyframes shake{25%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}75%{transform:rotate(-4deg)}}
+.av.g-cover .av-arm-r{transform:rotate(-120deg) translate(-70px,0)}
+.ts-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border);border-radius:16px;font-size:.78rem;cursor:pointer;background:var(--surface);margin:3px}
+.ts-chip:hover{border-color:var(--primary);color:var(--primary)}
+.ts-chip b{font-variant-numeric:tabular-nums;color:var(--primary)}
+#rec-video{width:100%;max-height:420px;background:#000;border-radius:8px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <div id="topbar">
+    <div class="logo">🏥</div>
+    <div>
+      <h1>行為過程紀錄練習平台</h1>
+      <div class="sub">基本護理學實習・虛擬個案會談・第二版（3D 擬真病人＋護生錄影）</div>
+    </div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.18);color:#fff" onclick="openSettings()">⚙ 設定</button>
+  </div>
+
+  <div id="steps">
+    <div class="step active" id="step-cases" onclick="goStep('cases')"><span class="step-num">1</span>選擇個案</div>
+    <div class="step" id="step-goals" onclick="goStep('goals')"><span class="step-num">2</span>設定目的</div>
+    <div class="step" id="step-conv" onclick="goStep('conv')"><span class="step-num">3</span>語音會談</div>
+    <div class="step" id="step-record" onclick="goStep('record')"><span class="step-num">4</span>填寫記錄</div>
+    <div class="step" id="step-analysis" onclick="goStep('analysis')"><span class="step-num">5</span>分析反思</div>
+    <div class="step" id="step-export" onclick="goStep('export')"><span class="step-num">6</span>產出報告</div>
+    <div class="step" id="step-review" onclick="goStep('review')"><span class="step-num">7</span>回顧會談</div>
+  </div>
+
+  <div id="main">
+    <!-- PHASE 1: CASE SELECTION -->
+    <div id="phase-cases">
+      <div class="section-title"><span class="section-icon">📋</span><h2>選擇練習個案</h2></div>
+      <div class="info-box info-primary" style="margin-bottom:16px">
+        選擇一個虛擬個案，查看病歷後開始練習。每個個案模擬真實內外科臨床情境，請依個案狀況擬定會談目的。
+      </div>
+      <div class="card-grid" id="case-grid"></div>
+    </div>
+
+    <!-- PHASE 2: GOALS -->
+    <div id="phase-goals" class="hidden">
+      <div class="split-view">
+        <div>
+          <div class="section-title"><span class="section-icon">🎯</span><h2>設定會談目的</h2></div>
+          <div class="card" style="margin-bottom:16px" id="selected-case-summary"></div>
+          <div class="card">
+            <div style="margin-bottom:16px">
+              <label>學生姓名（練習者）</label>
+              <input type="text" id="student-name" placeholder="請輸入您的姓名" style="max-width:240px">
+            </div>
+            <div style="margin-bottom:16px">
+              <label>今日會談目的 <span style="color:var(--danger)">*</span></label>
+              <textarea id="goals-input" placeholder="根據個案目前狀況，說明此次會談的主要目的。"></textarea>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-outline" onclick="goStep('cases')">← 返回</button>
+              <button class="btn btn-primary" onclick="startConv()">開始語音會談 →</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="section-title"><span class="section-icon">📝</span><h2>病歷詳細資料</h2></div>
+          <div class="card" id="goals-case-detail" style="font-size:.85rem"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 3: CONVERSATION -->
+    <div id="phase-conv" class="hidden">
+      <div style="max-width:760px;margin:0 auto">
+        <div>
+          <div class="section-title" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span class="section-icon">🎤</span><h2>語音會談練習</h2></div>
+            <button class="btn btn-outline btn-sm" onclick="const d=document.getElementById('conv-side');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'查看個案資訊':'收起個案資訊'">查看個案資訊</button></div>
+          <div id="timer-bar" style="margin-bottom:12px">
+            <div>
+              <div class="timer-label">會談時間</div>
+              <div class="timer-digit" id="timer-display">00:00</div>
+            </div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--text2);margin-bottom:4px">
+                <span>進度</span><span id="timer-pct">最少10分鐘</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="timer-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div id="stage">
+            <div class="stage-box" id="avatar-wrap">
+              <div class="stage-label" id="avatar-label">病人</div>
+              <div id="avatar-3d" style="position:absolute;inset:0"></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
+            </div>
+            <div class="stage-box" id="cam-wrap">
+              <div class="stage-label" id="cam-label">護生鏡頭</div>
+              <video id="cam-video" autoplay muted playsinline class="hidden"></video>
+              <div id="cam-off">鏡頭尚未開啟<br><button class="btn btn-outline btn-sm" style="margin-top:8px;color:#fff;border-color:#fff" onclick="startCamera()">開啟鏡頭並錄影</button></div>
+            </div>
+          </div>
+          <div id="conv-area" style="min-height:160px;max-height:240px"></div>
+          <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="btn-record" id="mic-btn" onclick="toggleMic()" title="按下說話">🎤</button>
+            <div style="flex:1">
+              <div id="status-msg">按下麥克風開始說話</div>
+              <div id="interim-text" style="font-size:.8rem;color:var(--text2);min-height:18px;font-style:italic"></div>
+            </div>
+            <button class="btn btn-danger btn-sm" id="end-conv-btn" onclick="endConv()" disabled>結束會談</button>
+          </div>
+          <div id="text-fallback">
+            <input type="text" id="text-input" placeholder="或在此輸入文字後按 Enter（語音無法使用時）" onkeydown="if(event.key==='Enter'){sendTextInput()}">
+            <button class="btn btn-outline btn-sm" onclick="sendTextInput()">送出</button>
+          </div>
+          <div id="end-confirm" class="inline-confirm hidden">
+            <span id="end-confirm-msg"></span>
+            <button class="btn btn-danger btn-sm" onclick="endConv(true)">確定結束</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('end-confirm').classList.add('hidden')">繼續會談</button>
+          </div>
+          <div class="info-box info-warn" style="margin-top:12px;font-size:.8rem">
+            💡 點麥克風說話，病人會以語音、表情與動作回應。右側鏡頭會錄下您的表情與姿勢，會談結束後可在「分析反思」回放。請允許麥克風與鏡頭權限。
+          </div>
+        </div>
+        <div id="conv-side" class="hidden" style="margin-top:16px">
+          <div class="card" id="conv-case-mini" style="font-size:.83rem;margin-bottom:12px"></div>
+          <div class="card">
+            <h4 style="margin-bottom:8px">會談目的</h4>
+            <div id="conv-goals-display" style="font-size:.82rem;line-height:1.7;color:var(--text2)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 4: PROCESS RECORD -->
+    <div id="phase-record" class="hidden">
+      <div class="section-title"><span class="section-icon">✍️</span><h2>填寫行為過程記錄</h2></div>
+      <div class="info-box info-primary" style="margin-bottom:16px">
+        請憑記憶，依會談的先後順序寫下每一句互動：您說了什麼、做了什麼（表情、姿勢、眼神、動作），病人說了什麼、做了什麼。此階段<strong>不會顯示會談逐字稿</strong>，請盡量回想。寫完後進入下一步分析，之後仍可隨時回來增補。
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <table class="record-table" id="record-table">
+          <thead>
+            <tr>
+              <th style="width:40px">序</th>
+              <th colspan="2" style="background:var(--nurse-bubble)!important;color:var(--primary-dark)!important">護　生</th>
+              <th colspan="2" style="background:var(--patient-bubble)!important;color:var(--text)!important">病　人</th>
+              <th style="width:44px"></th>
+            </tr>
+            <tr>
+              <th></th>
+              <th class="label-header" style="min-width:180px">語言反應</th>
+              <th class="label-header" style="min-width:150px">非語言反應</th>
+              <th class="label-header" style="min-width:180px">語言反應</th>
+              <th class="label-header" style="min-width:150px">非語言反應</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="record-tbody"></tbody>
+        </table>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button>
+          <span style="font-size:.78rem;color:var(--text2);align-self:center">提示：本次會談共約 <span id="exchange-hint">0</span> 次互動</span>
+        </div>
+      </div>
+      <div class="row-actions" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="renderPhase('analysis')">進入分析反思 →</button>
+      </div>
+    </div>
+
+    <!-- PHASE 5: ANALYSIS -->
+    <div id="phase-analysis" class="hidden">
+      <div class="section-title"><span class="section-icon">🔍</span><h2>分析與反思</h2></div>
+      <div class="info-box info-primary" style="margin-bottom:16px">
+        以下是您剛才寫下的會談過程。請為<strong>每一句</strong>標示您使用的溝通技巧，並寫下自我分析。所有欄位仍可修改，想起遺漏可用「＋ 新增一列」補上。
+      </div>
+      <div class="card" style="overflow-x:auto;margin-bottom:20px">
+        <table class="record-table" id="analysis-table"><thead><tr><th style="width:40px">序</th><th style="min-width:150px">護生語言</th><th style="min-width:120px">護生非語言</th><th style="min-width:150px">病人語言</th><th style="min-width:120px">病人非語言</th><th style="min-width:170px">使用技巧</th><th style="min-width:170px">自我分析</th><th style="width:44px"></th></tr></thead><tbody id="analysis-tbody"></tbody></table>
+        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button></div>
+      </div>
+      <div class="card hidden" id="rec-card" style="margin-bottom:20px">
+        <h3 style="margin-bottom:6px">🎥 護生表情與肢體回放</h3>
+        <div style="font-size:.8rem;color:var(--text2);margin-bottom:10px">點選下方時間點可跳到您說那句話的當下，觀察自己的表情、眼神與姿勢，填入「護生非語言反應」欄。</div>
+        <video id="rec-video" controls playsinline></video>
+        <div id="rec-marks" style="margin-top:10px"></div>
+        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="downloadRecording()">⬇ 下載錄影（WebM）</button></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px">整體反思</h3>
+        <div style="display:grid;gap:12px">
+          <div>
+            <label>1. 此次會談，您認為最成功的部分是什麼？為什麼？</label>
+            <textarea id="reflect1" placeholder="請描述…"></textarea>
+          </div>
+          <div>
+            <label>2. 此次會談，有哪些地方可以改善？如果重來，您會如何調整？</label>
+            <textarea id="reflect2" placeholder="請描述…"></textarea>
+          </div>
+          <div>
+            <label>3. 個案在此次會談中的情緒/需求，您如何評估？是否有未達到的目標？</label>
+            <textarea id="reflect3" placeholder="請描述…"></textarea>
+          </div>
+          <div>
+            <label>4. 透過此次練習，您對護病溝通有什麼新的體會或學習？</label>
+            <textarea id="reflect4" placeholder="請描述…"></textarea>
+          </div>
+        </div>
+        <div class="row-actions" style="margin-top:16px">
+          <button class="btn btn-outline" onclick="goStep('record')">← 修改記錄</button>
+          <button class="btn btn-success" onclick="generateExport()">產出完整報告 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 7: REVIEW -->
+    <div id="phase-review" class="hidden">
+      <div class="section-title"><span class="section-icon">🎬</span><h2>回顧會談過程</h2></div>
+      <div class="info-box info-primary" style="margin-bottom:16px">完整逐字稿（含病人的表情與動作標記）與您的會談錄影。對照自己憑記憶寫的記錄，看看有哪些遺漏或記錯的地方。</div>
+      <div class="card hidden" id="review-video-card" style="margin-bottom:20px">
+        <h3 style="margin-bottom:6px">🎥 護生錄影回放</h3>
+        <video id="review-video" controls playsinline style="width:100%;max-height:420px;background:#000;border-radius:8px"></video>
+        <div id="review-marks" style="margin-top:10px"></div>
+        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="downloadRecording()">⬇ 下載錄影</button></div>
+      </div>
+      <div class="card" id="review-no-video" style="margin-bottom:20px;font-size:.85rem;color:var(--text2)">此次會談沒有錄影（鏡頭未開啟或此環境不允許鏡頭）。</div>
+      <div class="card">
+        <h3 style="margin-bottom:10px">📝 會談逐字稿</h3>
+        <div id="review-meta" style="font-size:.82rem;color:var(--text2);margin-bottom:12px"></div>
+        <div id="review-transcript" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div class="row-actions" style="margin-top:16px">
+        <button class="btn btn-outline" onclick="goStep('export')">← 返回報告</button>
+        <button class="btn btn-primary" onclick="goStep('analysis')">修改我的記錄</button>
+      </div>
+    </div>
+
+    <!-- PHASE 6: EXPORT -->
+    <div id="phase-export" class="hidden">
+      <div class="section-title"><span class="section-icon">📄</span><h2>產出報告</h2></div>
+      <div style="display:grid;gap:20px">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+            <h3>📘 學生版行為過程記錄</h3>
+            <button class="btn btn-primary btn-sm" onclick="downloadStudentReport()">⬇ 下載 PDF（學生版）</button>
+          </div>
+          <div id="student-report-preview" style="font-size:.82rem"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+            <h3>🤖 AI版行為過程記錄</h3>
+            <button class="btn btn-success btn-sm" onclick="downloadAiReport()">⬇ 下載 PDF（AI 版）</button>
+          </div>
+          <div id="ai-generating" class="info-box info-warn">AI 正在分析會談過程，請稍候…</div>
+          <div id="ai-report-preview" style="font-size:.82rem"></div>
+        </div>
+        <div class="row-actions"><button class="btn btn-primary" onclick="renderPhase('review')">🎬 回顧會談過程 →</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+<div class="modal-overlay hidden" id="settings-modal" onclick="if(event.target.id==='settings-modal')this.classList.add('hidden')">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('settings-modal').classList.add('hidden')">✕</button>
+    <h2>平台設定</h2>
+    <div class="info-box info-warn" style="margin-bottom:14px;font-size:.8rem">金鑰只存在這台裝置的瀏覽器中，不會上傳到其他地方。建議由教師在共用電腦上設定一次。</div>
+    <div style="display:grid;gap:12px">
+      <div><label>Anthropic API 金鑰（AI 病人與 AI 版記錄）</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
+      <div><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
+      <div><label>男性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-m" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
+      <div><label>女性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-f" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
+      <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<!-- Case detail modal -->
+<div class="modal-overlay hidden" id="case-modal" onclick="closeModal(event)">
+  <div class="modal" id="modal-content">
+    <button class="modal-close" onclick="document.getElementById('case-modal').classList.add('hidden')">✕</button>
+    <div id="modal-body"></div>
+    <div style="margin-top:20px;display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" id="modal-select-btn">選擇此個案 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CASE DATA =====
+const CASES = [
+  {
+    id:1, dept:'cardio', deptLabel:'心臟內科', deptClass:'dept-cardio', icon:'❤️',
+    name:'王○明', age:65, gender:'男', bed:'C302-2',
+    dx:'急性心肌梗塞（STEMI），PCI術後第3天',
+    admission:'3天前因胸痛15分鐘送急診',
+    chief:'「我心裡很怕，不知道以後還能不能活得好好的…」',
+    hx:'高血壓15年、抽菸35年（已戒1年）、BMI 28',
+    vitals:'BP 136/82, HR 78 bpm, SpO₂ 97%（room air）',
+    lab:'CK-MB 趨緩下降中，EF 48%',
+    meds:'Aspirin, Clopidogrel, Metoprolol, Atorvastatin, Lisinopril',
+    diet:'低鹽低脂飲食，攝水限制1500mL/day',
+    activity:'臥床休息，可床上坐起',
+    nursing:['焦慮','知識不足（疾病及藥物）','活動無耐受性'],
+    personality:'平日話少，個性較壓抑，不習慣表達情緒',
+    emotional:'非常擔心未來，害怕再次發作，家人也都很緊張',
+    context:'太太每天來探視，昨晚睡眠不佳，不斷按呼叫鈴詢問注意事項',
+    talk:'話少，回答常常只有一兩句；被問到感受會先用簡短、保留的方式帶過（例如只說身體狀況、不談心情），護生若耐心、用反映感受才會慢慢說出害怕',
+    voice:{pitch:0.85,rate:0.9}
+  },
+  {
+    id:2, dept:'endo', deptLabel:'新陳代謝科', deptClass:'dept-endo', icon:'🩸',
+    name:'李○華', age:58, gender:'女', bed:'E415-3',
+    dx:'第2型糖尿病合併足部潰瘍（Wagner grade II），蜂窩組織炎',
+    admission:'因右足第三趾潰瘍惡化入院，已5天',
+    chief:'「我不就是腳破了一點，要住這麼久的醫院？」',
+    hx:'T2DM 12年、高血壓、視網膜病變（初期）',
+    vitals:'BP 148/88, HR 82, T 37.8°C, BS 216 mg/dL（飯後）',
+    lab:'HbA1c 9.8%，白血球升高',
+    meds:'Insulin（Lantus＋NovoRapid）、抗生素靜脈點滴',
+    wound:'右足第三趾，1.5×2cm 潰瘍，無滲液但周圍紅腫，每日換藥',
+    nursing:['知識不足（足部照護）','不遵從醫囑','皮膚完整性受損'],
+    personality:'個性爽朗但固執，認為「老毛病了不用擔心」',
+    emotional:'有些煩躁，不理解為何要住這麼久，擔心家務沒人做',
+    context:'自述飲食控制做得「差不多」，但偷吃甜食，不規則施打胰島素',
+    talk:'話多、爆怓、愛抱怨，對任何問題都會多說幾句；但一被說教或講到「你應該要…」就會頂回去或敲衍',
+    voice:{pitch:1.1,rate:1.05}
+  },
+  {
+    id:3, dept:'resp', deptLabel:'胸腔內科', deptClass:'dept-resp', icon:'🫁',
+    name:'陳○國', age:72, gender:'男', bed:'R201-1',
+    dx:'慢性阻塞性肺疾病（COPD stage III）急性發作',
+    admission:'因喘、發燒、痰增多入院，已4天',
+    chief:'「喘死了，這樣下去不知道還能撐多久…」',
+    hx:'COPD 8年、抽菸史50包年（仍在抽）、高血壓',
+    vitals:'BP 144/86, HR 98, RR 22/min, SpO₂ 91%（O₂ 2L）',
+    lab:'ABG: pH 7.35, PaCO₂ 52mmHg（代償中）',
+    meds:'Salbutamol吸入、Ipratropium、靜脈類固醇、抗生素',
+    activity:'使用鼻導管吸氧，半坐臥位，使用輔助肌肉呼吸',
+    nursing:['呼吸型態改變','焦慮','知識不足（戒菸衛教）'],
+    personality:'固執，非常排斥戒菸話題，個性急躁',
+    emotional:'因呼吸困難感到恐慌，擔心「每次發作都會更嚴重」',
+    context:'家屬表示患者在家仍偷抽菸，對疾病認知不足',
+    talk:'因為喘，每句話都短，常常說到一半要停下來喘氣；講到戒菸會不耐煩或轉移話題；護生若先關心他的喘、不急著衛教，才會願意多說',
+    voice:{pitch:0.8,rate:0.85}
+  },
+  {
+    id:4, dept:'onco', deptLabel:'乳房外科', deptClass:'dept-onco', icon:'🎗️',
+    name:'張○玲', age:50, gender:'女', bed:'B308-2',
+    dx:'左側乳癌（Stage IIA），接受改良式根治性乳房切除術後第1天',
+    admission:'昨日上午手術，目前術後第1天',
+    chief:'「我不敢看那邊…（哽咽）覺得自己不完整了…」',
+    hx:'乳癌確診2個月前，無其他慢性病，G2P2，已停經',
+    vitals:'BP 120/76, HR 88, T 36.9°C，疼痛評分5/10',
+    lab:'病理報告待確認淋巴結狀況，引流管共200mL/24hr',
+    meds:'鎮痛藥PCA中、預防性抗生素',
+    wound:'左胸傷口閉合良好，乳房引流管×1，腋下引流管×1',
+    nursing:['急性疼痛','身體意象紊亂','預期性悲傷','潛在性感染'],
+    personality:'平日是家庭主婦，個性溫和細心，非常在意外表',
+    emotional:'情緒低落，不願意直視傷口，擔心丈夫的眼光，害怕後續化療',
+    context:'先生昨晚一直在旁陪伴，患者昨晚哭泣多次，目前丈夫去上班',
+    talk:'聲音小、語速慢，常有停頓和哽咽；對封閉式問句只會輕輕回「嗯」；護生若給她時間、反映她的難過，會慢慢說出對外貌、先生眼光、化療的恐懼',
+    voice:{pitch:1.05,rate:0.85}
+  },
+  {
+    id:5, dept:'ortho', deptLabel:'骨科', deptClass:'dept-ortho', icon:'🦴',
+    name:'林○英', age:78, gender:'女', bed:'O512-4',
+    dx:'右側股骨頸骨折，全髖關節置換術後第2天',
+    admission:'因在浴室滑倒骨折入院，已4天（含術前準備2天）',
+    chief:'「這腳痛死了，不敢動…以後不知道能不能走路。」',
+    hx:'骨質疏鬆症、高血壓、白內障（輕度）',
+    vitals:'BP 138/80, HR 76, 疼痛評分7/10',
+    lab:'Hb 9.8 g/dL（術後貧血），已開始補鐵',
+    meds:'口服鐵劑、鎮痛藥（口服）、DVT預防抗凝血劑',
+    activity:'傷口引流管已移除，物理治療師昨日協助床邊站立1分鐘',
+    nursing:['急性疼痛','跌倒高危險群','自我照顧缺失','知識不足（術後復健）'],
+    personality:'傳統婦女，怕麻煩別人，對醫療很順從但問題很多',
+    emotional:'擔心自己「以後變成廢人」，很怕再跌倒，也擔心自費費用',
+    context:'兒子在外縣市工作，每週末回來，媳婦白天來探視，照顧者有限',
+    talk:'典型台灣長輩，話多且愛客氣（常說「麻煩你了」「不好意思」）；容易岲開話題講到兒子媳婦、費用；被問封閉式問題也會多說兩句，但對復健的害怕需要護生耐心引導才會說',
+    voice:{pitch:1.0,rate:0.85}
+  },
+  {
+    id:6, dept:'surg', deptLabel:'一般外科', deptClass:'dept-surg', icon:'🩺',
+    name:'吳○豪', age:45, gender:'男', bed:'S220-3',
+    dx:'急性盲腸炎，腹腔鏡闌尾切除術後第1天',
+    admission:'昨日急診入院手術，目前術後第1天',
+    chief:'「傷口還是有點痛，我想知道什麼時候可以出院回去工作？」',
+    hx:'無重大病史，無用藥史',
+    vitals:'BP 122/74, HR 80, T 37.1°C，疼痛評分4/10（休息時）',
+    lab:'白血球由17000降至11500，傷口無滲液',
+    meds:'口服鎮痛藥PRN，術後預防性抗生素（今日最後一劑）',
+    wound:'腹腔鏡傷口×3，約0.5-1cm，覆蓋敷料中',
+    diet:'昨晚已排氣，今早開始軟食，進食中等',
+    nursing:['急性疼痛','知識不足（出院準備）','潛在性感染'],
+    personality:'個性積極，業務員，非常在乎工作，有點急性子',
+    emotional:'疼痛尚可忍受，主要焦慮的是何時能出院、何時能恢復工作',
+    context:'妻子早上來探視，患者希望明後天就能出院，實際視傷口恢復狀況',
+    talk:'語速快、直接、有效率導向，常反過來問護生問題（出院、工作、傷口照顧）；對情緒類問題會輕描淡寫、很快轉回實際問題，除非護生具體回應他對工作的壓力',
+    voice:{pitch:0.9,rate:1.05}
+  }
+];
+
+const TECHNIQUES = [
+  '主動傾聽','接納與不批判','給予肯定','善用沉默','治療性觸摸','重述','澄清','反映','詢問',
+  '集中焦點','提供訊息','拓寬話題','引導會談繼續','鼓勵描述感受','提出觀察','開放式提問','排序','總結'
+];
+
+// ===== STATE =====
+let state = {
+  phase:'cases',
+  caseId:null,
+  studentName:'',
+  goals:'',
+  plannedTech:[],
+  conversation:[],
+  convStart:null,
+  convDuration:0,
+  processRecord:[],
+  reflections:{r1:'',r2:'',r3:'',r4:''},
+  aiRecord:null,
+};
+
+function getCase(){ return CASES.find(c=>c.id===state.caseId) }
+
+// ===== STEP NAVIGATION =====
+const PHASES = ['cases','goals','conv','record','analysis','export','review'];
+function goStep(p){
+  if(p===state.phase) return;
+  const idx=PHASES.indexOf(p);
+  const cur=PHASES.indexOf(state.phase);
+  // Only allow going back or to done steps
+  const el = document.getElementById('step-'+p);
+  if(idx>cur && !el.classList.contains('done')) return;
+  renderPhase(p);
+}
+function renderPhase(p){
+  state.phase=p;
+  PHASES.forEach(ph=>{
+    document.getElementById('phase-'+ph)?.classList.add('hidden');
+  });
+  document.getElementById('phase-'+p)?.classList.remove('hidden');
+  // Update steps
+  document.querySelectorAll('.step').forEach(el=>{
+    const sp=el.id.replace('step-','');
+    const idx=PHASES.indexOf(sp);
+    const cur=PHASES.indexOf(p);
+    el.classList.remove('active','done');
+    if(idx<cur) el.classList.add('done');
+    if(idx===cur) el.classList.add('active');
+  });
+  if(p==='goals') renderGoalsPhase();
+  if(p==='record') renderRecordTable();
+  if(p==='analysis') renderAnalysisPhase();
+  if(p==='export') renderExportPhase();
+  if(p==='review') renderReviewPhase();
+  window.scrollTo(0,0);
+}
+
+// ===== PHASE 1: CASES =====
+function renderCases(){
+  const grid=document.getElementById('case-grid');
+  grid.innerHTML=CASES.map(c=>`
+    <div class="card case-card ${state.caseId===c.id?'selected':''}" onclick="selectCase(${c.id})">
+      <div class="dept-badge ${c.deptClass}">${c.icon} ${c.deptLabel}</div>
+      <div class="case-name">${c.name}　${c.age}歲 ${c.gender}</div>
+      <div class="case-meta">病床 ${c.bed}</div>
+      <div class="case-dx">${c.dx}</div>
+      <div class="case-problems" style="margin-top:10px">
+        <div style="font-size:.75rem;color:var(--text2);margin-bottom:4px">護理問題：</div>
+        ${c.nursing.map(n=>`<span class="np-tag">${n}</span>`).join('')}
+      </div>
+      <div style="margin-top:12px;font-size:.78rem;color:var(--text2);font-style:italic">"${c.chief}"</div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openModal(${c.id})">查看病歷</button>
+        ${state.caseId===c.id?'<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();goStep(\'goals\')">繼續 →</button>':''}
+      </div>
+    </div>
+  `).join('');
+}
+function selectCase(id){
+  state.caseId=id;
+  state.conversation=[];
+  state.processRecord=[];
+  state.aiRecord=null;
+  renderCases();
+  // Mark step 1 done after selection
+  document.getElementById('step-goals').classList.add('done');
+}
+function openModal(id){
+  const c=CASES.find(x=>x.id===id);
+  document.getElementById('modal-body').innerHTML=buildMedicalRecord(c);
+  document.getElementById('modal-select-btn').onclick=()=>{
+    selectCase(id);
+    document.getElementById('case-modal').classList.add('hidden');
+    goStep('goals');
+  };
+  document.getElementById('case-modal').classList.remove('hidden');
+}
+function closeModal(e){
+  if(e.target.id==='case-modal') document.getElementById('case-modal').classList.add('hidden');
+}
+function buildMedicalRecord(c){
+  return `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="font-size:2rem">${c.icon}</div>
+      <div>
+        <div class="dept-badge ${c.deptClass}">${c.deptLabel}</div>
+        <h2>${c.name}　${c.age}歲 ${c.gender}</h2>
+        <div style="font-size:.82rem;color:var(--text2)">病床 ${c.bed}</div>
+      </div>
+    </div>
+    <div class="medical-section">
+      <h4>主訴</h4>
+      <p style="font-size:.85rem;font-style:italic;color:var(--text)">"${c.chief}"</p>
+    </div>
+    <div class="medical-section">
+      <h4>診斷 / 入院原因</h4>
+      <div class="medical-row"><span class="medical-key">診斷：</span><span class="medical-val">${c.dx}</span></div>
+      <div class="medical-row"><span class="medical-key">入院：</span><span class="medical-val">${c.admission}</span></div>
+    </div>
+    <div class="medical-section">
+      <h4>健康史 / 生命徵象</h4>
+      <div class="medical-row"><span class="medical-key">病史：</span><span class="medical-val">${c.hx}</span></div>
+      <div class="medical-row"><span class="medical-key">生命徵象：</span><span class="medical-val">${c.vitals}</span></div>
+      ${c.lab?`<div class="medical-row"><span class="medical-key">檢驗：</span><span class="medical-val">${c.lab}</span></div>`:''}
+    </div>
+    <div class="medical-section">
+      <h4>治療 / 用藥</h4>
+      <div class="medical-row"><span class="medical-key">用藥：</span><span class="medical-val">${c.meds}</span></div>
+      ${c.diet?`<div class="medical-row"><span class="medical-key">飲食：</span><span class="medical-val">${c.diet}</span></div>`:''}
+      ${c.wound?`<div class="medical-row"><span class="medical-key">傷口：</span><span class="medical-val">${c.wound}</span></div>`:''}
+      ${c.activity?`<div class="medical-row"><span class="medical-key">活動：</span><span class="medical-val">${c.activity}</span></div>`:''}
+    </div>
+    <div class="medical-section">
+      <h4>護理問題</h4>
+      ${c.nursing.map((n,i)=>`<span class="np-tag">${i+1}. ${n}</span>`).join(' ')}
+    </div>
+    <div class="medical-section">
+      <h4>個案背景（護理評估）</h4>
+      <div class="medical-row"><span class="medical-key">個性：</span><span class="medical-val">${c.personality}</span></div>
+      <div class="medical-row"><span class="medical-key">情緒狀態：</span><span class="medical-val">${c.emotional}</span></div>
+      <div class="medical-row"><span class="medical-key">情境說明：</span><span class="medical-val">${c.context}</span></div>
+    </div>
+  `;
+}
+
+// ===== PHASE 2: GOALS =====
+function renderGoalsPhase(){
+  const c=getCase(); if(!c) return;
+  document.getElementById('selected-case-summary').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:1.8rem">${c.icon}</div>
+      <div>
+        <div class="dept-badge ${c.deptClass}">${c.deptLabel}</div>
+        <div style="font-weight:700">${c.name}　${c.age}歲 ${c.gender}</div>
+        <div style="font-size:.82rem;color:var(--text2)">${c.dx}</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('goals-case-detail').innerHTML=buildMedicalRecord(c);
+  if(state.studentName) document.getElementById('student-name').value=state.studentName;
+  if(state.goals) document.getElementById('goals-input').value=state.goals;
+}
+function startConv(){
+  const name=document.getElementById('student-name').value.trim();
+  const goals=document.getElementById('goals-input').value.trim();
+  if(!name){toast('請填寫學生姓名');document.getElementById('student-name').focus();return}
+  if(!goals){toast('請填寫會談目的');document.getElementById('goals-input').focus();return}
+  state.studentName=name;
+  state.goals=goals;
+  state.plannedTech=[];
+  state.conversation=[];
+  state.processRecord=[];
+  state.aiRecord=null;
+  state.convStart=null;
+  state.convDuration=0;
+  document.getElementById('step-conv').classList.add('done');
+  renderPhase('conv');
+  initConvPhase();
+}
+
+// ===== PHASE 3: CONVERSATION =====
+let recognition=null;
+let timerInterval=null;
+let isRecording=false;
+let sampleFn=null;
+let convHistory=[];
+let isSpeaking=false;
+let currentUtterance=null;
+
+// ===== AVATAR (3D bridge; implementation in the module script at the bottom) =====
+const EXPR_MAP={'難過':'sad','哀傷':'sad','悲傷':'sad','焦慮':'anxious','擔心':'anxious','緊張':'anxious','害怕':'anxious','疼痛':'pain','痛':'pain','不悅':'angry','生氣':'angry','煩躁':'angry','防衛':'angry','疲憊':'tired','疲倦':'tired','累':'tired','微笑':'smile','放鬆':'smile','高興':'smile','平靜':'neutral','中性':'neutral'};
+const GEST_MAP={'點頭':'nod','低頭':'down','別過頭':'away','看向別處':'away','移開視線':'away','手按胸口':'chest','按住傷口':'chest','摸胸口':'chest','嘆氣':'sigh','深呼吸':'sigh','揮手':'wave','搖頭':'shake','遮臉':'cover','擦眼淚':'cover','無':''};
+function setExpression(e){ window.Avatar3D&&Avatar3D.setExpression(e||'neutral'); }
+function playGesture(g){ window.Avatar3D&&g&&Avatar3D.gesture(g); }
+function startMouth(){ window.Avatar3D&&Avatar3D.startMouth(); }
+function stopMouth(){ window.Avatar3D&&Avatar3D.stopMouth(); }
+function startBlink(){} function stopBlink(){}
+function setCaption(){}
+function parsePatientReply(raw){
+  let expr='neutral', gest='', text=raw.trim();
+  const m=text.match(/^[【\[]\s*表情[：:]\s*([^｜|】\]]+)\s*[｜|]\s*動作[：:]\s*([^】\]]+)[】\]]\s*/);
+  if(m){
+    const e=m[1].trim(), g=m[2].trim();
+    for(const k in EXPR_MAP){ if(e.includes(k)){expr=EXPR_MAP[k];break} }
+    for(const k in GEST_MAP){ if(g.includes(k)){gest=GEST_MAP[k];break} }
+    text=text.slice(m[0].length).trim();
+  }
+  return {expr,gest,text};
+}
+function loadAvatarFor(c){
+  const st=getSettings();
+  const url=(c.gender==='女'?st.avF:st.avM)||DEFAULT_AVATARS[c.gender==='女'?'f':'m'];
+  document.getElementById('avatar-loading').classList.remove('hidden');
+  document.getElementById('avatar-loading').textContent='載入 3D 病人中…';
+  const candidates=[...new Set([url,DEFAULT_AVATARS[c.gender==='女'?'f':'m'],...FALLBACK_AVATARS])];
+  const tryLoad=async()=>{
+    if(!window.Avatar3D){ setTimeout(tryLoad,200); return; }
+    const errors=[];
+    for(const u of candidates){
+      try{ await Avatar3D.load(u,{old:c.age>=70}); document.getElementById('avatar-loading').classList.add('hidden'); if(u!==url) console.warn('使用備援頭像：',u); return; }
+      catch(e){ errors.push((u.split('/').pop().split('?')[0])+'：'+(e&&e.message?e.message:e)); console.warn('頭像載入失敗',u,e); }
+    }
+    document.getElementById('avatar-loading').innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">3D 頭像載入失敗。<br><span style="font-size:.72rem;opacity:.8">'+escHtml(errors.join('；')).slice(0,300)+'</span><br><span style="font-size:.72rem">請確認已用 https 或 localhost 開啟，並檢查 ⚙ 設定中的頭像網址。</span></div>';
+  };
+  tryLoad();
+}
+const DEFAULT_AVATARS={
+  f:'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb',
+  m:'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb'
+};
+// 最後備援：TalkingHead 專案附的 Ready Player Me 範例頭像（含 ARKit 表情與 visemes）
+const FALLBACK_AVATARS=['https://raw.githubusercontent.com/met4citizen/TalkingHead/main/avatars/brunette.glb','https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/brunette.glb'];
+
+// ===== SETTINGS / API =====
+const SET_KEY='bpr-settings-v2';
+function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
+function openSettings(){
+  const st=getSettings();
+  document.getElementById('set-apikey').value=st.apiKey||'';
+  document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
+  document.getElementById('set-av-m').value=st.avM||'';
+  document.getElementById('set-av-f').value=st.avF||'';
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function saveSettings(){
+  const st={apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim()};
+  try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
+  document.getElementById('settings-modal').classList.add('hidden');
+  toast('設定已儲存');
+}
+async function apiSample(input,opts={}){
+  const st=getSettings();
+  if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰（右上角 ⚙ 設定）'),{code:'no_key'});
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:st.model||'claude-sonnet-5-5',max_tokens:opts.maxTokens||1024,system:opts.system||undefined,messages})
+  });
+  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('API 錯誤 '+res.status+' '+t); }
+  const j=await res.json();
+  return {text:(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')};
+}
+function saveBlob(filename,blob){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+
+// ===== CAMERA RECORDING =====
+let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null;
+async function startCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camUnavailable('此環境不支援鏡頭'); return; }
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:true});
+  }catch(e){
+    camUnavailable(e.name==='NotAllowedError'?'鏡頭權限被拒絕，請在瀏覽器網址列允許鏡頭後重新整理':'無法開啟鏡頭：'+(e.message||e.name)); return;
+  }
+  const v=document.getElementById('cam-video'); v.srcObject=camStream; v.classList.remove('hidden');
+  document.getElementById('cam-off').classList.add('hidden');
+  try{
+    const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
+    recorder=new MediaRecorder(camStream,mime?{mimeType:mime}:{});
+    recChunks=[]; recBlob=null;
+    recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
+    recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); };
+    recorder.start(1000); recStart=Date.now();
+    document.getElementById('cam-label').innerHTML='<span class="rec-dot"></span>錄影中';
+  }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; }
+}
+function camUnavailable(msg){
+  const off=document.getElementById('cam-off');
+  off.innerHTML=`<div>${escHtml(msg)}</div><div style="font-size:.72rem;opacity:.75;margin-top:6px">不影響會談；仍可進行語音或文字會談。</div>`;
+  toast(msg);
+}
+function stopCamera(){
+  try{ if(recorder&&recorder.state!=='inactive') recorder.stop(); }catch(e){}
+  try{ camStream&&camStream.getTracks().forEach(t=>t.stop()); }catch(e){}
+  camStream=null;
+  const v=document.getElementById('cam-video'); if(v){v.srcObject=null;v.classList.add('hidden')}
+  document.getElementById('cam-off').classList.remove('hidden');
+  document.getElementById('cam-label').textContent='護生鏡頭';
+}
+function renderRecordingPlayback(){
+  const card=document.getElementById('rec-card'); if(!card) return;
+  if(!recBlob||!recStart){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const v=document.getElementById('rec-video');
+  if(v.dataset.blobUrl) URL.revokeObjectURL(v.dataset.blobUrl);
+  const url=URL.createObjectURL(recBlob); v.src=url; v.dataset.blobUrl=url;
+  const marks=state.conversation.filter(m=>m.role==='nurse').map((m,i)=>{
+    const sec=Math.max(0,(m.ts-recStart)/1000-1.5);
+    const mm=String(Math.floor(sec/60)).padStart(2,'0'), ss=String(Math.floor(sec%60)).padStart(2,'0');
+    return `<span class="ts-chip" onclick="seekRec(${sec.toFixed(1)})"><b>${mm}:${ss}</b> 第${i+1}句：${escHtml(m.text.slice(0,18))}${m.text.length>18?'…':''}</span>`;
+  }).join('');
+  document.getElementById('rec-marks').innerHTML=marks||'<span style="font-size:.8rem;color:var(--text2)">沒有可標記的語句</span>';
+}
+function seekRec(sec){ const v=document.getElementById('rec-video'); v.currentTime=sec; v.play().catch(()=>{}); }
+async function downloadRecording(){
+  if(!recBlob){toast('沒有錄影');return}
+  const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm';
+  saveBlob(`護生會談錄影_${state.studentName}.${ext}`,recBlob);
+}
+
+async function initConvPhase(){
+  const c=getCase(); if(!c) return;
+  // Case mini card
+  document.getElementById('conv-case-mini').innerHTML=`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <span style="font-size:1.5rem">${c.icon}</span>
+      <div><div style="font-weight:700">${c.name}</div><div class="dept-badge ${c.deptClass}" style="margin:0">${c.deptLabel}</div></div>
+    </div>
+    <div style="font-size:.8rem;color:var(--text2)">${c.dx}</div>
+    <div style="margin-top:8px;font-size:.78rem">
+      <strong>護理問題：</strong>${c.nursing.join('、')}
+    </div>
+    <div style="margin-top:8px;font-size:.78rem;font-style:italic;color:var(--text2)">"${c.chief}"</div>
+  `;
+  document.getElementById('conv-goals-display').textContent=state.goals;
+  const area=document.getElementById('conv-area');
+  area.innerHTML='';
+  convHistory=[];
+  document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
+  loadAvatarFor(c);
+  setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
+  if(!camStream) startCamera();
+  // Setup speech recognition
+  setupRecognition();
+  // Load sample
+  sampleFn=getSettings().apiKey?apiSample:null;
+  if(!sampleFn) toast('尚未設定 API 金鑰，病人將使用內建的簡單回應（右上角 ⚙ 設定）');
+  // Welcome message
+  addBubble('system','💬 會談開始。請按麥克風向個案說話。',Date.now());
+  setStatus('按下麥克風開始說話');
+  document.getElementById('end-conv-btn').disabled=true;
+}
+
+function setupRecognition(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){setStatus('⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome');return}
+  recognition=new SR();
+  recognition.lang='zh-TW';
+  recognition.continuous=false;
+  recognition.interimResults=true;
+  recognition.onstart=()=>{
+    isRecording=true;
+    document.getElementById('mic-btn').classList.add('recording');
+    setStatus('🎤 正在聆聽…');
+    startTimer();
+  };
+  recognition.onresult=(e)=>{
+    let interim=''; let final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) final+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    document.getElementById('interim-text').textContent=interim||final;
+    if(final) handleNurseSpeech(final.trim());
+  };
+  recognition.onerror=(e)=>{
+    isRecording=false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    if(e.error!=='aborted') setStatus('識別錯誤：'+e.error+'。請再試一次。');
+  };
+  recognition.onend=()=>{
+    isRecording=false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('interim-text').textContent='';
+    if(!isSpeaking) setStatus('按下麥克風說話');
+  };
+}
+
+function toggleMic(){
+  if(isSpeaking) return;
+  if(isRecording){recognition.stop();return}
+  if(!recognition){setStatus('⚠️ 不支援語音識別');return}
+  try{recognition.start();}catch(e){recognition.stop();setTimeout(()=>recognition.start(),300)}
+}
+
+function startTimer(){
+  if(timerInterval) return;
+  if(!state.convStart) state.convStart=Date.now();
+  timerInterval=setInterval(()=>{
+    const secs=Math.floor((Date.now()-state.convStart)/1000);
+    state.convDuration=secs;
+    const m=String(Math.floor(secs/60)).padStart(2,'0');
+    const s=String(secs%60).padStart(2,'0');
+    document.getElementById('timer-display').textContent=`${m}:${s}`;
+    const pct=Math.min(100,(secs/600)*100);
+    document.getElementById('timer-fill').style.width=pct+'%';
+    if(secs>=600){
+      document.getElementById('timer-fill').classList.add('done');
+      document.getElementById('timer-pct').textContent='✅ 已達10分鐘';
+      document.getElementById('end-conv-btn').disabled=false;
+    } else {
+      const rem=600-secs;
+      document.getElementById('timer-pct').textContent=`還差 ${Math.ceil(rem/60)} 分 ${rem%60} 秒`;
+    }
+  },1000);
+}
+
+async function handleNurseSpeech(text){
+  if(!text) return;
+  const ts=Date.now();
+  addBubble('nurse',text,ts);
+  playGesture('g-nod');
+  const entry={role:'nurse',text,ts};
+  state.conversation.push(entry);
+  convHistory.push({role:'user',content:`護生說：「${text}」`});
+  setStatus('AI 正在回應…');
+  isSpeaking=true;
+  document.getElementById('mic-btn').classList.add('waiting');
+  document.getElementById('mic-btn').textContent='⏳';
+  // Show typing indicator
+  const typingEl=document.createElement('div');
+  typingEl.className='bubble-wrap patient';
+  typingEl.innerHTML=`<div class="avatar">👤</div><div class="typing"><span></span><span></span><span></span></div>`;
+  document.getElementById('conv-area').appendChild(typingEl);
+  scrollConv();
+  let response='';
+  try{
+    if(sampleFn){
+      const c=getCase();
+      const systemMsg=buildPatientSystem(c);
+      const trimmed=convHistory.slice(Math.max(0,convHistory.length-16));
+      const res=await sampleFn(trimmed,{system:systemMsg,maxTokens:300});
+      response=res.text||'（病人沉默）';
+    } else {
+      response=fallbackPatientResponse(getCase(),text);
+    }
+  }catch(e){
+    console.error(e);
+    response=fallbackPatientResponse(getCase(),text);
+  }
+  typingEl.remove();
+  const parsed=parsePatientReply(response);
+  response=parsed.text||response;
+  setExpression(parsed.expr); if(parsed.gest) playGesture(parsed.gest);
+  setCaption(response);
+  addBubble('patient',response,Date.now());
+  state.conversation.push({role:'patient',text:response,ts:Date.now(),expr:parsed.expr,gest:parsed.gest});
+  convHistory.push({role:'assistant',content:response});
+  isSpeaking=false;
+  document.getElementById('mic-btn').classList.remove('waiting');
+  document.getElementById('mic-btn').textContent='🎤';
+  document.getElementById('end-conv-btn').disabled=false;
+  setStatus('按下麥克風繼續說話');
+  saveState();
+  speakTTS(response);
+}
+
+function buildPatientSystem(c){
+  return `你正在扮演一位台灣的住院病患，角色設定如下：
+姓名代號：${c.name}，性別：${c.gender}，年齡：${c.age}歲
+所在科別：${c.deptLabel}
+診斷：${c.dx}
+目前個案說的話："${c.chief}"
+個性特點：${c.personality}
+情緒狀態：${c.emotional}
+背景情境：${c.context}
+護理問題：${c.nursing.join('、')}
+說話習慣：${c.talk}
+
+【扮演規則】
+1. 完全以第一人稱回應，真實扮演這個病患，絕不跳出角色、不解釋自己是AI。
+2. 用台灣人平常說話的自然語氣和用詞（例如「不好意思」「麻煩你」「醫生說…」「我是想說…」），像真人在病房裡講話。不要用書面語，不要用中國大陸用語（如「挺好的」「搞定」「打針兒」）。不要夾雜台語或方言字，不要堆疊語助詞（不要一直「喔」「啦」「唉唷」），文字會被朗讀出來，要念起來順。
+2-1. 回應必須針對護生那句話的內容，像真人一樣有來有往：被打招呼就回打招呼、被問名字就回答、被問痛不痛就說痛的情形。不要用「還好啦」「嗯」這種敷衍詞當開場，除非規則3說明你刻意在防衛。
+2-2. 第一次見面的回應要合理，例如護生說「您好，我是護生○○」，你可以回「你好，你是今天照顧我的嗎？」或「好，謝謝。」
+3. 【回應量的判斷，最重要】回答多少要看護生怎麼問：
+   - 封閉式問句（有沒有、會不會、痛不痛）→ 只簡短回答一句，不主動多說。
+   - 開放式問句、反映感受、同理心、給予時間和尊重 → 逐漸打開，可說2-4句，透露更多內心擔憂。
+   - 一次問太多問題、說教、急著衛教、輕率保證（「不用擔心」）、打斷、批判 → 變得簡短、保留或有點防衛，例如只回答其中一個問題、轉移話題、或說「我知道了」。
+   - 護生如果沒有自我介紹或沒說明來意，你可以有點疑惑或問「你是？」。
+   - 依你的性格調整基準：話少的人即使被問得好也不會一下子講很多；話多的人對封閉式問句也可能多說一點。
+4. 信任是累積的：會談前段較保留，護生持續做得好才慢慢說出真正的擔心；不要一開始就把心事全部說出來。
+5. 體現目前的身體狀況（疼痛、疲憊、呼吸困難等），可用括號簡短標示動作，如（喘氣）（沉默一下），但不要每句都加。
+6. 不提供醫療建議，不替護生總結，只是病患的視角。對專業問題可反問護生。
+7. 【輸出格式】每次回應的第一行開頭必須是一個標籤，格式固定為：【表情：X｜動作：Y】，接著才是病患說的話。
+   X 從這些選一個：平靜、難過、焦慮、疼痛、不悅、疲憊、微笑。
+   Y 從這些選一個：無、點頭、低頭、別過頭、手按胸口、嘆氣、搖頭、擦眼淚、揮手。
+   表情與動作要符合你當下的情緒和身體狀況（例如疼痛時手按胸口或傷口、難過時低頭或擦眼淚、防衛時別過頭）。標籤之後不要再加其他標題或說明。
+
+請現在以病患身份回應護生最新的一句話。`;
+}
+
+function fallbackPatientResponse(c,text){
+  const responses={
+    1:['我就是心裡很擔心啊…心臟出問題，以後還能做什麼？','胸口還是有點悶悶的感覺，醫生說要多休息，但我睡不著啊。','昨晚一直想，以後是不是要一直吃藥？','太太很擔心我，我也怕讓她操心…'],
+    2:['唉，我就說不就是腳破了嗎，住這麼久…','我在家有自己換藥啊，也有打胰島素的，差不多了啦。','什麼時候可以出院？家裡還有很多事情。','血糖高一點點沒關係吧，我吃東西很注意的。'],
+    3:['喘啊…你看我呼吸這樣，很難受。（停頓喘氣）','我抽了幾十年的菸，也沒事，就這兩年才比較不好。','每次發作都覺得快不行了，這次又比上次嚴重…','喘的時候就很怕，不知道什麼時候才能好。'],
+    4:['我不敢看那邊…（沉默）你覺得正常嗎，這樣？','先生昨晚一直說沒關係，可是…我自己知道不一樣了。','會不會要化療？想到就害怕…','謝謝你來陪我說話，我很需要有人說說話。'],
+    5:['唉唷，這腳一動就好痛…你輕一點好嗎。','我這麼老了，跌一跤，以後能走嗎？真的很擔心。','我不要變成累贅，要靠人家照顧，那怎麼辦。','昨天物理治療師叫我站起來，腳好軟，好怕再跌倒。'],
+    6:['傷口還是有點痛，可是還好，可以忍。','最重要的是什麼時候可以出院？我工作等不了啊。','要注意什麼？我很快就要回去上班的。','我老婆說要多休息，但我真的有很多事情要處理。'],
+  };
+  const arr=responses[c.id]||['嗯…（沉默）'];
+  const tag={1:'【表情：焦慮｜動作：手按胸口】',2:'【表情：不悅｜動作：別過頭】',3:'【表情：疲憊｜動作：嘆氣】',4:'【表情：難過｜動作：低頭】',5:'【表情：疼痛｜動作：無】',6:'【表情：平靜｜動作：點頭】'}[c.id]||'';
+  return tag+arr[Math.floor(Math.random()*arr.length)];
+}
+
+// 已知的中文聲音性別（Apple / Microsoft / Google）
+const VOICE_GENDER={
+  'mei-jia':'女','meijia':'女','hsiaochen':'女','hsiaoyu':'女','yating':'女','hanhan':'女','tingting':'女','xiaoxiao':'女','sinji':'女',
+  'yunjhe':'男','zhiwei':'男','yunxi':'男','kangkang':'男','wanlung':'男'
+};
+function voiceGender(v){
+  const n=(v.name||'').toLowerCase().replace(/[\s_]/g,'');
+  for(const k in VOICE_GENDER){ if(n.includes(k)) return VOICE_GENDER[k]; }
+  if(/female|女/i.test(v.name)) return '女';
+  if(/\bmale\b|男/i.test(v.name)) return '男';
+  return null;
+}
+function pickVoice(gender){
+  const voices=window.speechSynthesis.getVoices();
+  const tw=voices.filter(v=>/zh[-_]tw/i.test(v.lang)||/臺灣|台灣|taiwan/i.test(v.name));
+  const other=voices.filter(v=>/^zh/i.test(v.lang)&&!tw.includes(v));
+  const match=list=>list.find(v=>voiceGender(v)===gender);
+  return match(tw)||tw[0]||match(other)||other[0]||null;
+}
+function speakTTS(text){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const c=getCase()||{};
+  // 括號內的動作描述不念出來，只念說話內容
+  const spoken=text.replace(/[（(][^）)]*[）)]/g,'，').replace(/，{2,}/g,'，').replace(/^，|，$/g,'');
+  const utter=new SpeechSynthesisUtterance(spoken);
+  utter.lang='zh-TW';
+  const v=pickVoice(c.gender);
+  if(v) utter.voice=v;
+  const vs=c.voice||{};
+  let pitch=vs.pitch??1;
+  // 找不到符合性別的聲音時，用音高補償：男壓低、女抬高
+  if(!v||voiceGender(v)!==c.gender){ pitch=c.gender==='男'?Math.min(pitch,0.7):Math.max(pitch,1.2); }
+  utter.pitch=pitch;
+  utter.rate=vs.rate??0.95;
+  utter.onstart=startMouth; utter.onend=stopMouth; utter.onerror=stopMouth;
+  currentUtterance=utter;
+  window.speechSynthesis.speak(utter);
+}
+
+function addBubble(role,text,ts){
+  const area=document.getElementById('conv-area');
+  const wrap=document.createElement('div');
+  const d=new Date(ts);
+  const timeStr=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  wrap.className=`bubble-wrap ${role}`;
+  if(role==='system'){
+    wrap.innerHTML=`<div class="bubble">${text}</div>`;
+  } else {
+    const avatar=role==='nurse'?'👩‍⚕️':'👤';
+    wrap.innerHTML=`<div class="avatar">${avatar}</div><div><div class="bubble">${escHtml(text)}</div><div class="bubble-ts">${timeStr}</div></div>`;
+  }
+  area.appendChild(wrap);
+  scrollConv();
+}
+function scrollConv(){
+  const area=document.getElementById('conv-area');
+  area.scrollTop=area.scrollHeight;
+}
+function setStatus(msg){document.getElementById('status-msg').textContent=msg}
+
+function sendTextInput(){
+  const inp=document.getElementById('text-input');
+  const t=inp.value.trim();
+  if(!t||isSpeaking) return;
+  inp.value='';
+  startTimer();
+  handleNurseSpeech(t);
+}
+function endConv(force){
+  if(!state.conversation.length){toast('尚未開始會談');return}
+  if(state.convDuration<600 && !force){
+    document.getElementById('end-confirm-msg').textContent=`會談時間僅 ${Math.floor(state.convDuration/60)} 分 ${state.convDuration%60} 秒，建議至少 10 分鐘。確定要結束嗎？`;
+    document.getElementById('end-confirm').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('end-confirm').classList.add('hidden');
+  if(recognition) try{recognition.stop()}catch(e){}
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  stopMouth(); stopBlink(); stopCamera();
+  addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
+  buildProcessRecord();
+  document.getElementById('step-record').classList.add('done');
+  setTimeout(()=>renderPhase('record'),600);
+}
+
+// ===== PHASE 4: PROCESS RECORD (student writes from memory) =====
+const FIELDS=['nurseVerbal','nurseNonverbal','patientVerbal','patientNonverbal','techniques','analysis'];
+function blankRow(){return {nurseVerbal:'',nurseNonverbal:'',patientVerbal:'',patientNonverbal:'',techniques:'',analysis:''}}
+function exchangeCount(){return state.conversation.filter(m=>m.role==='nurse').length}
+function buildProcessRecord(){
+  // Start with blank rows equal to the number of exchanges (min 6); student fills every cell.
+  if(state.processRecord.length) return;
+  const n=Math.max(6,exchangeCount());
+  state.processRecord=Array.from({length:n},blankRow);
+}
+function addRow(){
+  syncRecordFromDOM();
+  state.processRecord.push(blankRow());
+  saveState();
+  if(state.phase==='record') renderRecordTable(); else renderAnalysisPhase();
+  const tb=document.getElementById(state.phase==='record'?'record-tbody':'analysis-tbody');
+  tb.lastElementChild?.querySelector('textarea')?.focus();
+}
+function removeRow(i){
+  syncRecordFromDOM();
+  if(state.processRecord.length<=1) return;
+  state.processRecord.splice(i,1);
+  saveState();
+  if(state.phase==='record') renderRecordTable(); else renderAnalysisPhase();
+}
+const delBtn=i=>`<td class="row-num"><button type="button" class="btn btn-sm" style="background:transparent;color:var(--text2);padding:4px" title="刪除此列" onclick="removeRow(${i})">✕</button></td>`;
+
+function renderRecordTable(){
+  buildProcessRecord();
+  document.getElementById('exchange-hint').textContent=exchangeCount();
+  const tbody=document.getElementById('record-tbody');
+  tbody.innerHTML=state.processRecord.map((r,i)=>`
+    <tr data-row="${i}">
+      <td class="row-num">${i+1}</td>
+      <td><textarea data-f="nurseVerbal" placeholder="我說了什麼…" onchange="updateRecord(${i},'nurseVerbal',this.value)">${escHtml(r.nurseVerbal)}</textarea></td>
+      <td><textarea data-f="nurseNonverbal" placeholder="我的表情、動作、姿勢、眼神…" onchange="updateRecord(${i},'nurseNonverbal',this.value)">${escHtml(r.nurseNonverbal)}</textarea></td>
+      <td><textarea data-f="patientVerbal" placeholder="病人說了什麼…" onchange="updateRecord(${i},'patientVerbal',this.value)">${escHtml(r.patientVerbal)}</textarea></td>
+      <td><textarea data-f="patientNonverbal" placeholder="病人的表情、動作、姿勢、語氣…" onchange="updateRecord(${i},'patientNonverbal',this.value)">${escHtml(r.patientNonverbal)}</textarea></td>
+      ${delBtn(i)}
+    </tr>
+  `).join('');
+}
+function addTech(i,t){
+  const ta=document.getElementById('tech-'+i); if(!ta) return;
+  const cur=ta.value.split(/[、,，\s]+/).filter(Boolean);
+  if(cur.includes(t)) return;
+  cur.push(t); ta.value=cur.join('、'); updateRecord(i,'techniques',ta.value); saveState();
+}
+function updateRecord(idx,field,val){
+  if(state.processRecord[idx]) state.processRecord[idx][field]=val;
+}
+
+// ===== PHASE 5: ANALYSIS =====
+function renderAnalysisPhase(){
+  syncRecordFromDOM();
+  setTimeout(renderRecordingPlayback,300);
+  buildProcessRecord();
+  document.getElementById('step-analysis').classList.add('done');
+  const tbody=document.getElementById('analysis-tbody');
+  tbody.innerHTML=state.processRecord.map((r,i)=>`
+    <tr data-row="${i}">
+      <td class="row-num">${i+1}</td>
+      <td><textarea data-f="nurseVerbal" onchange="updateRecord(${i},'nurseVerbal',this.value)">${escHtml(r.nurseVerbal)}</textarea></td>
+      <td><textarea data-f="nurseNonverbal" onchange="updateRecord(${i},'nurseNonverbal',this.value)">${escHtml(r.nurseNonverbal)}</textarea></td>
+      <td><textarea data-f="patientVerbal" onchange="updateRecord(${i},'patientVerbal',this.value)">${escHtml(r.patientVerbal)}</textarea></td>
+      <td><textarea data-f="patientNonverbal" onchange="updateRecord(${i},'patientNonverbal',this.value)">${escHtml(r.patientNonverbal)}</textarea></td>
+      <td><textarea id="tech-${i}" data-f="techniques" placeholder="點選下方技巧或自行輸入" onchange="updateRecord(${i},'techniques',this.value)">${escHtml(r.techniques)}</textarea>
+        <div class="tech-picker">${TECHNIQUES.map(t=>`<button type="button" class="tech-chip" onclick="addTech(${i},'${t}')">${t}</button>`).join('')}</div></td>
+      <td><textarea data-f="analysis" placeholder="這一句我做得如何？病人的反應說明了什麼？若重來會怎麼調整？" onchange="updateRecord(${i},'analysis',this.value)">${escHtml(r.analysis)}</textarea></td>
+      ${delBtn(i)}
+    </tr>
+  `).join('');
+  ['r1','r2','r3','r4'].forEach(k=>{
+    const el=document.getElementById('reflect'+k.substring(1));
+    if(el&&state.reflections[k]) el.value=state.reflections[k];
+  });
+}
+function syncRecordFromDOM(){
+  document.querySelectorAll('#record-tbody tr[data-row], #analysis-tbody tr[data-row]').forEach(tr=>{
+    const i=+tr.dataset.row; if(!state.processRecord[i]) return;
+    tr.querySelectorAll('textarea[data-f]').forEach(ta=>{ state.processRecord[i][ta.dataset.f]=ta.value; });
+  });
+}
+function syncReflections(){
+  ['1','2','3','4'].forEach(n=>{
+    const el=document.getElementById('reflect'+n);
+    if(el) state.reflections['r'+n]=el.value;
+  });
+}
+
+// ===== PHASE 6: EXPORT =====
+async function renderExportPhase(){
+  syncReflections();
+  syncRecordFromDOM();
+  document.getElementById('step-export').classList.add('done');
+  document.getElementById('student-report-preview').innerHTML=buildStudentReportHTML();
+  document.getElementById('ai-generating').classList.remove('hidden');
+  document.getElementById('ai-report-preview').innerHTML='';
+  // Generate AI report
+  try{
+    const aiText=await generateAiRecord();
+    state.aiRecord=aiText;
+    document.getElementById('ai-generating').classList.add('hidden');
+    document.getElementById('ai-report-preview').innerHTML=aiText;
+  }catch(e){
+    document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成，請稍後再試。';
+  }
+}
+
+function buildStudentReportHTML(){
+  const c=getCase(); if(!c) return '';
+  const date=new Date().toLocaleDateString('zh-TW');
+  const dur=`${Math.floor(state.convDuration/60)}分${state.convDuration%60}秒`;
+  let html=`
+    <div style="border:2px solid var(--border);border-radius:8px;padding:20px;background:var(--surface)">
+      <h3 style="text-align:center;margin-bottom:16px">行為過程記錄</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:16px">
+        <tr>
+          <td style="padding:6px;border:1px solid var(--border);background:var(--surface2);width:80px"><strong>學生姓名</strong></td>
+          <td style="padding:6px;border:1px solid var(--border)">${escHtml(state.studentName)}</td>
+          <td style="padding:6px;border:1px solid var(--border);background:var(--surface2);width:80px"><strong>日期</strong></td>
+          <td style="padding:6px;border:1px solid var(--border)">${date}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px;border:1px solid var(--border);background:var(--surface2)"><strong>科別</strong></td>
+          <td style="padding:6px;border:1px solid var(--border)">${c.deptLabel}</td>
+          <td style="padding:6px;border:1px solid var(--border);background:var(--surface2)"><strong>會談時長</strong></td>
+          <td style="padding:6px;border:1px solid var(--border)">${dur}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px;border:1px solid var(--border);background:var(--surface2)"><strong>個案代號</strong></td>
+          <td style="padding:6px;border:1px solid var(--border)" colspan="3">${c.name}　${c.age}歲 ${c.gender}　診斷：${c.dx}</td>
+        </tr>
+      </table>
+      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:16px;background:var(--surface2)">
+        <strong>會談目的：</strong><br><div style="margin-top:6px;line-height:1.8;white-space:pre-wrap">${escHtml(state.goals)}</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="record-table" style="font-size:.78rem">
+          <thead>
+            <tr>
+              <th style="width:32px">序</th>
+              <th style="width:18%;background:#dbeafe!important;color:#1e40af!important">護生語言反應</th>
+              <th style="width:14%;background:#dbeafe!important;color:#1e40af!important">護生非語言</th>
+              <th style="width:18%;background:#f1f5f9!important;color:#334155!important">病人語言反應</th>
+              <th style="width:14%;background:#f1f5f9!important;color:#334155!important">病人非語言</th>
+              <th style="width:14%">使用技巧</th>
+              <th style="width:18%">自我分析</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.processRecord.filter(r=>FIELDS.some(f=>r[f])).map((r,i)=>`
+              <tr>
+                <td style="text-align:center;font-weight:700">${i+1}</td>
+                <td style="padding:8px">${escHtml(r.nurseVerbal)}</td>
+                <td style="padding:8px">${escHtml(r.nurseNonverbal)||'—'}</td>
+                <td style="padding:8px">${escHtml(r.patientVerbal)}</td>
+                <td style="padding:8px">${escHtml(r.patientNonverbal)||'—'}</td>
+                <td style="padding:8px">${escHtml(r.techniques)||'—'}</td>
+                <td style="padding:8px">${escHtml(r.analysis)||'—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:20px">
+        <h4 style="margin-bottom:12px">整體反思</h4>
+        ${[
+          ['1. 此次會談最成功的部分',state.reflections.r1],
+          ['2. 可改善之處',state.reflections.r2],
+          ['3. 病人情緒/需求評估',state.reflections.r3],
+          ['4. 新體會與學習',state.reflections.r4],
+        ].map(([q,a])=>`
+          <div style="margin-bottom:14px">
+            <div style="font-weight:500;color:var(--text2);margin-bottom:4px">${q}</div>
+            <div style="padding:8px 12px;background:var(--surface2);border-radius:6px;line-height:1.8;white-space:pre-wrap;min-height:40px">${escHtml(a)||'（未填寫）'}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  return html;
+}
+
+async function generateAiRecord(){
+  const c=getCase(); if(!c) return '<p>無法生成</p>';
+  if(!sampleFn){
+    return buildAiFallbackRecord(c);
+  }
+  // 以實際逐字稿為依據（學生版是憑記憶書寫，AI 版用真實對話）
+  const pairs=[]; const conv=state.conversation;
+  for(let i=0;i<conv.length;i++){
+    if(conv[i].role==='nurse'){
+      const p=(conv[i+1]&&conv[i+1].role==='patient')?conv[i+1].text:'（病人未回應）';
+      pairs.push({n:conv[i].text,p});
+    }
+  }
+  const convText=pairs.map((r,i)=>`[第${i+1}句]\n護生說：${r.n}\n病人說：${r.p}`).join('\n\n');
+  const studentText=state.processRecord.filter(r=>r.nurseVerbal||r.patientVerbal).map((r,i)=>`[學生記錄第${i+1}句] 護生：${r.nurseVerbal}｜護生非語言：${r.nurseNonverbal||'未填'}｜病人：${r.patientVerbal}｜病人非語言：${r.patientNonverbal||'未填'}｜技巧：${r.techniques||'未填'}｜自我分析：${r.analysis||'未填'}`).join('\n');
+
+  const prompt=`你是一位資深護理教師，請根據以下護生與病人的會談「實際逐字稿」，產出一份專業的「AI版行為過程記錄」。
+
+病人背景：${c.name}，${c.age}歲${c.gender}性，${c.dx}；護理問題：${c.nursing.join('、')}；個性：${c.personality}；情緒：${c.emotional}
+護生自訂的會談目的：${state.goals}
+
+【實際逐字稿】
+${convText}
+
+【學生憑記憶寫的版本（供對照用，若有明顯遺漏或記錯可在整體評估中點出）】
+${studentText||'（學生未填寫）'}
+
+技巧名稱請只使用以下清單：${TECHNIQUES.join('、')}。若護生的回應屬於非治療性（例如：不當保證、說教、改變話題、一次問多個問題、批判、忽略感受），請在技巧欄標示「非治療性：○○」。
+
+請直接輸出 HTML（不要 markdown、不要 <html>/<body> 標籤），結構如下：
+1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（依語句合理推測，前加「推測：」）｜病人語言反應（引用原文）｜病人非語言反應（依診斷、情境、語句合理推測）｜使用技巧（用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">）｜教師分析與建議（針對這一句：做得好的地方、病人反應透露什麼、可以怎麼說更好，並給一句示範語句）
+2. 一個 <h4>整體評估</h4> 段落，包含：會談整體優點（2-3點）、建議加強之處（2-3點）、會談目的達成程度、學生記憶版本與實際逐字稿的落差（若有）。
+
+全部使用繁體中文、台灣護理用語，稱呼對方為「病人」，不要用「案主」或「個案」。`;
+
+  const res=await sampleFn(prompt,{maxTokens:6000});
+  return res.text;
+}
+
+function buildAiFallbackRecord(c){
+  return `
+    <div class="info-box info-warn">
+      <strong>提示：</strong>AI分析功能需要網路連線。以下顯示基本格式範例，請參考護理教師的說明。
+    </div>
+    <div style="margin-top:16px;overflow-x:auto">
+      <table class="record-table">
+        <thead><tr><th>序</th><th>護生語言</th><th>護生非語言（推測）</th><th>病人語言</th><th>病人非語言（推測）</th><th>技巧分析</th><th>教師建議</th></tr></thead>
+        <tbody>
+          ${state.processRecord.filter(r=>r.nurseVerbal).slice(0,3).map((r,i)=>`
+            <tr>
+              <td style="text-align:center">${i+1}</td>
+              <td>${escHtml(r.nurseVerbal)}</td>
+              <td>眼神注視個案，身體微前傾</td>
+              <td>${escHtml(r.patientVerbal)}</td>
+              <td>稍顯緊張，眼神游移</td>
+              <td><span class="tech-tag">主動傾聽</span></td>
+              <td>可加強眼神接觸與情感反映</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function makePdf(title,innerHtml,filename){
+  if(!window.html2pdf){ toast('PDF 產生器尚未載入，請稍後再試'); return; }
+  toast('正在產生 PDF…');
+  // 以固定的列印樣式在隱藏容器中排版（A4 橫向，白底黑字，不受深色模式影響）
+  const host=document.createElement('div');
+  host.style.cssText='position:absolute;left:-20000px;top:0;width:1100px;background:#fff;color:#111;font-family:"Noto Sans TC",system-ui,sans-serif;font-size:11pt;padding:24px;line-height:1.6';
+  host.innerHTML=`<style>
+    .pdf h2{text-align:center;font-size:16pt;margin:0 0 12px;color:#111}
+    .pdf h3,.pdf h4{font-size:12pt;margin:14px 0 6px;color:#111}
+    .pdf table{width:100%;border-collapse:collapse;font-size:9.5pt;page-break-inside:auto}
+    .pdf tr{page-break-inside:avoid}
+    .pdf td,.pdf th{border:1px solid #999;padding:5px 6px;vertical-align:top;color:#111;background:#fff}
+    .pdf th{background:#e8eef5;font-weight:600}
+    .pdf .tech-tag{display:inline-block;border:1px solid #7a9cc6;border-radius:4px;padding:1px 5px;margin:1px;font-size:8.5pt;background:#eef4fb;color:#1e3a5f}
+    .pdf .tech-non{border-color:#d9a441;background:#fdf3dc;color:#7a4b00}
+    .pdf .info-box,.pdf .pre-filled{background:#f5f5f5;color:#111}
+    .pdf *{box-shadow:none!important}
+  </style><div class="pdf" id="pdf-root">${title?`<h2>${escHtml(title)}</h2>`:''}${innerHtml}</div>`;
+  document.body.appendChild(host);
+  const root=host.querySelector('#pdf-root');
+  try{
+    const blob=await html2pdf().set({
+      margin:[10,10,12,10], filename,
+      image:{type:'jpeg',quality:0.95},
+      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
+      pagebreak:{mode:['css','legacy']}
+    }).from(root).outputPdf('blob');
+    saveBlob(filename,blob);
+    toast('PDF 已產生');
+  }catch(e){ if(e&&e.code!=='cancelled') toast('PDF 產生失敗：'+(e.message||'')); }
+  finally{ host.remove(); }
+}
+async function downloadStudentReport(){
+  const c=getCase();
+  await makePdf('',document.getElementById('student-report-preview').innerHTML,`行為過程記錄_${state.studentName}_${c.name}.pdf`);
+}
+async function downloadAiReport(){
+  const c=getCase();
+  const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${new Date().toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML;
+  await makePdf('行為過程記錄（AI 版）',body,`AI行為過程記錄_${state.studentName}_${c.name}.pdf`);
+}
+
+function generateExport(){
+  syncReflections();
+  syncRecordFromDOM();
+  renderPhase('export');
+}
+
+// ===== PHASE 7: REVIEW =====
+const EXPR_ZH={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
+const GEST_ZH={nod:'點頭','g-nod':'點頭',down:'低頭','g-down':'低頭',away:'別過頭','g-away':'別過頭',chest:'手按胸口','g-chest':'手按胸口',sigh:'嘆氣','g-sigh':'嘆氣',wave:'揮手','g-wave':'揮手',shake:'搖頭','g-shake':'搖頭',cover:'擦眼淚','g-cover':'擦眼淚'};
+function renderReviewPhase(){
+  document.getElementById('step-review').classList.add('done');
+  const c=getCase(); const conv=state.conversation;
+  const t0=conv.length?conv[0].ts:Date.now();
+  const dur=`${Math.floor(state.convDuration/60)}分${state.convDuration%60}秒`;
+  document.getElementById('review-meta').innerHTML=`病人：${c?c.name:''}（${c?c.deptLabel:''}）　會談時長：${dur}　共 ${conv.filter(m=>m.role==='nurse').length} 次互動`;
+  const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+  let n=0;
+  document.getElementById('review-transcript').innerHTML=conv.map(m=>{
+    if(m.role==='nurse'){ n++; return `<div style="display:flex;gap:10px;align-items:flex-start"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:6px">${fmt(m.ts-t0)}</div><div style="flex:1;background:var(--nurse-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--primary-dark);font-weight:700">護生 第${n}句</span><br>${escHtml(m.text)}</div></div>`; }
+    const tags=[m.expr&&EXPR_ZH[m.expr]?`表情：${EXPR_ZH[m.expr]}`:'',m.gest&&GEST_ZH[m.gest]?`動作：${GEST_ZH[m.gest]}`:''].filter(Boolean).join('　');
+    return `<div style="display:flex;gap:10px;align-items:flex-start"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:6px">${fmt(m.ts-t0)}</div><div style="flex:1;background:var(--patient-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--text2);font-weight:700">病人</span>${tags?`<span style="font-size:.72rem;color:var(--warn);margin-left:8px">${tags}</span>`:''}<br>${escHtml(m.text)}</div></div>`;
+  }).join('')||'<div style="color:var(--text2);font-size:.85rem">沒有會談內容</div>';
+  // video
+  const vc=document.getElementById('review-video-card'), nv=document.getElementById('review-no-video');
+  if(typeof recBlob!=='undefined'&&recBlob&&recStart){
+    vc.classList.remove('hidden'); nv.classList.add('hidden');
+    const v=document.getElementById('review-video');
+    if(v.dataset.blobUrl) URL.revokeObjectURL(v.dataset.blobUrl);
+    const url=URL.createObjectURL(recBlob); v.src=url; v.dataset.blobUrl=url;
+    let k=0;
+    document.getElementById('review-marks').innerHTML=conv.filter(m=>m.role==='nurse').map(m=>{k++;const sec=Math.max(0,(m.ts-recStart)/1000-1.5);return `<span class="ts-chip" onclick="const v=document.getElementById('review-video');v.currentTime=${sec.toFixed(1)};v.play().catch(()=>{})"><b>${fmt(sec*1000)}</b> 第${k}句</span>`}).join('');
+  } else { vc.classList.add('hidden'); nv.classList.remove('hidden'); }
+}
+
+// ===== UTILS =====
+function escHtml(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+// ===== PERSISTENCE (per-browser convenience) =====
+const SAVE_KEY='bpr-practice-v1';
+function saveState(){
+  try{
+    const {phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections}=state;
+    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections,savedAt:Date.now()}));
+  }catch(e){}
+}
+function loadState(){
+  try{const raw=localStorage.getItem(SAVE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}
+}
+function resumeSaved(){
+  const s=loadState(); if(!s||!s.caseId) return;
+  Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
+  ['goals','conv','record','analysis','export'].forEach(p=>document.getElementById('step-'+p).classList.add('done'));
+  renderCases();
+  if(state.conversation.length){ renderPhase('record'); toast('已恢復上次的會談記錄'); }
+  else { renderPhase('goals'); }
+}
+function clearSaved(){
+  try{localStorage.removeItem(SAVE_KEY)}catch(e){}
+  location.reload();
+}
+function renderResumeBanner(){
+  const s=loadState();
+  const existing=document.getElementById('resume-banner'); if(existing) existing.remove();
+  if(!s||!s.caseId) return;
+  const c=CASES.find(x=>x.id===s.caseId); if(!c) return;
+  const d=new Date(s.savedAt||Date.now()).toLocaleString('zh-TW',{hour12:false});
+  const el=document.createElement('div');
+  el.id='resume-banner';
+  el.className='info-box info-success';
+  el.style.cssText='margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  el.innerHTML=`<span style="flex:1">上次練習：${escHtml(s.studentName||'')}・${c.name}（${c.deptLabel}）・${s.conversation?.length||0} 句對話・${d}</span>
+    <button class="btn btn-success btn-sm" onclick="resumeSaved()">繼續上次</button>
+    <button class="btn btn-outline btn-sm" onclick="clearSaved()">清除重來</button>`;
+  document.getElementById('phase-cases').insertBefore(el,document.getElementById('case-grid'));
+}
+document.addEventListener('change',e=>{ if(e.target.matches('textarea,input')) { syncRecordFromDOM(); syncReflections(); saveState(); } });
+window.addEventListener('beforeunload',()=>{ syncRecordFromDOM(); syncReflections(); saveState(); });
+
+// ===== INIT =====
+renderCases();
+renderResumeBanner();
+if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices(); window.speechSynthesis.getVoices(); }
+</script>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const EXPR={
+  neutral:{},
+  sad:{browInnerUp:.75,mouthFrownLeft:.6,mouthFrownRight:.6,eyeSquintLeft:.15,eyeSquintRight:.15,mouthPressLeft:.15,mouthPressRight:.15,browDownLeft:.1,browDownRight:.1},
+  anxious:{browInnerUp:.65,browDownLeft:.15,browDownRight:.15,eyeWideLeft:.25,eyeWideRight:.25,mouthStretchLeft:.2,mouthStretchRight:.2,mouthPressLeft:.2,mouthPressRight:.2},
+  pain:{browDownLeft:.7,browDownRight:.7,browInnerUp:.4,eyeSquintLeft:.75,eyeSquintRight:.75,noseSneerLeft:.4,noseSneerRight:.4,mouthPressLeft:.4,mouthPressRight:.4,cheekSquintLeft:.4,cheekSquintRight:.4,jawOpen:.08},
+  angry:{browDownLeft:.85,browDownRight:.85,mouthFrownLeft:.3,mouthFrownRight:.3,mouthPressLeft:.45,mouthPressRight:.45,noseSneerLeft:.2,noseSneerRight:.2,eyeSquintLeft:.2,eyeSquintRight:.2},
+  tired:{eyeBlinkLeft:.45,eyeBlinkRight:.45,browInnerUp:.2,mouthFrownLeft:.2,mouthFrownRight:.2,jawOpen:.05,cheekPuff:.05},
+  smile:{mouthSmileLeft:.7,mouthSmileRight:.7,cheekSquintLeft:.4,cheekSquintRight:.4,eyeSquintLeft:.25,eyeSquintRight:.25,browInnerUp:.1}
+};
+const VISEMES=['viseme_aa','viseme_O','viseme_E','viseme_I','viseme_U','viseme_PP','viseme_FF','viseme_DD'];
+// 手勢：骨骼目標角度（弧度）。載入您自己的頭像後若手部位置不自然，調整這裡的數值即可。
+const GESTURES={
+  nod:   {bones:{Head:{x:.28}},                       hold:.35, loop:2, period:.55},
+  shake: {bones:{Head:{y:.22}},                       hold:.3,  loop:2, period:.5, alternate:true},
+  down:  {bones:{Head:{x:.42},Neck:{x:.12}},          hold:5},
+  away:  {bones:{Head:{y:-.55,z:.08},Neck:{y:-.15}},  hold:5},
+  chest: {bones:{RightArm:{y:-1.2,z:.85,x:.7},RightForeArm:{z:-2.5,x:.3}}, hold:6},
+  cover: {bones:{RightArm:{y:-1.2,z:1.0,x:1.1},RightForeArm:{z:-2.8,x:.4},Head:{x:.22}}, hold:5},
+  sigh:  {bones:{Spine2:{x:-.1},Head:{x:-.12}},       hold:.9, loop:1, period:1.6},
+  wave:  {bones:{LeftArm:{y:-1.5},LeftForeArm:{z:2.0}}, hold:2.5}
+};
+
+const container=document.getElementById('avatar-3d');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+container.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(28,4/3,.1,20);
+camera.position.set(0,1.52,1.05); camera.lookAt(0,1.47,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8899aa,1.1));
+const key=new THREE.DirectionalLight(0xfff4e6,1.6); key.position.set(1.2,2.4,1.6); scene.add(key);
+const fill=new THREE.DirectionalLight(0xdbe9ff,.7); fill.position.set(-1.5,1.6,1); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xffffff,.5); rim.position.set(0,2,-2); scene.add(rim);
+
+let model=null, morphMeshes=[], bones={}, baseRot={};
+let exprTarget={}, exprCur={}, mouthOn=false, visemeCur=null, visemeNext=0, blinkAt=2, blinkPhase=0;
+let gest=null, clock=new THREE.Clock();
+
+function resize(){
+  const w=container.clientWidth||400, h=container.clientHeight||300;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(container); resize();
+
+function setMorph(name,v){
+  for(const m of morphMeshes){ const i=m.morphTargetDictionary[name]; if(i!==undefined) m.morphTargetInfluences[i]=v; }
+}
+function allMorphNames(){ const set=new Set(); morphMeshes.forEach(m=>Object.keys(m.morphTargetDictionary).forEach(k=>set.add(k))); return [...set]; }
+
+async function load(url,opts={}){
+  if(model){ scene.remove(model); model=null; }
+  morphMeshes=[]; bones={}; baseRot={}; exprCur={}; exprTarget={};
+  const loader=new GLTFLoader();
+  const sep=url.includes('?')?'&':'?';
+  const full=(!/^https?:/i.test(url)||url.includes('morphTargets='))?url:url+sep+'morphTargets=ARKit,Oculus%20Visemes&textureSizeLimit=1024&textureFormat=png';
+  const gltf=await loader.loadAsync(full).catch(e=>{throw new Error(e&&e.message?e.message:(e&&e.target&&e.target.status?('HTTP '+e.target.status):'無法下載模型（網路、CORS 或網址錯誤）'))});
+  model=gltf.scene; scene.add(model);
+  model.traverse(o=>{
+    if(o.isMesh&&o.morphTargetDictionary){ morphMeshes.push(o); o.frustumCulled=false; }
+    if(o.isBone){ bones[o.name]=o; baseRot[o.name]=o.rotation.clone(); }
+  });
+  // 將模型置中：以頭骨位置對齊鏡頭
+  const head=bones['Head'];
+  if(head){ const p=new THREE.Vector3(); head.getWorldPosition(p); model.position.y+= (1.5-p.y); model.position.x-=p.x; }
+  // 年長者：眼皮微垂、嘴角微下
+  if(opts.old){ setMorph('eyeBlinkLeft',.12); setMorph('eyeBlinkRight',.12); }
+  return allMorphNames();
+}
+
+function setExpression(name){
+  exprTarget=Object.assign({},EXPR[name]||{});
+}
+function startMouth(){ mouthOn=true; }
+function stopMouth(){ mouthOn=false; }
+function gesture(name){
+  const g=GESTURES[name]; if(!g) return;
+  gest={def:g,t:0,done:false};
+}
+
+function lerp(a,b,k){return a+(b-a)*k}
+const EXPR_KEYS=['browInnerUp','browDownLeft','browDownRight','mouthFrownLeft','mouthFrownRight','mouthSmileLeft','mouthSmileRight','eyeSquintLeft','eyeSquintRight','eyeWideLeft','eyeWideRight','mouthPressLeft','mouthPressRight','mouthStretchLeft','mouthStretchRight','noseSneerLeft','noseSneerRight','cheekSquintLeft','cheekSquintRight','cheekPuff','jawOpen','eyeBlinkLeft','eyeBlinkRight'];
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(.05,clock.getDelta()), t=clock.elapsedTime;
+  if(model){
+    // expressions
+    for(const k of EXPR_KEYS){
+      const tgt=exprTarget[k]||0; const cur=exprCur[k]||0;
+      exprCur[k]=lerp(cur,tgt,1-Math.pow(.001,dt));
+    }
+    // blink
+    blinkAt-=dt;
+    if(blinkAt<=0){ blinkPhase=.22; blinkAt=2.2+Math.random()*3; }
+    let blink=0;
+    if(blinkPhase>0){ blinkPhase-=dt; blink=Math.sin(Math.PI*Math.max(0,blinkPhase)/.22); }
+    for(const k of EXPR_KEYS){
+      let v=exprCur[k];
+      if(k==='eyeBlinkLeft'||k==='eyeBlinkRight') v=Math.max(v,blink);
+      setMorph(k,v);
+    }
+    // mouth / visemes
+    if(mouthOn){
+      visemeNext-=dt;
+      if(visemeNext<=0){ visemeCur=VISEMES[Math.floor(Math.random()*VISEMES.length)]; visemeNext=.09+Math.random()*.09; }
+      for(const v of VISEMES){ const cur=mouthMorph[v]||0; mouthMorph[v]=lerp(cur,v===visemeCur?.75:0,1-Math.pow(.0005,dt)); setMorph(v,mouthMorph[v]); }
+      const jaw=lerp(mouthMorph.jaw||0,(visemeCur==='viseme_aa'||visemeCur==='viseme_O')?.35:.12,1-Math.pow(.0005,dt)); mouthMorph.jaw=jaw;
+      setMorph('jawOpen',Math.max(exprCur.jawOpen||0,jaw));
+    } else {
+      for(const v of VISEMES){ const cur=mouthMorph[v]||0; if(cur>0.001){ mouthMorph[v]=lerp(cur,0,1-Math.pow(.001,dt)); setMorph(v,mouthMorph[v]); } }
+      mouthMorph.jaw=lerp(mouthMorph.jaw||0,0,1-Math.pow(.001,dt));
+    }
+    // idle motion + gestures (bones)
+    const idle={Head:{x:Math.sin(t*.6)*.025,y:Math.sin(t*.37)*.05,z:Math.sin(t*.45)*.015},Spine2:{x:Math.sin(t*1.1)*.012},Spine1:{x:Math.sin(t*1.1)*.01}};
+    const target={};
+    for(const b in idle) target[b]=Object.assign({},idle[b]);
+    if(gest){
+      const g=gest.def; gest.t+=dt;
+      let amp=1;
+      const total=g.loop?g.loop*g.period:(g.hold+1.2);
+      if(g.loop){ const ph=(gest.t/g.period)%1; amp=Math.sin(ph*Math.PI); if(g.alternate){ amp*=(Math.floor(gest.t/g.period)%2?-1:1);} }
+      else { const inT=.5, outStart=g.hold; amp=gest.t<inT?gest.t/inT:gest.t<outStart?1:Math.max(0,1-(gest.t-outStart)/.8); }
+      if(gest.t>=total) gest=null;
+      for(const b in g.bones){ target[b]=target[b]||{}; for(const ax in g.bones[b]) target[b][ax]=(target[b][ax]||0)+g.bones[b][ax]*amp; }
+    }
+    for(const b in target){
+      const bone=bones[b]; if(!bone) continue; const base=baseRot[b];
+      for(const ax of ['x','y','z']){ const want=base[ax]+(target[b][ax]||0); bone.rotation[ax]=lerp(bone.rotation[ax],want,1-Math.pow(.002,dt)); }
+    }
+  }
+  renderer.render(scene,camera);
+}
+const mouthMorph={};
+animate();
+
+window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture};
+</script>
+
+</body>
+</html>
