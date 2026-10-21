@@ -1125,11 +1125,11 @@ function toGemini(messages,system,maxTokens){
 }
 // 會談：快為主（flash-lite，約 1 秒）；報告：品質為主（可以慢）。逾時或錯誤自動換下一個模型。
 const GEMINI_CHAT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
-const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-2.5-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
+const GEMINI_REPORT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
 let geminiModelOverride=null;
 function geminiModels(kind){ const st=getSettings(); const base=kind==='report'?GEMINI_REPORT_MODELS:GEMINI_CHAT_MODELS; const m=kind==='report'?base[0]:(geminiModelOverride||st.gModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
 async function geminiFetch(method,body,kind){
-  const st=getSettings(); let lastErr=null; const timeoutMs=kind==='report'?120000:12000;
+  const st=getSettings(); let lastErr=null; const timeoutMs=kind==='report'?45000:12000;
   for(const model of geminiModels(kind)){
     const ac=new AbortController(); const timer=setTimeout(()=>ac.abort(),timeoutMs);
     let res;
@@ -1184,7 +1184,7 @@ async function apiSampleStream(input,opts={}){
   const st=getSettings();
   if((st.provider||'gemini')==='gemini'){ if(!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰'),{code:'no_key'}); return geminiSampleStream(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰'),{code:'no_key'});
-  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -1214,7 +1214,7 @@ function captureNurseFrame(){
   try{
     const v=document.getElementById('cam-video'); if(!camStream||!v||v.readyState<2||!v.videoWidth) return null;
     const c=captureNurseFrame._c||(captureNurseFrame._c=document.createElement('canvas'));
-    const w=320, h=Math.round(320*v.videoHeight/v.videoWidth); c.width=w; c.height=h;
+    const w=256, h=Math.round(256*v.videoHeight/v.videoWidth); c.width=w; c.height=h;
     const ctx=c.getContext('2d'); ctx.translate(w,0); ctx.scale(-1,1); ctx.drawImage(v,0,0,w,h);
     return c.toDataURL('image/jpeg',0.6);
   }catch(e){ return null; }
@@ -1834,7 +1834,7 @@ async function renderExportPhase(){
     document.getElementById('ai-generating').classList.add('hidden');
     document.getElementById('ai-report-preview').innerHTML=aiText;
   }catch(e){
-    document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成，請稍後再試。';
+    document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成：'+escHtml(e&&e.message||'')+' <button class="btn btn-outline btn-sm" onclick="renderExportPhase()">重試</button>';
   }
 }
 
@@ -1952,12 +1952,14 @@ ${studentText||'（學生未填寫）'}
   const parts=[{text:prompt}];
   let nImg=0, k=0;
   for(const m of state.conversation){ if(m.role!=='nurse') continue; k++;
-    const fr=(m.frames||[]).slice(0,2); if(!fr.length) continue;
-    parts.push({text:`\n[護生第${k}句「${m.text.slice(0,30)}」當下的鏡頭畫面，第一張是說話時、第二張是聽病人回應時]`});
-    for(const img of fr){ if(nImg>=40) break; parts.push({image:img}); nImg++; }
+    const fr=(m.frames||[]).slice(0,1); if(!fr.length) continue;
+    parts.push({text:`\n[護生第${k}句「${m.text.slice(0,30)}」說話時的鏡頭畫面]`});
+    for(const img of fr){ if(nImg>=20) break; parts.push({image:img}); nImg++; }
   }
   if(nImg){ parts.push({text:`\n以上共 ${nImg} 張護生的鏡頭畫面。請務必根據畫面描述每一句的「護生非語言反應」（眼神是否看著病人、表情、頭部動作、身體姿勢、手部），有畫面的句子不要寫「推測」，而是寫「畫面：…」；並在整體評估最後新增一段「非語言行為回饋」，具體指出做得好的和需要調整的（例如低頭看稿、面無表情、身體後仰、缺乏點頭回應）。`}); }
-  const res=await sampleFn(nImg?[{role:'user',parts}]:prompt,{maxTokens:6000,kind:'report'});
+  const input=nImg?[{role:'user',parts}]:prompt;
+  const onDelta=(full)=>{ const el=document.getElementById('ai-report-preview'); if(el) el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g) g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
+  const res=await apiSampleStream(input,{maxTokens:5000,kind:'report',onDelta});
   return res.text;
 }
 
