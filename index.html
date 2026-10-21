@@ -636,7 +636,7 @@ input[type=text]:focus{border-color:var(--primary)}
         </select></div>
       <div id="prov-gemini">
         <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.7-flash"></div>
+        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.5-flash-lite"></div>
         <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可，免費層不需信用卡。</div>
       </div>
       <div id="prov-anthropic" class="hidden">
@@ -1023,7 +1023,7 @@ function openSettings(){
   const st=getSettings();
   document.getElementById('set-provider').value=st.provider||'gemini';
   document.getElementById('set-gkey').value=st.gKey||'';
-  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.7-flash';
+  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.5-flash-lite';
   toggleProviderFields();
   document.getElementById('set-apikey').value=st.apiKey||'';
   document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
@@ -1051,14 +1051,20 @@ function toGemini(messages,system,maxTokens){
     contents:messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:msgParts(m).map(p=>p.image?{inline_data:{mime_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{text:p.text||''})})),
     generationConfig:{maxOutputTokens:maxTokens||1024,temperature:0.9}};
 }
-const GEMINI_FALLBACKS=['gemini-3.7-flash','gemini-3.8-flash','gemini-3.5-flash','gemini-2.5-flash','gemini-flash-latest'];
+// 會談：快為主（flash-lite，約 1 秒）；報告：品質為主（可以慢）。逾時或錯誤自動換下一個模型。
+const GEMINI_CHAT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
+const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-2.5-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
 let geminiModelOverride=null;
-function geminiModels(){ const st=getSettings(); const m=geminiModelOverride||st.gModel||'gemini-3.7-flash'; return [m,...GEMINI_FALLBACKS.filter(x=>x!==m)]; }
-async function geminiFetch(method,body){
-  const st=getSettings(); let lastErr=null;
-  for(const model of geminiModels()){
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${method.includes('stream')?'?alt=sse&':'?'}key=${encodeURIComponent(st.gKey)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
-    if(res.ok){ if(model!==(st.gModel||'gemini-3.7-flash')){ geminiModelOverride=model; console.warn('Gemini 改用模型',model); } return res; }
+function geminiModels(kind){ const st=getSettings(); const base=kind==='report'?GEMINI_REPORT_MODELS:GEMINI_CHAT_MODELS; const m=kind==='report'?base[0]:(geminiModelOverride||st.gModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
+async function geminiFetch(method,body,kind){
+  const st=getSettings(); let lastErr=null; const timeoutMs=kind==='report'?120000:12000;
+  for(const model of geminiModels(kind)){
+    const ac=new AbortController(); const timer=setTimeout(()=>ac.abort(),timeoutMs);
+    let res;
+    try{ res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${method.includes('stream')?'?alt=sse&':'?'}key=${encodeURIComponent(st.gKey)}`,{method:'POST',signal:ac.signal,headers:{'content-type':'application/json'},body:JSON.stringify(body)}); }
+    catch(e){ clearTimeout(timer); lastErr=new Error('Gemini 逾時（'+model+'）'); console.warn('Gemini 逾時，換模型',model); continue; }
+    if(res.ok){ if(kind!=='report'&&model!==(st.gModel||GEMINI_CHAT_MODELS[0])){ geminiModelOverride=model; console.warn('Gemini 改用模型',model); } res.__timer=timer; return res; }
+    clearTimeout(timer);
     let t=''; try{t=(await res.json()).error?.message||''}catch(e){}
     lastErr=new Error('Gemini 錯誤 '+res.status+' '+t);
     if(![404,429,503,400].includes(res.status)) break;   // 其他錯誤（如金鑰無效）不再換模型
@@ -1068,13 +1074,14 @@ async function geminiFetch(method,body){
 }
 async function geminiSample(input,opts={}){
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await geminiFetch('generateContent',toGemini(messages,opts.system,opts.maxTokens));
-  const j=await res.json();
+  const res=await geminiFetch('generateContent',toGemini(messages,opts.system,opts.maxTokens),opts.kind);
+  const j=await res.json(); clearTimeout(res.__timer);
   return {text:(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('')};
 }
 async function geminiSampleStream(input,opts={}){
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await geminiFetch('streamGenerateContent',toGemini(messages,opts.system,opts.maxTokens));
+  const res=await geminiFetch('streamGenerateContent',toGemini(messages,opts.system,opts.maxTokens),opts.kind);
+  clearTimeout(res.__timer);
   const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
   while(true){
     const {value,done}=await reader.read(); if(done) break;
@@ -1803,7 +1810,7 @@ ${studentText||'（學生未填寫）'}
     for(const img of fr){ if(nImg>=40) break; parts.push({image:img}); nImg++; }
   }
   if(nImg){ parts.push({text:`\n以上共 ${nImg} 張護生的鏡頭畫面。請務必根據畫面描述每一句的「護生非語言反應」（眼神是否看著病人、表情、頭部動作、身體姿勢、手部），有畫面的句子不要寫「推測」，而是寫「畫面：…」；並在整體評估最後新增一段「非語言行為回饋」，具體指出做得好的和需要調整的（例如低頭看稿、面無表情、身體後仰、缺乏點頭回應）。`}); }
-  const res=await sampleFn(nImg?[{role:'user',parts}]:prompt,{maxTokens:6000});
+  const res=await sampleFn(nImg?[{role:'user',parts}]:prompt,{maxTokens:6000,kind:'report'});
   return res.text;
 }
 
