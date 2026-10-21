@@ -685,6 +685,7 @@ input[type=text]:focus{border-color:var(--primary)}
       <select id="set-engine" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
         <option value="3d">3D 擬真人物（免費）</option>
         <option value="simli">Simli 真人影像（需 Simli 金鑰）</option>
+        <option value="liveavatar">HeyGen LiveAvatar 真人影像（需 LiveAvatar 金鑰）</option>
       </select>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div style="grid-column:1/-1"><label>Simli API 金鑰</label><input type="text" id="set-simli-key" placeholder="由 app.simli.com 取得"></div>
@@ -693,6 +694,13 @@ input[type=text]:focus{border-color:var(--primary)}
       </div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">Face ID 可在 app.simli.com 的臉孔庫複製（內建亞洲面孔），或上傳照片自製。<button class="btn btn-outline btn-sm" type="button" onclick="listSimliFaces()">列出我的臉孔</button> <button class="btn btn-outline btn-sm" type="button" onclick="testSimli()">▶ 連線測試（約 20 秒）</button> <span id="simli-msg"></span></div>
       <div id="simli-face-list" style="font-size:.75rem;color:var(--text2);line-height:1.6"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/-1"><label>LiveAvatar API 金鑰</label><input type="text" id="set-la-key" placeholder="由 app.liveavatar.com 取得"></div>
+        <div><label>男性病人 Avatar ID</label><input type="text" id="set-la-m" placeholder="UUID"></div>
+        <div><label>女性病人 Avatar ID</label><input type="text" id="set-la-f" placeholder="UUID"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6"><button class="btn btn-outline btn-sm" type="button" onclick="listLiveAvatars()">列出公開數位人</button> <button class="btn btn-outline btn-sm" type="button" onclick="testLiveAvatar()">▶ LiveAvatar 連線測試</button> <span id="la-msg"></span></div>
+      <div id="la-list" style="font-size:.75rem;color:var(--text2);line-height:1.6;max-height:220px;overflow:auto"></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
       <hr class="divider" style="margin:4px 0">
@@ -1095,7 +1103,7 @@ class SimliSession{
     const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
     if(!faceId) throw new Error('未設定此性別病人的 Face ID');
     say('取得連線票…');
-    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:false,maxSessionLength:3600,maxIdleTime:900})});
+    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:true,maxSessionLength:3600,maxIdleTime:900})});
     if(!tr.ok) throw new Error('Simli 連線票失敗 '+tr.status+'：'+(await tr.text()).slice(0,120));
     const token=(await tr.json()).session_token;
     let iceServers=[{urls:'stun:stun.l.google.com:19302'}];
@@ -1140,7 +1148,91 @@ class SimliSession{
   clear(){ try{ this.ws&&this.ws.readyState===1&&this.ws.send('SKIP'); }catch(e){} this.queueEnd=0; this._paceEnd=0; this.__curGen=(this.__curGen||0)+1; this._gen=this.__curGen; }
   stop(){ this.closed=true; try{ this.ws&&this.ws.readyState===1&&this.ws.send('DONE'); }catch(e){} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.pc&&this.pc.close(); }catch(e){} this.pc=null; this.ws=null; this.ready=false; }
 }
-let simli=null;
+let simli=null, liveav=null;
+function vidEngine(){ if(simli&&simli.ready) return simli; if(liveav&&liveav.ready) return liveav; return null; }
+function laOn(){ const st=getSettings(); return st.engine==='liveavatar'&&!!st.laKey; }
+function laAvatarFor(c){ const st=getSettings(); return c.gender==='女'?st.laF:st.laM; }
+async function blobToPCM(blob,rate){
+  ensureAudioCtx(); const ctx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
+  const n=Math.ceil(buf.duration*rate);
+  const off=new OfflineAudioContext(1,n,rate); const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
+  const out=await off.startRendering(); const ch=out.getChannelData(0); const pcm=new Int16Array(ch.length);
+  for(let i=0;i<ch.length;i++){ const v=Math.max(-1,Math.min(1,ch[i])); pcm[i]=v<0?v*32768:v*32767; }
+  return {pcm,duration:buf.duration};
+}
+function b64FromBytes(u8){ let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192)); return btoa(s); }
+class LiveAvatarSession{
+  constructor(){ this.ready=false; this.room=null; this.ws=null; this.closed=false; this.waiters={}; this.keep=null; this.sessionId=null; }
+  async start(avatarId,onStatus){
+    const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
+    if(!avatarId) throw new Error('未設定此性別病人的 Avatar ID');
+    if(!window.LivekitClient) throw new Error('影像元件未載入（livekit-client）');
+    say('取得連線票…');
+    const tr=await fetch('https://api.liveavatar.com/v1/sessions/token',{method:'POST',headers:{'Content-Type':'application/json','X-API-KEY':st.laKey},body:JSON.stringify({mode:'LITE',avatar_id:avatarId,is_sandbox:false,video_settings:{quality:'high',encoding:'H264'}})});
+    if(!tr.ok) throw new Error('LiveAvatar token 失敗 '+tr.status+'：'+(await tr.text()).slice(0,140));
+    const tok=(await tr.json()).data||{}; this.sessionId=tok.session_id;
+    say('啟動數位人…');
+    const sr=await fetch('https://api.liveavatar.com/v1/sessions/start',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok.session_token},body:'{}'});
+    if(!sr.ok) throw new Error('LiveAvatar start 失敗 '+sr.status+'：'+(await sr.text()).slice(0,140));
+    const d=(await sr.json()).data||{};
+    say('連接影像…');
+    const LK=window.LivekitClient; const room=new LK.Room({adaptiveStream:true,dynacast:true}); this.room=room;
+    const v=document.getElementById('simli-video'), a=document.getElementById('simli-audio');
+    room.on(LK.RoomEvent.TrackSubscribed,(track)=>{ if(track.kind==='video'){ track.attach(v); v.play().catch(()=>{}); } else if(track.kind==='audio'){ track.attach(a); a.play().catch(()=>{}); } });
+    await room.connect(d.livekit_url,d.livekit_client_token);
+    if(!d.ws_url) throw new Error('LiveAvatar 未回傳事件通道');
+    const ws=new WebSocket(d.ws_url); this.ws=ws;
+    await new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(new Error('LiveAvatar 連線逾時')),25000);
+      ws.onmessage=(e)=>{ let j; try{ j=JSON.parse(e.data); }catch(err){ return; }
+        if(j.type==='session.state_updated'&&j.state==='connected'){ clearTimeout(timeout); this.ready=true; say(''); resolve(); }
+        if(j.type==='agent.speak_ended'||j.type==='agent.speak_interrupted'){ const w=this.waiters[j.source_event_id]; if(w){ w(); delete this.waiters[j.source_event_id]; } }
+        if(j.type==='error') console.warn('LiveAvatar error',j.error);
+      };
+      ws.onerror=()=>{ clearTimeout(timeout); reject(new Error('LiveAvatar WebSocket 錯誤')); };
+      ws.onclose=()=>{ this.ready=false; };
+    });
+    this.keep=setInterval(()=>{ try{ ws.readyState===1&&ws.send(JSON.stringify({type:'session.keep_alive'})); }catch(e){} },45000);
+  }
+  send(o){ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify(o)); }
+  async speak(blob){
+    const {pcm,duration}=await blobToPCM(blob,24000);
+    const bytes=new Uint8Array(pcm.buffer); const chunk=48000; // 1 秒
+    const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()));
+    let first=true;
+    for(let i=0;i<bytes.length;i+=chunk){ const part=bytes.subarray(i,Math.min(i+chunk,bytes.length)); this.send({type:'agent.speak',event_id:first?id:undefined,audio:b64FromBytes(part)}); first=false; }
+    this.send({type:'agent.speak_end'});
+    await new Promise(res=>{ this.waiters[id]=res; setTimeout(res,(duration+3)*1000); });
+  }
+  listening(on){ this.send({type:on?'agent.start_listening':'agent.stop_listening'}); }
+  clear(){ this.send({type:'agent.interrupt'}); }
+  stop(){ this.closed=true; if(this.keep){clearInterval(this.keep);this.keep=null} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.room&&this.room.disconnect(); }catch(e){} this.ws=null; this.room=null; this.ready=false; }
+}
+async function startLiveAvatarFor(c){
+  const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
+  wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.remove('hidden'); ld.textContent='連線真人影像中…';
+  if(liveav) liveav.stop(); if(simli){ simli.stop(); simli=null; }
+  liveav=new LiveAvatarSession();
+  try{ await liveav.start(laAvatarFor(c),m=>{ if(m) ld.textContent=m; }); ld.classList.add('hidden'); }
+  catch(e){ ld.innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">真人影像連線失敗：'+escHtml(e.message||'')+'<br><span style="font-size:.72rem">改用 3D 人物。請檢查 LiveAvatar 金鑰、Avatar ID 或點數。</span></div>'; liveav=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); setTimeout(()=>ld.classList.add('hidden'),5000); }
+}
+async function listLiveAvatars(){
+  saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('la-list');
+  if(!st.laKey){ out.textContent='請先填 LiveAvatar 金鑰'; return; }
+  try{ const r=await fetch('https://api.liveavatar.com/v1/avatars/public?page_size=100',{headers:{'X-API-KEY':st.laKey}}); if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,100)); const j=await r.json(); const list=(j.data&&(j.data.results||j.data.items||j.data))||j.results||[];
+    out.innerHTML=Array.isArray(list)&&list.length?list.map(a=>`<div style="display:inline-block;width:110px;margin:4px;text-align:center;vertical-align:top"><img src="${a.preview_url||a.preview_image_url||a.thumbnail_url||''}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;background:#ddd"><div style="font-size:.7rem">${escHtml(a.name||'')}</div><code style="font-size:.6rem;cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${a.id||a.avatar_id}');toast('已複製 ID')">${(a.id||a.avatar_id||'').slice(0,8)}…</code></div>`).join(''):'沒有取得清單：'+JSON.stringify(j).slice(0,200); }
+  catch(e){ out.textContent='取得失敗：'+e.message; }
+}
+async function testLiveAvatar(){
+  saveSettings(); openSettings(); const msg=document.getElementById('la-msg'); const c=getCase()||CASES[0];
+  if(!laOn()){ msg.textContent='請先選擇 LiveAvatar 引擎並填金鑰'; return; }
+  document.getElementById('settings-modal').classList.add('hidden');
+  renderPhase('conv'); document.getElementById('stage').classList.add('solo'); moveAvatarTo('avatar-wrap');
+  await startLiveAvatarFor(c);
+  if(liveav){ toast('已連線，播放測試語音'); try{ const obj=azureReady()?await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'):null; if(obj) await liveav.speak(obj.blob||obj); else toast('未設定 Azure，無法送語音'); }catch(e){ toast('語音失敗：'+e.message); } }
+  setTimeout(()=>{ stopSimli(); goStep('cases'); },20000);
+}
 async function blobToPCM16k(blob){
   ensureAudioCtx(); const ctx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
   const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
@@ -1153,6 +1245,7 @@ async function blobToPCM16k(blob){
 // 把一段語音送給 Simli 播放，並在估計播完時 resolve（維持逐句順序與 UI 狀態）
 async function simliSpeak(blobOrObj){
   const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj;
+  if(liveav&&liveav.ready){ startMouth(); await liveav.speak(blob); stopMouth(); return; }
   if(!simli||!simli.ready) return;
   const {pcm,duration}=await blobToPCM16k(blob);
   startMouth();
@@ -1168,7 +1261,7 @@ async function startSimliFor(c,label){
   try{ await simli.start(simliFaceFor(c),m=>{ if(m) ld.textContent=m; }); ld.classList.add('hidden'); }
   catch(e){ ld.innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">真人影像連線失敗：'+escHtml(e.message||'')+'<br><span style="font-size:.72rem">改用 3D 人物。請檢查 Simli 金鑰、Face ID 或分鐘額度。</span></div>'; simli=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); setTimeout(()=>ld.classList.add('hidden'),4000); }
 }
-function stopSimli(){ if(simli){ simli.stop(); simli=null; } document.getElementById('avatar-simli').classList.add('hidden'); document.getElementById('avatar-3d').classList.remove('hidden'); }
+function stopSimli(){ if(simli){ simli.stop(); simli=null; } if(liveav){ liveav.stop(); liveav=null; } document.getElementById('avatar-simli').classList.add('hidden'); document.getElementById('avatar-3d').classList.remove('hidden'); }
 async function listSimliFaces(){
   saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('simli-face-list');
   if(!st.simliKey){ out.textContent='請先填 Simli 金鑰'; return; }
@@ -1228,7 +1321,7 @@ const SET_KEY='bpr-settings-v2';
 function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
 function makeSetupLink(){
   saveSettings(); openSettings();
-  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands,engine:st.engine,simliKey:st.simliKey,simliM:st.simliM,simliF:st.simliF};
+  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands,engine:st.engine,simliKey:st.simliKey,simliM:st.simliM,simliF:st.simliF,laKey:st.laKey,laM:st.laM,laF:st.laF};
   if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey;
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1264,10 +1357,13 @@ function openSettings(){
   document.getElementById('set-simli-key').value=st.simliKey||'';
   document.getElementById('set-simli-m').value=st.simliM||'';
   document.getElementById('set-simli-f').value=st.simliF||'';
+  document.getElementById('set-la-key').value=st.laKey||'';
+  document.getElementById('set-la-m').value=st.laM||'';
+  document.getElementById('set-la-f').value=st.laF||'';
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim(),laKey:document.getElementById('set-la-key').value.trim(),laM:document.getElementById('set-la-m').value.trim(),laF:document.getElementById('set-la-f').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1457,7 +1553,7 @@ async function initConvPhase(){
   area.innerHTML='';
   convHistory=[];
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
-  if(simliOn()){ startSimliFor(c); } else { stopSimli(); loadAvatarFor(c); }
+  if(simliOn()){ startSimliFor(c); } else if(laOn()){ startLiveAvatarFor(c); } else { stopSimli(); loadAvatarFor(c); }
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
   if(!camStream) startCamera();
@@ -1483,7 +1579,7 @@ function setupRecognition(){
   recognition.continuous=true;
   recognition.interimResults=true;
   recognition.onstart=()=>{
-    isRecording=true;
+    isRecording=true; if(liveav&&liveav.ready) liveav.listening(true);
     document.getElementById('mic-btn').classList.add('recording');
     setStatus('🎤 聆聽中…說完稍停一下就會送出');
     startTimer();
@@ -1557,7 +1653,7 @@ async function handleNurseSpeech(text){
   if(!text) return;
   const ts=Date.now();
   addBubble('nurse',text,ts);
-  playGesture('g-nod');
+  playGesture('g-nod'); if(liveav&&liveav.ready) liveav.listening(false);
   const entry={role:'nurse',text,ts,frames:[]};
   const f0=captureNurseFrame(); if(f0) entry.frames.push(f0);
   state.conversation.push(entry);
@@ -1765,7 +1861,7 @@ const AZ_VISEME=['viseme_sil','viseme_aa','viseme_aa','viseme_O','viseme_E','vis
 // 音訊播放 + 以音量驅動嘴型
 let audioCtx=null, analyser=null, curAudio=null, mouthRAF=null;
 function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); }
-function stopAudio(){ if(simli&&simli.ready) simli.clear(); if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
+function stopAudio(){ const ve=vidEngine(); if(ve) ve.clear(); if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
 function playBlob(blobOrObj,hint){
   const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj; const visemes=blobOrObj&&blobOrObj.visemes||null;
   return new Promise((resolve)=>{
@@ -1793,7 +1889,7 @@ class SentenceSpeaker{
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
-      if(blob&&simli&&simli.ready) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
+      if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
     this.playing=false; if(this.finished&&!this.cancelled&&!isSpeaking) resumeListening(); }
 }
 let _curExpr='neutral';
@@ -1822,7 +1918,7 @@ function speakTTS(text){
 }
 async function speakBackchannel(t){
   const c=getCase(); if(!azureReady()) return;
-  try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; if(simli&&simli.ready) await simliSpeak(blob); else await playBlob(blob); }catch(e){}
+  try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; if(vidEngine()) await simliSpeak(blob); else await playBlob(blob); }catch(e){}
 }
 // ===== 回放用：Gemini 情緒語音（會談結束後背景合成） =====
 const gttsCache=new Map(); let gttsJob=null;
@@ -1863,7 +1959,7 @@ async function prepareEmotionalVoices(){
 async function speakPatientLine(e){
   stopAudio(); window.speechSynthesis&&speechSynthesis.cancel();
   const blob=gttsCache.get(e.i);
-  if(blob){ SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); if(simli&&simli.ready) await simliSpeak(blob); else await playBlob(blob,/[？?]\s*$/.test(e.text)?'question':'statement'); }
+  if(blob){ SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); if(vidEngine()) await simliSpeak(blob); else await playBlob(blob,/[？?]\s*$/.test(e.text)?'question':'statement'); }
   else speakTTS(e.text);
 }
 async function testAzureVoice(){
@@ -2304,7 +2400,7 @@ function renderReviewPhase(){
   replay.duration=lastRel;
   // avatar into review stage
   moveAvatarTo('review-avatar');
-  if(simliOn()&&c){ startSimliFor(c); } else { stopSimli(); }
+  if(simliOn()&&c){ startSimliFor(c); } else if(laOn()&&c){ startLiveAvatarFor(c); } else { stopSimli(); }
   document.getElementById('review-avatar-label').textContent=c?`病人・${c.name}（${c.age}歲）`:'病人';
   if(c) setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious');
   // video
@@ -2457,6 +2553,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
