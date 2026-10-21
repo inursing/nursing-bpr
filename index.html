@@ -361,6 +361,9 @@ input[type=text]:focus{border-color:var(--primary)}
 .ts-chip:hover{border-color:var(--primary);color:var(--primary)}
 .ts-chip b{font-variant-numeric:tabular-nums;color:var(--primary)}
 #rec-video{width:100%;max-height:420px;background:#000;border-radius:8px}
+@media(max-width:720px){#review-stage{grid-template-columns:1fr}}
+.rv-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;border-radius:10px;padding:2px}
+.rv-row.active{outline:2px solid var(--primary);background:var(--primary-light)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -529,13 +532,6 @@ input[type=text]:focus{border-color:var(--primary)}
         <table class="record-table" id="analysis-table"><thead><tr><th style="width:40px">序</th><th style="min-width:150px">護生語言</th><th style="min-width:120px">護生非語言</th><th style="min-width:150px">病人語言</th><th style="min-width:120px">病人非語言</th><th style="min-width:170px">使用技巧</th><th style="min-width:170px">自我分析</th><th style="width:44px"></th></tr></thead><tbody id="analysis-tbody"></tbody></table>
         <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button></div>
       </div>
-      <div class="card hidden" id="rec-card" style="margin-bottom:20px">
-        <h3 style="margin-bottom:6px">🎥 護生表情與肢體回放</h3>
-        <div style="font-size:.8rem;color:var(--text2);margin-bottom:10px">點選下方時間點可跳到您說那句話的當下，觀察自己的表情、眼神與姿勢，填入「護生非語言反應」欄。</div>
-        <video id="rec-video" controls playsinline></video>
-        <div id="rec-marks" style="margin-top:10px"></div>
-        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="downloadRecording()">⬇ 下載錄影（WebM）</button></div>
-      </div>
       <div class="card">
         <h3 style="margin-bottom:12px">整體反思</h3>
         <div style="display:grid;gap:12px">
@@ -566,18 +562,34 @@ input[type=text]:focus{border-color:var(--primary)}
     <!-- PHASE 7: REVIEW -->
     <div id="phase-review" class="hidden">
       <div class="section-title"><span class="section-icon">🎬</span><h2>回顧會談過程</h2></div>
-      <div class="info-box info-primary" style="margin-bottom:16px">完整逐字稿（含病人的表情與動作標記）與您的會談錄影。對照自己憑記憶寫的記錄，看看有哪些遺漏或記錯的地方。</div>
-      <div class="card hidden" id="review-video-card" style="margin-bottom:20px">
-        <h3 style="margin-bottom:6px">🎥 護生錄影回放</h3>
-        <video id="review-video" controls playsinline style="width:100%;max-height:420px;background:#000;border-radius:8px"></video>
-        <div id="review-marks" style="margin-top:10px"></div>
-        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="downloadRecording()">⬇ 下載錄影</button></div>
+      <div class="info-box info-primary" style="margin-bottom:16px">同步回放整段會談：左邊是病人當時的表情、動作與語音，右邊是您的錄影。下方逐字稿會隨時間反白，點任一句可跳到那個時間點。</div>
+      <div class="card" style="margin-bottom:16px">
+        <div id="review-stage" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="stage-box" id="review-avatar-wrap" style="background:radial-gradient(120% 90% at 50% 20%,#eef3f8 0%,#cfdbe8 70%,#b9c9d9 100%)">
+            <div class="stage-label" id="review-avatar-label">病人</div>
+            <div id="review-avatar" style="position:absolute;inset:0"></div>
+          </div>
+          <div class="stage-box" id="review-nurse-wrap" style="background:#111">
+            <div class="stage-label">護生</div>
+            <video id="review-video" playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1)" class="hidden"></video>
+            <div id="review-nurse-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;color:#eee;font-size:.95rem;line-height:1.7;text-align:center">此次會談沒有錄影，以逐字稿回放護生的發言。</div>
+          </div>
+        </div>
+        <div id="review-subtitle" style="margin-top:10px;min-height:44px;padding:8px 12px;border-radius:8px;background:var(--surface2);font-size:.9rem;line-height:1.6;color:var(--text)"></div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" id="review-play-btn" onclick="replayToggle()">▶ 從頭播放</button>
+          <div style="flex:1;display:flex;align-items:center;gap:8px">
+            <span id="review-time" style="font-variant-numeric:tabular-nums;font-size:.85rem;color:var(--text2);min-width:92px">00:00 / 00:00</span>
+            <input type="range" id="review-seek" min="0" max="100" value="0" step="0.1" style="flex:1" oninput="replaySeek(+this.value)">
+          </div>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="review-tts" checked> 播放病人語音</label>
+          <button class="btn btn-outline btn-sm" id="review-dl-btn" onclick="downloadRecording()">⬇ 下載錄影</button>
+        </div>
       </div>
-      <div class="card" id="review-no-video" style="margin-bottom:20px;font-size:.85rem;color:var(--text2)">此次會談沒有錄影（鏡頭未開啟或此環境不允許鏡頭）。</div>
       <div class="card">
         <h3 style="margin-bottom:10px">📝 會談逐字稿</h3>
         <div id="review-meta" style="font-size:.82rem;color:var(--text2);margin-bottom:12px"></div>
-        <div id="review-transcript" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div id="review-transcript" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
       <div class="row-actions" style="margin-top:16px">
         <button class="btn btn-outline" onclick="goStep('export')">← 返回報告</button>
@@ -805,7 +817,7 @@ function renderPhase(p){
   if(p==='record') renderRecordTable();
   if(p==='analysis') renderAnalysisPhase();
   if(p==='export') renderExportPhase();
-  if(p==='review') renderReviewPhase();
+  if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); }
   window.scrollTo(0,0);
 }
 
@@ -1090,6 +1102,7 @@ async function initConvPhase(){
     <div style="margin-top:8px;font-size:.78rem;font-style:italic;color:var(--text2)">"${c.chief}"</div>
   `;
   document.getElementById('conv-goals-display').textContent=state.goals;
+  moveAvatarTo('avatar-wrap');
   const area=document.getElementById('conv-area');
   area.innerHTML='';
   convHistory=[];
@@ -1412,7 +1425,6 @@ function updateRecord(idx,field,val){
 // ===== PHASE 5: ANALYSIS =====
 function renderAnalysisPhase(){
   syncRecordFromDOM();
-  setTimeout(renderRecordingPlayback,300);
   buildProcessRecord();
   document.getElementById('step-analysis').classList.add('done');
   const tbody=document.getElementById('analysis-tbody');
@@ -1655,32 +1667,115 @@ function generateExport(){
   renderPhase('export');
 }
 
-// ===== PHASE 7: REVIEW =====
+// ===== PHASE 7: REVIEW (synchronized replay) =====
 const EXPR_ZH={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
 const GEST_ZH={nod:'點頭','g-nod':'點頭',down:'低頭','g-down':'低頭',away:'別過頭','g-away':'別過頭',chest:'手按胸口','g-chest':'手按胸口',sigh:'嘆氣','g-sigh':'嘆氣',wave:'揮手','g-wave':'揮手',shake:'搖頭','g-shake':'搖頭',cover:'擦眼淚','g-cover':'擦眼淚'};
+const AVATAR_EL_ID='avatar-3d';
+function moveAvatarTo(containerId){
+  const av=document.getElementById(AVATAR_EL_ID), host=document.getElementById(containerId);
+  if(av&&host&&av.parentElement!==host) host.appendChild(av);
+}
+const replay={events:[],base:0,duration:0,playing:false,timer:null,clockStart:0,clockOffset:0,fired:0,hasVideo:false};
+function fmtSec(sec){sec=Math.max(0,Math.round(sec));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 function renderReviewPhase(){
   document.getElementById('step-review').classList.add('done');
+  replayStop();
   const c=getCase(); const conv=state.conversation;
-  const t0=conv.length?conv[0].ts:Date.now();
-  const dur=`${Math.floor(state.convDuration/60)}分${state.convDuration%60}秒`;
-  document.getElementById('review-meta').innerHTML=`病人：${c?c.name:''}（${c?c.deptLabel:''}）　會談時長：${dur}　共 ${conv.filter(m=>m.role==='nurse').length} 次互動`;
-  const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
-  let n=0;
-  document.getElementById('review-transcript').innerHTML=conv.map(m=>{
-    if(m.role==='nurse'){ n++; return `<div style="display:flex;gap:10px;align-items:flex-start"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:6px">${fmt(m.ts-t0)}</div><div style="flex:1;background:var(--nurse-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--primary-dark);font-weight:700">護生 第${n}句</span><br>${escHtml(m.text)}</div></div>`; }
-    const tags=[m.expr&&EXPR_ZH[m.expr]?`表情：${EXPR_ZH[m.expr]}`:'',m.gest&&GEST_ZH[m.gest]?`動作：${GEST_ZH[m.gest]}`:''].filter(Boolean).join('　');
-    return `<div style="display:flex;gap:10px;align-items:flex-start"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:6px">${fmt(m.ts-t0)}</div><div style="flex:1;background:var(--patient-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--text2);font-weight:700">病人</span>${tags?`<span style="font-size:.72rem;color:var(--warn);margin-left:8px">${tags}</span>`:''}<br>${escHtml(m.text)}</div></div>`;
-  }).join('')||'<div style="color:var(--text2);font-size:.85rem">沒有會談內容</div>';
+  const hasVideo=(typeof recBlob!=='undefined')&&!!recBlob&&!!recStart;
+  replay.hasVideo=hasVideo;
+  // timeline base: recording start if available, otherwise 1s before first line
+  replay.base=hasVideo?recStart:(conv.length?conv[0].ts-1000:Date.now());
+  replay.events=conv.map((m,i)=>({...m,i,rel:Math.max(0,(m.ts-replay.base)/1000-(m.role==='nurse'?1.2:0))}));
+  const lastRel=replay.events.length?replay.events[replay.events.length-1].rel+6:0;
+  replay.duration=lastRel;
+  // avatar into review stage
+  moveAvatarTo('review-avatar');
+  document.getElementById('review-avatar-label').textContent=c?`病人・${c.name}（${c.age}歲）`:'病人';
+  if(c) setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious');
   // video
-  const vc=document.getElementById('review-video-card'), nv=document.getElementById('review-no-video');
-  if(typeof recBlob!=='undefined'&&recBlob&&recStart){
-    vc.classList.remove('hidden'); nv.classList.add('hidden');
-    const v=document.getElementById('review-video');
+  const v=document.getElementById('review-video'), nt=document.getElementById('review-nurse-text');
+  v.onended=null; v.ontimeupdate=null;
+  if(hasVideo){
+    v.classList.remove('hidden'); nt.classList.add('hidden');
     if(v.dataset.blobUrl) URL.revokeObjectURL(v.dataset.blobUrl);
     const url=URL.createObjectURL(recBlob); v.src=url; v.dataset.blobUrl=url;
-    let k=0;
-    document.getElementById('review-marks').innerHTML=conv.filter(m=>m.role==='nurse').map(m=>{k++;const sec=Math.max(0,(m.ts-recStart)/1000-1.5);return `<span class="ts-chip" onclick="const v=document.getElementById('review-video');v.currentTime=${sec.toFixed(1)};v.play().catch(()=>{})"><b>${fmt(sec*1000)}</b> 第${k}句</span>`}).join('');
-  } else { vc.classList.add('hidden'); nv.classList.remove('hidden'); }
+    v.onloadedmetadata=()=>{ if(isFinite(v.duration)&&v.duration>0) replay.duration=Math.max(replay.duration,v.duration); updateSeekUI(0); };
+    v.ontimeupdate=()=>replayTick(v.currentTime);
+    v.onended=()=>{replay.playing=false;updatePlayBtn();};
+    v.onpause=()=>{ if(replay.playing){replay.playing=false;updatePlayBtn();window.speechSynthesis&&speechSynthesis.cancel();stopMouth();} };
+    v.onplay=()=>{ replay.playing=true; updatePlayBtn(); };
+    document.getElementById('review-dl-btn').classList.remove('hidden');
+  } else {
+    v.classList.add('hidden'); nt.classList.remove('hidden'); nt.textContent='此次會談沒有錄影，以逐字稿回放護生的發言。';
+    document.getElementById('review-dl-btn').classList.add('hidden');
+  }
+  document.getElementById('review-meta').innerHTML=`病人：${c?c.name:''}（${c?c.deptLabel:''}）　會談時長：${Math.floor(state.convDuration/60)}分${state.convDuration%60}秒　共 ${conv.filter(m=>m.role==='nurse').length} 次互動${hasVideo?'':'　（無錄影）'}`;
+  let n=0;
+  document.getElementById('review-transcript').innerHTML=replay.events.map(e=>{
+    if(e.role==='nurse'){ n++; return `<div class="rv-row" data-i="${e.i}" onclick="replaySeek(${e.rel.toFixed(1)})"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:8px">${fmtSec(e.rel)}</div><div style="flex:1;background:var(--nurse-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--primary-dark);font-weight:700">護生 第${n}句</span><br>${escHtml(e.text)}</div></div>`; }
+    const tags=[e.expr&&EXPR_ZH[e.expr]?`表情：${EXPR_ZH[e.expr]}`:'',e.gest&&GEST_ZH[e.gest]?`動作：${GEST_ZH[e.gest]}`:''].filter(Boolean).join('　');
+    return `<div class="rv-row" data-i="${e.i}" onclick="replaySeek(${e.rel.toFixed(1)})"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:8px">${fmtSec(e.rel)}</div><div style="flex:1;background:var(--patient-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--text2);font-weight:700">病人</span>${tags?`<span style="font-size:.72rem;color:var(--warn);margin-left:8px">${tags}</span>`:''}<br>${escHtml(e.text)}</div></div>`;
+  }).join('')||'<div style="color:var(--text2);font-size:.85rem">沒有會談內容</div>';
+  document.getElementById('review-subtitle').textContent='按「從頭播放」開始同步回放。';
+  replay.fired=0; updateSeekUI(0); updatePlayBtn();
+}
+function replayNow(){ return replay.hasVideo?document.getElementById('review-video').currentTime:(replay.playing?(performance.now()-replay.clockStart)/1000+replay.clockOffset:replay.clockOffset); }
+function updateSeekUI(sec){
+  const s=document.getElementById('review-seek'); s.max=Math.max(1,replay.duration).toFixed(1); s.value=sec.toFixed(1);
+  document.getElementById('review-time').textContent=fmtSec(sec)+' / '+fmtSec(replay.duration);
+}
+function updatePlayBtn(){ document.getElementById('review-play-btn').textContent=replay.playing?'⏸ 暫停':(replayNow()>0.5?'▶ 繼續':'▶ 從頭播放'); }
+function replayToggle(){
+  if(replay.playing){ replayPause(); return; }
+  if(replayNow()>=replay.duration-0.2) replaySeek(0,true);
+  replayPlay();
+}
+function replayPlay(){
+  if(replay.hasVideo){ document.getElementById('review-video').play().catch(()=>{}); return; }
+  replay.playing=true; replay.clockStart=performance.now();
+  replay.timer=setInterval(()=>{ const t=replayNow(); replayTick(t); if(t>=replay.duration){replayPause();replay.clockOffset=replay.duration;} },200);
+  updatePlayBtn();
+}
+function replayPause(){
+  if(replay.hasVideo){ document.getElementById('review-video').pause(); }
+  else { if(replay.timer){clearInterval(replay.timer);replay.timer=null} replay.clockOffset=replayNow(); replay.playing=false; }
+  window.speechSynthesis&&speechSynthesis.cancel(); stopMouth(); updatePlayBtn();
+}
+function replayStop(){ if(replay.timer){clearInterval(replay.timer);replay.timer=null} replay.playing=false; replay.clockOffset=0; const v=document.getElementById('review-video'); if(v){try{v.pause()}catch(e){}} window.speechSynthesis&&speechSynthesis.cancel(); stopMouth(); }
+function replaySeek(sec,silent){
+  const wasPlaying=replay.playing;
+  window.speechSynthesis&&speechSynthesis.cancel(); stopMouth();
+  if(replay.hasVideo){ const v=document.getElementById('review-video'); v.currentTime=sec; }
+  else { replay.clockOffset=sec; replay.clockStart=performance.now(); }
+  // reset fired pointer to first event after sec; restore last patient expression before sec
+  replay.fired=replay.events.findIndex(e=>e.rel>=sec); if(replay.fired<0) replay.fired=replay.events.length;
+  let lastP=null, lastAny=null; for(const e of replay.events){ if(e.rel<sec){ lastAny=e; if(e.role==='patient') lastP=e; } }
+  const c=getCase();
+  setExpression(lastP?lastP.expr:(c?(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'):'neutral'));
+  highlightRow(lastAny?lastAny.i:-1); showSubtitle(lastAny);
+  updateSeekUI(sec);
+  if(!silent&&!wasPlaying&&!replay.hasVideo) updatePlayBtn();
+  if(!replay.hasVideo&&wasPlaying){ /* keep playing */ }
+}
+function replayTick(sec){
+  updateSeekUI(sec);
+  while(replay.fired<replay.events.length&&replay.events[replay.fired].rel<=sec){
+    const e=replay.events[replay.fired++];
+    highlightRow(e.i); showSubtitle(e);
+    if(e.role==='patient'){
+      setExpression(e.expr||'neutral'); if(e.gest) playGesture(e.gest);
+      if(document.getElementById('review-tts').checked) speakTTS(e.text);
+    } else { playGesture(GEST_MAP['點頭']||'nod'); }
+  }
+}
+function highlightRow(i){
+  document.querySelectorAll('#review-transcript .rv-row').forEach(r=>r.classList.toggle('active',+r.dataset.i===i));
+  const el=document.querySelector(`#review-transcript .rv-row[data-i="${i}"]`); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function showSubtitle(e){
+  const box=document.getElementById('review-subtitle'); if(!e){box.textContent='';return}
+  box.innerHTML=`<span style="font-size:.75rem;font-weight:700;color:${e.role==='nurse'?'var(--primary-dark)':'var(--text2)'}">${e.role==='nurse'?'護生':'病人'}</span>　${escHtml(e.text)}`;
+  if(!replay.hasVideo){ const nt=document.getElementById('review-nurse-text'); if(e.role==='nurse') nt.textContent=e.text; }
 }
 
 // ===== UTILS =====
