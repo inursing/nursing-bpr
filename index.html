@@ -171,6 +171,7 @@ textarea,input,select{font-family:inherit;font-size:inherit}
 @keyframes pulse{50%{box-shadow:0 0 0 12px rgba(220,38,38,.0)}}
 .btn-record.waiting{background:var(--accent)}
 .btn-record.on{background:var(--primary)}
+#mic-bar{position:sticky;bottom:0;z-index:50;background:var(--bg);padding:10px 0;border-top:1px solid var(--border);margin-left:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1*max(16px,env(safe-area-inset-right,0px)));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* --- Form fields --- */
 label{font-size:.85rem;font-weight:500;color:var(--text2);display:block;margin-bottom:4px}
@@ -459,8 +460,8 @@ input[type=text]:focus{border-color:var(--primary)}
               <div id="cam-off">鏡頭尚未開啟<br><button class="btn btn-outline btn-sm" style="margin-top:8px;color:#fff;border-color:#fff" onclick="startCamera()">開啟鏡頭並錄影</button></div>
             </div>
           </div>
-          <div id="conv-area" style="min-height:160px;max-height:240px"></div>
-          <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div id="conv-area" style="min-height:140px;max-height:220px"></div>
+          <div id="mic-bar" style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <button class="btn-record" id="mic-btn" onclick="toggleMic()" title="按下說話">🎤</button>
             <div style="flex:1">
               <div id="status-msg">按下麥克風開始說話</div>
@@ -1554,6 +1555,7 @@ async function initConvPhase(){
   convHistory=[];
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
   if(simliOn()){ startSimliFor(c); } else if(laOn()){ startLiveAvatarFor(c); } else { stopSimli(); loadAvatarFor(c); }
+  warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
   if(!camStream) startCamera();
@@ -1827,21 +1829,32 @@ function buildSSML(text,c,expr){
 }
 const azCache=new Map();
 // 回傳 {blob, visemes:[{t,id}]}；有 SDK 時用 SDK 取得音素時間（嘴型精準），否則 REST
-function azureSynthSDK(text,c,expr){
-  return new Promise((resolve,reject)=>{
-    const st=getSettings();
-    const cfg=SpeechSDK.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
-    cfg.speechSynthesisOutputFormat=SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
-    const syn=new SpeechSDK.SpeechSynthesizer(cfg,null);
-    const visemes=[];
-    syn.visemeReceived=(sdr,e)=>{ visemes.push({t:e.audioOffset/10000000,id:e.visemeId}); };
-    syn.speakSsmlAsync(buildSSML(text,c,expr),r=>{
-      syn.close();
-      if(r.reason===SpeechSDK.ResultReason.SynthesizingAudioCompleted) resolve({blob:new Blob([r.audioData],{type:'audio/mpeg'}),visemes});
-      else reject(new Error('Azure 語音失敗：'+(r.errorDetails||r.reason)));
-    },err=>{ syn.close(); reject(new Error('Azure 語音失敗：'+err)); });
-  });
+// 常駐一條 Azure 連線重複使用（省去每句 0.5–1 秒的握手），呼叫序列化
+let azSyn=null, azSynKey='', azVisemes=[], azChain=Promise.resolve();
+function getAzSyn(){
+  const st=getSettings(); const key=st.azKey+'|'+st.azRegion;
+  if(azSyn&&azSynKey===key) return azSyn;
+  try{ azSyn&&azSyn.close(); }catch(e){}
+  const cfg=SpeechSDK.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
+  cfg.speechSynthesisOutputFormat=SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+  azSyn=new SpeechSDK.SpeechSynthesizer(cfg,null); azSynKey=key;
+  azSyn.visemeReceived=(sdr,e)=>{ azVisemes.push({t:e.audioOffset/10000000,id:e.visemeId}); };
+  return azSyn;
 }
+function azureSynthSDK(text,c,expr){
+  const run=()=>new Promise((resolve,reject)=>{
+    const syn=getAzSyn(); azVisemes=[];
+    const timer=setTimeout(()=>{ try{azSyn.close()}catch(e){} azSyn=null; reject(new Error('Azure 語音逾時')); },8000);
+    syn.speakSsmlAsync(buildSSML(text,c,expr),r=>{
+      clearTimeout(timer);
+      if(r.reason===SpeechSDK.ResultReason.SynthesizingAudioCompleted) resolve({blob:new Blob([r.audioData],{type:'audio/mpeg'}),visemes:azVisemes.slice()});
+      else { try{azSyn.close()}catch(e){} azSyn=null; reject(new Error('Azure 語音失敗：'+(r.errorDetails||r.reason))); }
+    },err=>{ clearTimeout(timer); try{azSyn.close()}catch(e){} azSyn=null; reject(new Error('Azure 語音失敗：'+err)); });
+  });
+  const p=azChain.then(run,run); azChain=p.catch(()=>{}); return p;
+}
+// 會談開始時先暖機並預抓常用的回應聲
+function warmAzure(){ if(!azureReady()||!window.SpeechSDK) return; const c=getCase(); if(!c) return; ['嗯。','嗯嗯。','好。','嗯…','這個喔…'].forEach(t=>azureSynth(t,c,'neutral').catch(()=>{})); }
 async function azureSynth(text,c,expr){
   const st=getSettings(); const key=azureVoiceFor(c)+'|'+expr+'|'+text;
   if(azCache.has(key)) return azCache.get(key);
@@ -2297,8 +2310,22 @@ ${studentText||'（學生未填寫）'}
   if(nImg){ parts.push({text:`\n以上共 ${nImg} 張護生的鏡頭畫面。請務必根據畫面描述每一句的「護生非語言反應」（眼神是否看著病人、表情、頭部動作、身體姿勢、手部），有畫面的句子不要寫「推測」，而是寫「畫面：…」；並在整體評估最後新增一段「非語言行為回饋」，具體指出做得好的和需要調整的（例如低頭看稿、面無表情、身體後仰、缺乏點頭回應）。`}); }
   const input=nImg?[{role:'user',parts}]:prompt;
   const onDelta=(full)=>{ onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
-  const res=await apiSampleStream(input,{maxTokens:6000,kind:'report',onDelta});
-  return res.text;
+  const complete=t=>(t.match(/<td/gi)||[]).length>=7&&/整體評估/.test(t)&&t.length>400;
+  let text=''; let lastErr=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      geminiModelOverride=null;
+      const useInput=attempt<2?input:prompt;   // 第三次改用純文字（不附截圖）
+      const res=await apiSampleStream(useInput,{maxTokens:6000,kind:'report',onDelta});
+      text=res.text||'';
+      if(complete(text)) return text;
+      lastErr=new Error('報告不完整（'+text.length+' 字）');
+      // 內容不完整：下一輪改用下一個模型
+      GEMINI_REPORT_MODELS.push(GEMINI_REPORT_MODELS.shift());
+    }catch(e){ lastErr=e; }
+    onProgress&&onProgress(text+'\n<!-- retry -->');
+  }
+  if(text) return text; throw lastErr||new Error('AI 報告失敗');
 }
 
 function buildAiFallbackRecord(c){
