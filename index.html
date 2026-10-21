@@ -681,6 +681,12 @@ input[type=text]:focus{border-color:var(--primary)}
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
+      <hr class="divider" style="margin:4px 0">
+      <div style="font-weight:700;font-size:.9rem">發給學生的設定連結</div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">產生一個連結，學生點開後會自動套用 Azure 語音設定（與頭像設定）。建議 Gemini 金鑰由學生各自申請，以免全班共用一把金鑰超過免費額度；若要一起帶入可勾選。</div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（全班共用，額度會不夠）</label>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-outline btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
+      <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
       <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
     </div>
   </div>
@@ -1107,6 +1113,25 @@ const FALLBACK_AVATARS=['./patient_f2.glb','https://cdn.jsdelivr.net/gh/met4citi
 // ===== SETTINGS / API =====
 const SET_KEY='bpr-settings-v2';
 function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
+function makeSetupLink(){
+  saveSettings(); openSettings();
+  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
+  if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey;
+  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+  const url=location.origin+location.pathname+'#setup='+b64;
+  const out=document.getElementById('setup-link-out'); out.value=url;
+  navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{document.getElementById('setup-link-msg').textContent='已複製到剪貼簿';}).catch(()=>{document.getElementById('setup-link-msg').textContent='請手動複製下方連結';});
+}
+function applySetupFromHash(){
+  try{
+    const m=location.hash.match(/^#setup=([A-Za-z0-9+/=]+)/); if(!m) return;
+    const cfg=JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    const st=getSettings(); for(const k in cfg){ if(cfg[k]!==undefined&&cfg[k]!==''&&cfg[k]!==null) st[k]=cfg[k]; }
+    localStorage.setItem(SET_KEY,JSON.stringify(st));
+    history.replaceState(null,'',location.pathname+location.search);
+    setTimeout(()=>toast(cfg.gKey?'已套用教師提供的設定（含 AI 與語音）':'已套用教師提供的語音設定；請到 ⚙ 設定 貼上您自己的 Gemini 金鑰'),300);
+  }catch(e){ console.warn('setup link',e); }
+}
 function openSettings(){
   const st=getSettings();
   document.getElementById('set-provider').value=st.provider||'gemini';
@@ -2291,6 +2316,7 @@ document.addEventListener('change',e=>{ if(e.target.matches('textarea,input')) {
 window.addEventListener('beforeunload',()=>{ syncRecordFromDOM(); syncReflections(); saveState(); });
 
 // ===== INIT =====
+applySetupFromHash();
 renderCases();
 renderResumeBanner();
 if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices(); window.speechSynthesis.getVoices(); }
