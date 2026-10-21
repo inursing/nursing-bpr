@@ -660,50 +660,20 @@ input[type=text]:focus{border-color:var(--primary)}
   <div class="modal">
     <button class="modal-close" onclick="document.getElementById('settings-modal').classList.add('hidden')">✕</button>
     <h2>平台設定</h2>
-    <div class="info-box info-warn" style="margin-bottom:14px;font-size:.8rem">金鑰只存在這台裝置的瀏覽器中，不會上傳到其他地方。建議由教師在共用電腦上設定一次。</div>
     <div style="display:grid;gap:12px">
-      <div><label>AI 供應商（AI 病人與 AI 版記錄）</label>
-        <select id="set-provider" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" onchange="toggleProviderFields()">
-          <option value="gemini">Google Gemini（有免費額度）</option>
-          <option value="anthropic">Anthropic Claude（需儲值）</option>
-        </select></div>
-      <div id="prov-gemini">
-        <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
-        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可，免費層不需信用卡。</div>
-      </div>
-      <div id="prov-anthropic" class="hidden">
-        <div><label>Anthropic API 金鑰</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
-        <div style="margin-top:8px"><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
-      </div>
-      <div><label>男性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-m" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
-      <div><label>女性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-f" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">病人語音（Azure 語音服務；留空則用瀏覽器內建語音）</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label>Azure 語音金鑰</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
-        <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia、japaneast"></div>
-        <div><label>男性聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
-        <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
-      </div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">金鑰代理（學生看不到金鑰）</div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">把 Gemini 與 Azure 金鑰放在教師自己的 Cloudflare Worker 裡，學生只拿到代理網址與課程代碼。填了代理網址後，上方的金鑰欄位可留空，設定連結與 QR 也不會含任何金鑰。<a href="https://github.com/inursing/nursing-bpr/blob/main/worker.js" target="_blank" rel="noopener">Worker 程式與設定步驟</a></div>
+      <div style="font-weight:700;font-size:.9rem">① 課程代理（金鑰放在教師的 Cloudflare Worker，學生看不到）</div>
+      <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label>代理網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
         <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
       </div>
-      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
+      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span> <a href="https://github.com/inursing/nursing-bpr/blob/main/worker.js" target="_blank" rel="noopener" style="margin-left:6px">Worker 程式與設定步驟</a></div>
       <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">發給學生的設定連結 / QR Code</div>
-      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">已設定金鑰代理：連結與 QR 只含代理網址、課程代碼、語音與頭像設定，<b>不含任何金鑰</b>。</div>
-      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">未設定代理時，連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。要讓學生看不到金鑰，請先設定上方的金鑰代理。</div>
+      <div style="font-weight:700;font-size:.9rem">② 發給學生的設定連結 / QR Code</div>
+      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 只含代理網址、課程代碼與病人設定，<b>不含任何金鑰</b>。</div>
+      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">未設定代理時，連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。要讓學生看不到金鑰，請先設定上方的課程代理。</div>
       <label class="check-item" style="margin:0" id="link-incl-wrap"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（全班共用，學生可看到金鑰，額度也會不夠）</label>
-      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-outline btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-outline btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
       <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
       <div id="setup-qr-box" class="hidden" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div id="setup-qr" style="background:#fff;padding:8px;border-radius:8px;line-height:0"></div>
@@ -712,6 +682,42 @@ input[type=text]:focus{border-color:var(--primary)}
           <button class="btn btn-outline btn-sm" type="button" onclick="downloadQr()">⬇ 下載 QR 圖片</button>
         </div>
       </div>
+      <hr class="divider" style="margin:4px 0">
+      <div style="font-weight:700;font-size:.9rem">③ 病人聲音與動作</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label>男性聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
+        <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。留空即用預設。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
+      <hr class="divider" style="margin:4px 0">
+      <details id="adv-settings">
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">④ 進階：不用代理時直接填金鑰（一般不需要）</summary>
+        <div style="display:grid;gap:12px;margin-top:10px">
+          <div class="info-box info-warn" style="font-size:.78rem">這裡的金鑰只存在這台裝置的瀏覽器中。若已設定課程代理，這些欄位可留空。</div>
+          <div><label>AI 供應商</label>
+            <select id="set-provider" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" onchange="toggleProviderFields()">
+              <option value="gemini">Google Gemini（有免費額度）</option>
+              <option value="anthropic">Anthropic Claude（需儲值）</option>
+            </select></div>
+          <div id="prov-gemini">
+            <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
+            <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
+            <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可。</div>
+          </div>
+          <div id="prov-anthropic" class="hidden">
+            <div><label>Anthropic API 金鑰</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
+            <div style="margin-top:8px"><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label>Azure 語音金鑰</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
+            <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia、japaneast"></div>
+          </div>
+          <div><label>男性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-m" placeholder="留空使用內建頭像"></div>
+          <div><label>女性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-f" placeholder="留空使用內建頭像"></div>
+        </div>
+      </details>
       <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
     </div>
   </div>
@@ -1212,7 +1218,9 @@ function saveSettings(){
 function toggleProviderFields(){ const p=document.getElementById('set-provider').value; document.getElementById('prov-gemini').classList.toggle('hidden',p!=='gemini'); document.getElementById('prov-anthropic').classList.toggle('hidden',p!=='anthropic'); }
 function proxyOn(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
 function proxyHeaders(extra){ const st=getSettings(); return Object.assign({'X-Class-Code':st.classCode||''},extra||{}); }
-function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim()); document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
+function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
+  const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到下方「④ 進階」直接填金鑰。</span>';
+  document.getElementById('adv-settings').open=!on; document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
 async function testProxy(){
   saveSettings(); openSettings(); const msg=document.getElementById('proxy-msg'); const st=getSettings();
   if(!proxyOn()){ msg.textContent='請先填代理網址'; return; }
