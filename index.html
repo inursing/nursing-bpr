@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1a6fa3">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="行為過程紀錄">
@@ -372,6 +372,13 @@ input[type=text]:focus{border-color:var(--primary)}
 .rv-row.active{outline:2px solid var(--primary);background:var(--primary-light)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* --- 手機版面 --- */
+#student-report-preview,#ai-report-preview{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+#phase-export .card{overflow:hidden}
+@media(max-width:640px){
+  #student-report-preview>*,#ai-report-preview>*{min-width:600px}
+  #phase-export .card>div:first-child h3{font-size:1rem}
+}
+
 @media(max-width:640px){
   body.conv-active #topbar,body.conv-active #steps{display:none}
   body.conv-active #main{padding-top:6px}
@@ -711,6 +718,7 @@ input[type=text]:focus{border-color:var(--primary)}
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
       </div>
     </div>
+    <div id="check-diag" style="font-size:.74rem;color:var(--text2);line-height:1.6;margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;word-break:break-all"></div>
     <div class="row-actions" style="margin-top:16px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="cancelCheck()">取消</button>
       <button class="btn btn-primary" id="check-start-btn" onclick="confirmStartConv()">一切正常，開始會談 →</button>
@@ -721,28 +729,40 @@ input[type=text]:focus{border-color:var(--primary)}
   <div class="modal">
     <button class="modal-close" onclick="document.getElementById('settings-modal').classList.add('hidden')">✕</button>
     <h2>平台設定</h2>
-    <div style="display:grid;gap:12px">
-      <div style="font-weight:700;font-size:.9rem">① 課程代理（金鑰放在教師的 Cloudflare Worker，學生看不到）</div>
+    <div style="display:grid;gap:14px">
+
+      <div style="font-weight:700;font-size:.9rem">① 課程代理（AI 與病人語音的金鑰放在老師的 Cloudflare Worker，學生看不到）</div>
       <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label>代理網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
         <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
       </div>
-      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span> <a href="https://github.com/inursing/nursing-bpr/blob/main/worker.js" target="_blank" rel="noopener" style="margin-left:6px">Worker 程式與設定步驟</a></div>
-      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--text2)">教師工具：練習次數限制（只在教師自己的裝置填）</summary>
+      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
+      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具：練習次數（只在教師自己的裝置填）</summary>
         <div style="display:grid;gap:8px;margin-top:8px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">Worker 的 <code>MAX_SESSIONS</code> 設定每位學生可用課堂金鑰的練習次數（以學號計）。填入教師密語（Worker 的 <code>TEACHER_TOKEN</code>）後，你自己的裝置不受限制，也能查看與重設學生次數。此密語不會放進設定連結／QR。</div>
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">每位學生可用課堂金鑰的練習次數由 Worker 的 <code>MAX_SESSIONS</code> 決定（目前 3 次，以學號計）。填入教師密語後，這台裝置不受限制，並可查看／重設學生次數；密語不會放進連結或 QR。</div>
           <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="與 Worker 的 TEACHER_TOKEN 相同"></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
           <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
         </div>
       </details>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">② 發給學生的設定連結 / QR Code</div>
-      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 只含代理網址、課程代碼與病人設定，<b>不含任何金鑰</b>。</div>
-      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">未設定代理時，連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。要讓學生看不到金鑰，請先設定上方的課程代理。</div>
-      <label class="check-item" style="margin:0" id="link-incl-wrap"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（全班共用，學生可看到金鑰，額度也會不夠）</label>
-      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-outline btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
+
+      <hr class="divider" style="margin:0">
+      <div style="font-weight:700;font-size:.9rem">② 學生繳交（存到老師的 Google Drive）</div>
+      <div><label>收件網址（Apps Script 網頁應用程式）</label><input type="text" id="set-drive" placeholder="https://script.google.com/macros/s/…/exec"></div>
+      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
+
+      <hr class="divider" style="margin:0">
+      <div style="font-weight:700;font-size:.9rem">③ 會談</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話（病人說話時可直接開口；手機外放易誤判，建議戴耳機再開）</label>
+
+      <hr class="divider" style="margin:0">
+      <div style="font-weight:700;font-size:.9rem">④ 發給學生的設定連結 / QR Code</div>
+      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 含代理網址、課程代碼、收件網址與會談設定，<b>不含任何金鑰</b>。</div>
+      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">尚未設定代理：連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。</div>
+      <label class="check-item hidden" style="margin:0" id="link-incl-wrap"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（學生可看到）</label>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
       <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
       <div id="setup-qr-box" class="hidden" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div id="setup-qr" style="background:#fff;padding:8px;border-radius:8px;line-height:0"></div>
@@ -751,59 +771,34 @@ input[type=text]:focus{border-color:var(--primary)}
           <button class="btn btn-outline btn-sm" type="button" onclick="downloadQr()">⬇ 下載 QR 圖片</button>
         </div>
       </div>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">③ 病人聲音與動作</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label>男性聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
-        <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
-      </div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。留空即用預設。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
-      <div><label>語音辨識來源</label>
-        <select id="set-stt" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
-          <option value="auto">自動（電腦／Android／iPhone Safari 用免費內建辨識；iPhone 桌面 App 模式改用 Azure）</option>
-          <option value="browser">一律瀏覽器內建（免費；iPhone 需用 Safari 開）</option>
-          <option value="azure">一律 Azure 語音辨識（每月免費 5 小時，之後約 US$1／小時）</option>
-        </select></div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
-      <div style="font-size:.75rem;color:var(--text2);margin-top:-6px">太短會在換氣時就把話送出；太長病人反應會變慢。建議 1.4–2.0 秒。</div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（電腦預設開啟；手機外放容易把病人的聲音當成護生，預設關閉，建議戴耳機再開）</label>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">⑥ 學生繳交（存到老師的 Google Drive）</div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 Google Apps Script 部署一個收件程式（<a href="https://github.com/inursing/nursing-bpr/blob/main/drive-inbox.gs" target="_blank" rel="noopener">程式與步驟</a>），把「網頁應用程式網址」貼在這裡；設定連結／QR 會一併帶給學生。學生在「產出報告」頁按「繳交練習」就會上傳到你的雲端硬碟。</div>
-      <div><label>收件網址（Apps Script 網頁應用程式）</label><input type="text" id="set-drive" placeholder="https://script.google.com/macros/s/…/exec"></div>
-      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
-      <hr class="divider" style="margin:4px 0">
+
+      <hr class="divider" style="margin:0">
       <details id="own-key-settings">
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">④ 學生課後練習：使用自己的金鑰</summary>
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">⑤ 學生課後練習：使用自己的金鑰</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課堂外想自己練習時，可以申請一把免費的 Gemini 金鑰（不需信用卡，約 2 分鐘）。金鑰只存在你自己的手機／電腦瀏覽器中。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課堂外練習可申請免費的 Gemini 金鑰（不需信用卡）。金鑰只存在自己的裝置。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
           <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用我自己的金鑰（勾選後不走老師的課程代理）</label>
           <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
           <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
         </div>
       </details>
       <details id="adv-settings">
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑤ 進階（一般不需要）</summary>
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑥ 進階（一般不需要）</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
-          <div><label>AI 供應商</label>
-            <select id="set-provider" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" onchange="toggleProviderFields()">
-              <option value="gemini">Google Gemini（有免費額度）</option>
-              <option value="anthropic">Anthropic Claude（需儲值）</option>
-            </select></div>
-          <div id="prov-gemini"><div><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div></div>
-          <div id="prov-anthropic" class="hidden">
-            <div><label>Anthropic API 金鑰</label><input type="text" id="set-apikey" placeholder="sk-ant-…"></div>
-            <div style="margin-top:8px"><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
-          </div>
+          <div><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div><label>Azure 語音金鑰（直接填，不經代理）</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
-            <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia、japaneast"></div>
+            <div><label>男性病人聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
+            <div><label>女性病人聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
           </div>
-          <div style="font-size:.78rem;color:var(--text2)">沒有 Azure 金鑰且未使用代理時，病人會改用瀏覽器內建語音。</div>
+          <div style="font-size:.78rem;color:var(--text2)">台灣腔：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label>Azure 語音金鑰（不經代理時）</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
+            <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia"></div>
+          </div>
           <div><label>男性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-m" placeholder="留空使用內建頭像"></div>
           <div><label>女性病人 3D 頭像網址（.glb）</label><input type="text" id="set-av-f" placeholder="留空使用內建頭像"></div>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性）</label>
+          <div style="font-size:.78rem;color:var(--text2)">Worker 程式與設定步驟：<a href="https://github.com/inursing/nursing-bpr/blob/main/worker.js" target="_blank" rel="noopener">worker.js</a>　收件程式：<a href="https://github.com/inursing/nursing-bpr/blob/main/drive-inbox.gs" target="_blank" rel="noopener">drive-inbox.gs</a></div>
         </div>
       </details>
       <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
@@ -1135,6 +1130,7 @@ async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
   document.getElementById('check-sr-msg').textContent=''; document.getElementById('check-voice-msg').textContent='';
+  runCheckDiag();
   // camera (shared stream, reused for recording)
   const msg=document.getElementById('check-cam-msg');
   if(!camStream){ await startCamera(); }
@@ -1158,6 +1154,22 @@ async function openCheck(){
     } else document.getElementById('check-mic-msg').textContent='未取得麥克風。';
   }catch(e){}
 }
+async function runCheckDiag(){
+  const el=document.getElementById('check-diag'); const st=getSettings(); const rows=[];
+  rows.push('裝置：'+(IS_IOS?'iOS':IS_MOBILE?'Android/行動':'電腦')+(IS_STANDALONE?'（桌面 App 模式）':'（瀏覽器）')+'　內建辨識：'+((window.SpeechRecognition||window.webkitSpeechRecognition)?'有':'無'));
+  rows.push('語音 SDK：'+(window.SpeechSDK?'已載入':'❌ 未載入（網路擋住 cdn.jsdelivr.net？）')+'　AI：'+(aiReady()?(proxyOn()?'代理':'自己的金鑰'):'❌ 未設定')+'　語音：'+(azureReady()?(proxyConfigured()?'代理':'自己的金鑰'):'內建'));
+  el.innerHTML=rows.join('<br>');
+  if(proxyConfigured()){
+    try{ const t0=Date.now(); const r=await fetch(st.proxyUrl+'/ping',{cache:'no-store'}); rows.push('代理連線：'+(r.ok?'✅ '+(Date.now()-t0)+' ms':'❌ HTTP '+r.status)); }catch(e){ rows.push('代理連線：❌ '+e.message); }
+    el.innerHTML=rows.join('<br>');
+    try{ azTok=null; const t0=Date.now(); const tok=await getAzToken(); rows.push('Azure 票證：✅ 區域 '+tok.region+'，'+(Date.now()-t0)+' ms'); }catch(e){ rows.push('Azure 票證：❌ '+e.message); }
+    el.innerHTML=rows.join('<br>');
+  }
+  if(window.SpeechSDK&&azureReady()){
+    try{ const c=getCase()||CASES[0]; const t0=Date.now(); const out=await azureSynthSDK('測試。',c,'neutral'); rows.push('Azure 合成：✅ '+(Date.now()-t0)+' ms，'+Math.round(out.blob.size/1024)+' KB'); }catch(e){ rows.push('Azure 合成：❌ '+(e.message||e)); }
+    el.innerHTML=rows.join('<br>');
+  }
+}
 function closeCheck(){
   document.getElementById('check-modal').classList.add('hidden');
   if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null}
@@ -1177,12 +1189,12 @@ function checkSpeech(){
   if(checkSpeech._r){ try{checkSpeech._r.abort();}catch(e){} }
   if(checkMicStream){ try{checkMicStream.getTracks().forEach(t=>t.stop());}catch(e){} checkMicStream=null; if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null} document.getElementById('check-mic-msg').textContent='（音量表已停止，改由語音辨識使用麥克風）'; }
   const r=createRecognizer();
-  if(!r){ m.innerHTML=IS_IOS&&IS_STANDALONE?'⚠️ 從桌面圖示開啟時 iPhone 不提供內建語音辨識，且老師未設定 Azure 語音；請改用 <b>Safari</b> 直接開啟網址。':'⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome（電腦／Android）或 Safari（iPhone）。'; return; }
+  if(!r){ m.innerHTML=IS_IOS&&IS_STANDALONE?'⚠️ 從桌面圖示開啟時 iPhone 不提供語音辨識，請改用 <b>Safari</b> 直接開啟網址。':'⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome（電腦／Android）或 Safari（iPhone）。'; return; }
   checkSpeech._r=r; r.lang='zh-TW'; r.interimResults=true; r.continuous=false; m.textContent='🎤 聆聽中…請說「我是護生」（'+sttName()+'）';
   let got=false; const help=IS_IOS?'<br>iPhone 排除方法：① 用 Safari 開（不要用桌面圖示）② 設定 → 一般 → 鍵盤 → 開啟「啟用聽寫」③ 設定 → Safari → 麥克風 → 允許 ④ 關閉其他正在使用麥克風的 App。':'<br>排除方法：確認網址列左邊的麥克風權限為「允許」、沒有其他程式占用麥克風；Chrome 需要能連到 Google 語音服務。';
   const timer=setTimeout(()=>{ if(!got){ try{r.abort();}catch(e){} m.innerHTML='⏱ 8 秒內沒有收到辨識結果。'+help; } },8000);
   r.onresult=e=>{ got=true; const t=Array.from(e.results).map(x=>x[0].transcript).join(''); m.textContent=(e.results[e.results.length-1].isFinal?'✅ 辨識到：「':'…「')+t+'」（'+sttName()+'）'; if(e.results[e.results.length-1].isFinal){ clearTimeout(timer); try{ r.stop(); }catch(x){} } };
-  r.onerror=e=>{ clearTimeout(timer); if(e.error==='aborted') return; m.innerHTML='辨識錯誤：'+e.error+(e.error==='not-allowed'?'（請允許麥克風）':e.error==='audio-capture'?'（麥克風被占用或無法取得）':e.error==='network'?'（連不到語音服務，請檢查網路）':'')+help; };
+  r.onerror=e=>{ clearTimeout(timer); if(e.error==='aborted') return; m.innerHTML='辨識錯誤：'+e.error+(e.message?'（'+escHtml(String(e.message).slice(0,200))+'）':'')+(e.error==='not-allowed'?'（請允許麥克風）':e.error==='audio-capture'?'（麥克風被占用或無法取得）':e.error==='network'?'（連不到語音服務，請檢查網路）':'')+help; };
   r.onend=()=>{ clearTimeout(timer); if(m.textContent.startsWith('🎤')) m.innerHTML='沒有聽到聲音，請再試一次。'+help; };
   try{ r.start(); }catch(e){ clearTimeout(timer); m.innerHTML='無法啟動辨識：'+e.message+help; }
 }
@@ -1259,7 +1271,6 @@ function makeSetupLink(){
   if(proxyOn()){ cfg.proxyUrl=st.proxyUrl; cfg.classCode=st.classCode; cfg.gKey=''; cfg.azKey=''; cfg.azRegion=''; }
   if(st.driveUrl) cfg.driveUrl=st.driveUrl;
   if(st.pauseSec) cfg.pauseSec=st.pauseSec;
-  if(st.stt&&st.stt!=='auto') cfg.stt=st.stt;
   else { cfg.azKey=st.azKey; cfg.azRegion=st.azRegion; if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey; }
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1281,7 +1292,7 @@ function downloadQr(){
   img.onload=()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=1104; const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,1104,1104); ctx.drawImage(img,40,40); const a=document.createElement('a'); a.download='行為過程紀錄練習_設定QR.png'; a.href=cv.toDataURL('image/png'); a.click(); };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE&&!azureReady()&&!(window.SpeechRecognition||window.webkitSpeechRecognition)) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
+window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
 function applySetupFromHash(){
   try{
     const m=location.hash.match(/^#setup=([A-Za-z0-9+/=]+)/); if(!m) return;
@@ -1295,38 +1306,26 @@ function applySetupFromHash(){
 }
 function openSettings(){
   const st=getSettings();
-  document.getElementById('set-provider').value=st.provider||'gemini'; document.getElementById('set-proxy').oninput=updateLinkHints; document.getElementById('set-gkey').oninput=updateLinkHints;
-  document.getElementById('set-gkey').value=st.gKey||'';
-  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.1-flash-lite';
-  toggleProviderFields();
-  document.getElementById('set-apikey').value=st.apiKey||'';
-  document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
-  document.getElementById('set-av-m').value=st.avM||'';
-  document.getElementById('set-av-f').value=st.avF||'';
-  document.getElementById('set-az-key').value=st.azKey||'';
-  document.getElementById('set-az-region').value=st.azRegion||'';
-  document.getElementById('set-az-vm').value=st.azVM||'';
-  document.getElementById('set-az-vf').value=st.azVF||'';
-  document.getElementById('set-hands').checked=!!st.hands;
-  document.getElementById('set-stt').value=st.stt||'auto';
-  document.getElementById('set-backchannel').checked=!!st.backchannel;
-  document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set('set-proxy',st.proxyUrl||''); set('set-class',st.classCode||''); set('set-teacher',st.teacherToken||'');
+  set('set-drive',st.driveUrl||'');
   document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
-  document.getElementById('set-ownkey').checked=!!st.ownKey;
-  document.getElementById('set-drive').value=st.driveUrl||'';
-  document.getElementById('set-teacher').value=st.teacherToken||'';
-  document.getElementById('set-proxy').value=st.proxyUrl||'';
-  document.getElementById('set-class').value=st.classCode||'';
+  document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
+  document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
+  set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
+  set('set-az-key',st.azKey||''); set('set-az-region',st.azRegion||''); set('set-av-m',st.avM||''); set('set-av-f',st.avF||'');
+  document.getElementById('set-hands').checked=!!st.hands;
+  document.getElementById('set-proxy').oninput=updateLinkHints; document.getElementById('set-gkey').oninput=updateLinkHints;
   updateLinkHints();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,stt:document.getElementById('set-stt').value,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:document.getElementById('set-drive').value.trim(),teacherToken:document.getElementById('set-teacher').value.trim(),proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
+  const v=id=>(document.getElementById(id).value||'').trim();
+  const st={provider:'gemini',gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
 }
-function toggleProviderFields(){ const p=document.getElementById('set-provider').value; document.getElementById('prov-gemini').classList.toggle('hidden',p!=='gemini'); document.getElementById('prov-anthropic').classList.toggle('hidden',p!=='anthropic'); }
 function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
 // AI 是否走代理（學生勾選「用自己的金鑰」時不走）；語音只要有代理就一律走代理
 function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return proxyConfigured(); }
@@ -1355,12 +1354,12 @@ async function teacherQuota(action,studentId,count){
   }catch(e){ out.textContent='❌ '+e.message; }
 }
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
-  const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到下方「④ 進階」直接填金鑰。</span>';
+  const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到「⑤／⑥」直接填金鑰。</span>';
   const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
   const os=document.getElementById('ownkey-state'); os.innerHTML=own?(gk?'<span style="color:#1a7f37">✅ 使用自己的金鑰（AI 病人與 AI 記錄走你的 Gemini 額度；語音'+(on?'仍由老師代理提供':'用瀏覽器內建聲音')+'）</span>':'<span style="color:var(--danger)">請貼上你的 Gemini 金鑰，或取消勾選</span>'):'';
   if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
   document.getElementById('own-key-settings').open=own||(!on&&!!gk);
-  document.getElementById('adv-settings').open=false; document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
+  document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
 async function testDrive(){
   saveSettings(); openSettings(); const msg=document.getElementById('drive-msg');
   if(!driveUrl()){ msg.textContent='請先貼上 script.google.com 開頭的網址'; return; }
@@ -1595,47 +1594,18 @@ async function initConvPhase(){
 
 // 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
 let listenWanted=false, pendingFinal='', finalTimer=null;
-// ===== 語音辨識來源：瀏覽器內建（免費）或 Azure（iPhone 桌面 App 模式用）=====
-function useAzureSTT(){ const st=getSettings(); if(!window.SpeechSDK||!azureReady()) return false; if(st.stt==='azure') return true; if(st.stt==='browser') return false; const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return (IS_IOS&&IS_STANDALONE)||!SR; }
-// 介面仿 Web Speech API：lang / continuous / interimResults / onstart / onresult / onerror / onend / start() / stop() / abort()
-class AzureRecognizer{
-  constructor(){ this.lang='zh-TW'; this.continuous=true; this.interimResults=true; this.onstart=null; this.onresult=null; this.onerror=null; this.onend=null; this._rec=null; this._active=false; this._results=[]; }
-  async _build(){
-    const st=getSettings(); const tok=proxyConfigured()?await getAzToken():null;
-    const cfg=tok?SpeechSDK.SpeechConfig.fromAuthorizationToken(tok.token,tok.region):SpeechSDK.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
-    cfg.speechRecognitionLanguage=this.lang||'zh-TW';
-    try{ cfg.setProperty(SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs,String(pauseMs())); }catch(e){}
-    try{ cfg.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,'60000'); }catch(e){}
-    const rec=new SpeechSDK.SpeechRecognizer(cfg,SpeechSDK.AudioConfig.fromDefaultMicrophoneInput());
-    const emit=()=>{ if(this.onresult) this.onresult({results:this._results.map(r=>Object.assign([{transcript:r.text}],{isFinal:r.final}))}); };
-    rec.recognizing=(x,e)=>{ if(!this._active) return; const t=e.result.text||''; const last=this._results[this._results.length-1]; if(last&&!last.final) last.text=t; else this._results.push({text:t,final:false}); emit(); };
-    rec.recognized=(x,e)=>{ if(!this._active) return; if(e.result.reason!==SpeechSDK.ResultReason.RecognizedSpeech||!e.result.text) { const last=this._results[this._results.length-1]; if(last&&!last.final) this._results.pop(); return; } const last=this._results[this._results.length-1]; if(last&&!last.final){ last.text=e.result.text; last.final=true; } else this._results.push({text:e.result.text,final:true}); emit(); };
-    rec.canceled=(x,e)=>{ const d=e.errorDetails||''; this._active=false; if(e.reason===SpeechSDK.CancellationReason.Error&&this.onerror) this.onerror({error:/permission|microphone/i.test(d)?'not-allowed':/network|connect|1006|1002/i.test(d)?'network':'azure',message:d}); if(this.onend) this.onend(); };
-    rec.sessionStopped=()=>{ if(this._active){ this._active=false; if(this.onend) this.onend(); } };
-    return rec;
-  }
-  start(){
-    if(this._active) throw new Error('InvalidStateError: already started');
-    this._active=true; this._results=[];
-    (async()=>{ try{ if(!this._rec) this._rec=await this._build(); else if(proxyConfigured()){ const tok=await getAzToken(); this._rec.authorizationToken=tok.token; }
-      await new Promise((res,rej)=>this._rec.startContinuousRecognitionAsync(res,rej)); if(this._active&&this.onstart) this.onstart(); }
-      catch(e){ this._active=false; if(this.onerror) this.onerror({error:'azure',message:String(e&&e.message||e)}); if(this.onend) this.onend(); } })();
-  }
-  stop(){ if(!this._active) return; this._active=false; const r=this._rec; if(r) r.stopContinuousRecognitionAsync(()=>{ if(this.onend) this.onend(); },()=>{ if(this.onend) this.onend(); }); else if(this.onend) this.onend(); }
-  abort(){ this.stop(); }
-}
-function createRecognizer(){ if(useAzureSTT()) return new AzureRecognizer(); const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return SR?new SR():null; }
-function sttName(){ return useAzureSTT()?'Azure 語音辨識':'瀏覽器內建辨識'; }
+function createRecognizer(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return SR?new SR():null; }
+function sttName(){ return '瀏覽器內建辨識'; }
 function setupRecognition(){
   recognition=createRecognizer();
-  if(!recognition){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ 桌面圖示模式沒有語音辨識，且未設定 Azure，請用 Safari 開啟網址':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
+  if(!recognition){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ iPhone 桌面圖示模式沒有語音辨識，請用 Safari 開啟網址':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
   recognition.lang='zh-TW';
   recognition.continuous=true;
   recognition.interimResults=true;
   recognition.onstart=()=>{
     isRecording=true;
     document.getElementById('mic-btn').classList.add('recording');
-    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出'+(useAzureSTT()?'（Azure）':''));
+    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
