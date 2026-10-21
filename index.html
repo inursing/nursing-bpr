@@ -10,7 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="行為過程紀錄">
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjMWE2ZmEzIi8+PHRleHQgeD0iOTYiIHk9IjEyNCIgZm9udC1zaXplPSI5NiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+PpTwvdGV4dD48L3N2Zz4=">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjMWE2ZmEzIi8+PHRleHQgeD0iOTYiIHk9IjEyNCIgZm9udC1zaXplPSI5NiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+PpTwvdGV4dD48L3N2Zz4=">
-<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIuihjOeCuumBjueoi+e0gOmMhOe3tOe/kuW5s+WPsCIsICJzaG9ydF9uYW1lIjogIuihjOeCuumBjueoi+e0gOmMhCIsICJzdGFydF91cmwiOiAiLi9pbmRleC5odG1sIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmMGY0ZjgiLCAidGhlbWVfY29sb3IiOiAiIzFhNmZhMyIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeE9USWdNVGt5SWo0OGNtVmpkQ0IzYVdSMGFEMGlNVGt5SWlCb1pXbG5hSFE5SWpFNU1pSWdjbmc5SWpRd0lpQm1hV3hzUFNJak1XRTJabUV6SWk4K1BIUmxlSFFnZUQwaU9UWWlJSGs5SWpFeU5DSWdabTl1ZEMxemFYcGxQU0k1TmlJZ2RHVjRkQzFoYm1Ob2IzSTlJbTFwWkdSc1pTSSs4SitQcFR3dmRHVjRkRDQ4TDNOMlp6ND0iLCAic2l6ZXMiOiAiMTkyeDE5MiIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLCAicHVycG9zZSI6ICJhbnkifV19">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>:root{color-scheme:light dark}body{margin:0;font-family:system-ui,sans-serif;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -372,6 +373,24 @@ input[type=text]:focus{border-color:var(--primary)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* --- 手機版面 --- */
 @media(max-width:640px){
+  body.conv-active #topbar,body.conv-active #steps{display:none}
+  body.conv-active #main{padding-top:6px}
+  #phase-conv .section-title{margin-bottom:6px}
+  #phase-conv .section-title h2{font-size:1rem}
+  #phase-conv .section-icon{display:none}
+  #timer-bar{padding:6px 12px;gap:10px;margin-bottom:8px!important}
+  #timer-bar .timer-label{display:none}
+  #timer-bar .timer-digit{font-size:1.1rem}
+  #phase-conv .stage-box{aspect-ratio:4/5}
+  #phase-conv #conv-area{max-height:22vh;min-height:90px;padding:10px;gap:8px;font-size:.9rem}
+  #phase-conv .bubble-wrap .avatar{display:none}
+  #mic-bar{padding:8px 16px;gap:10px}
+  #mic-bar .btn-record{width:64px;height:64px;font-size:1.6rem}
+  #mic-bar #status-msg{font-size:.85rem}
+  #mic-bar #interim-text{font-size:.75rem}
+}
+
+@media(max-width:640px){
   #topbar{padding:8px 12px;gap:8px}
   #topbar h1{font-size:1.05rem;line-height:1.2}
   #topbar .sub{display:none}
@@ -381,8 +400,6 @@ input[type=text]:focus{border-color:var(--primary)}
   h2{font-size:1.1rem}
   .info-box{font-size:.82rem;padding:10px 12px}
   /* 會談頁：病人畫面縮小，讓麥克風與狀態同一螢幕 */
-  .stage-box{aspect-ratio:1/1}
-  #conv-area{max-height:34vh;min-height:140px}
   /* 記錄／分析表：每一句改成卡片直式排列 */
   #record-table,#analysis-table{display:block}
   #record-table thead,#analysis-table thead{display:none}
@@ -727,6 +744,7 @@ input[type=text]:focus{border-color:var(--primary)}
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。留空即用預設。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（預設開啟；若裝置有回音誤判可關閉）</label>
       <hr class="divider" style="margin:4px 0">
       <details id="adv-settings">
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">④ 進階：不用代理時直接填金鑰（一般不需要）</summary>
@@ -934,7 +952,7 @@ function goStep(p){
   renderPhase(p);
 }
 function renderPhase(p){
-  state.phase=p;
+  state.phase=p; document.body.classList.toggle('conv-active',p==='conv');
   PHASES.forEach(ph=>{
     document.getElementById('phase-'+ph)?.classList.add('hidden');
   });
@@ -1136,7 +1154,7 @@ let timerInterval=null;
 let isRecording=false;
 let sampleFn=null;
 let convHistory=[];
-let isSpeaking=false;
+let isSpeaking=false; let convGen=0, curReply=null;
 let currentUtterance=null;
 
 // ===== AVATAR (3D bridge; implementation in the module script at the bottom) =====
@@ -1240,13 +1258,14 @@ function openSettings(){
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-backchannel').checked=!!st.backchannel;
+  document.getElementById('set-bargein').checked=st.bargeIn!==false;
   document.getElementById('set-proxy').value=st.proxyUrl||'';
   document.getElementById('set-class').value=st.classCode||'';
   updateLinkHints();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1497,7 +1516,9 @@ function setupRecognition(){
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
-  const commit=(t)=>{ t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return; committedAt=Date.now(); committedText=t; pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); handleNurseSpeech(t); try{ recognition.stop(); }catch(e){} };
+  const commit=(t)=>{ t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return;
+    if(isSpeaking){ if(!bargeInOn()||isEcho(t)||t.length<2) return; interruptPatient(); }
+    committedAt=Date.now(); committedText=t; pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); handleNurseSpeech(t); try{ recognition.stop(); }catch(e){} };
   recognition.onresult=(e)=>{
     let interim=''; let final='';
     for(let i=0;i<e.results.length;i++){
@@ -1505,6 +1526,7 @@ function setupRecognition(){
       else interim+=e.results[i][0].transcript;
     }
     const shown=(final+interim).trim();
+    if(isSpeaking&&(!bargeInOn()||isEcho(shown))){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
     if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),800); }
@@ -1521,12 +1543,31 @@ function setupRecognition(){
     document.getElementById('mic-btn').classList.remove('recording');
     document.getElementById('interim-text').textContent='';
     // 瀏覽器會自行結束 continuous 聆聽；若仍要聆聽且病人沒在說話，就自動重啟
-    if(listenWanted&&!isSpeaking&&state.phase==='conv'){ setTimeout(()=>{ if(listenWanted&&!isSpeaking&&!isRecording) try{recognition.start();}catch(e){} },250); }
+    if(listenWanted&&state.phase==='conv'&&(bargeInOn()||!isSpeaking)){ setTimeout(()=>{ if(listenWanted&&!isRecording&&state.phase==='conv'&&(bargeInOn()||!isSpeaking)) try{recognition.start();}catch(e){} },250); }
     else if(!isSpeaking) setStatus(listenWanted?'（已暫停聆聽）':'按下麥克風開始聆聽');
   };
 }
 function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();}catch(e){} } }
-function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&!isSpeaking&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
+function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&(bargeInOn()||!isSpeaking)&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
+function bargeInOn(){ const st=getSettings(); return st.bargeIn!==false; }
+// 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
+function isEcho(t){ if(!curReply||!t) return false; const body=(curReply.body||'').replace(/[\s，。！？、…「」]/g,''); const x=t.replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return false; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1)>=0.5; }
+// 護生插話：立刻停止病人說話，把已說出的部分記為被打斷
+function interruptPatient(){
+  const r=curReply; if(!r||r.done) return; r.done=true; convGen++; curReply=null;
+  try{ r.speaker.cancel(); }catch(e){} stopAudio(); window.speechSynthesis&&speechSynthesis.cancel();
+  if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; }
+  const queued=(r.speaker.q||[]).reduce((a,i)=>a+i.t.length,0);
+  const spoken=(r.body||'').slice(0,Math.max(0,r.spokenUpTo-queued)).trim();
+  const txt=spoken?spoken+'…（被護生打斷）':'（還沒開口就被護生打斷）';
+  r.bubble.textContent=txt;
+  const d=new Date(); r.liveEl.querySelector('.bubble-ts').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  state.conversation.push({role:'patient',text:txt,ts:Date.now(),expr:(r.header&&r.header.expr)||'neutral',gest:'',interrupted:true});
+  convHistory.push({role:'assistant',content:txt});
+  isSpeaking=false; setExpression('neutral'); playGesture('g-nod');
+  document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤';
+  document.getElementById('end-conv-btn').disabled=false; saveState();
+}
 
 function toggleMic(){
   unlockAudio();
@@ -1572,7 +1613,8 @@ async function handleNurseSpeech(text){
   state.conversation.push(entry);
   setTimeout(()=>{ const f1=captureNurseFrame(); if(f1) entry.frames.push(f1); },2500);
   convHistory.push({role:'user',content:`護生說：「${text}」`});
-  isSpeaking=true; pauseListening();
+  isSpeaking=true; if(!bargeInOn()) pauseListening();
+  const gen=++convGen;
   const thinkT0=Date.now(); window.__thinkTimer&&clearInterval(window.__thinkTimer); window.__thinkTimer=setInterval(()=>{ const sec=Math.round((Date.now()-thinkT0)/1000); if(isSpeaking) setStatus('⏳ 病人正在想怎麼回答…（'+sec+' 秒）'); },500); setStatus('⏳ 病人正在想怎麼回答…');
   document.getElementById('mic-btn').classList.add('waiting');
   document.getElementById('mic-btn').textContent='⏳';
@@ -1588,16 +1630,18 @@ async function handleNurseSpeech(text){
   const bubble=liveEl.querySelector('.bubble');
   let response='', parsedHeader=null, spokenUpTo=0;
   const speaker=new SentenceSpeaker();
+  const reply={gen,speaker,bubble,liveEl,body:'',spokenUpTo:0,header:null,done:false}; curReply=reply;
   const onDelta=(full)=>{
+    if(gen!==convGen) return;
     if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; setStatus('🗣 病人回應中…'); }
-    if(!parsedHeader){ if(/[】\]]/.test(full)){ parsedHeader=parsePatientReply(full); setExpression(parsedHeader.expr); if(parsedHeader.gest) playGesture(parsedHeader.gest); } else return; }
-    const body=parsePatientReply(full).text;
+    if(!parsedHeader){ if(/[】\]]/.test(full)){ parsedHeader=parsePatientReply(full); reply.header=parsedHeader; setExpression(parsedHeader.expr); if(parsedHeader.gest) playGesture(parsedHeader.gest); } else return; }
+    const body=parsePatientReply(full).text; reply.body=body;
     bubble.textContent=body; scrollConv();
     // 逐句送出語音
     const restText=body.slice(spokenUpTo);
     let m=restText.match(/^[\s\S]*?[。！？!?；;…]+(?=\s|$|[^。！？!?；;…])/);
     if(!m&&spokenUpTo===0){ const mc=restText.match(/^[^，,]{6,}[，,]/); if(mc) m=mc; }   // 第一句：到第一個逗號就先開口
-    if(m&&m[0].length>=4){ speaker.push(m[0]); spokenUpTo+=m[0].length; }
+    if(m&&m[0].length>=4){ speaker.push(m[0]); spokenUpTo+=m[0].length; reply.spokenUpTo=spokenUpTo; }
   };
   try{
     if(sampleFn){
@@ -1612,6 +1656,8 @@ async function handleNurseSpeech(text){
     console.error(e); toast('AI 回應失敗：'+(e.message||'')); 
     response=fallbackPatientResponse(c,text);
   }
+  if(gen!==convGen||reply.done) return;   // 已被護生打斷
+  reply.done=true; curReply=null;
   const parsed=parsePatientReply(response);
   response=parsed.text||response;
   if(!parsedHeader){ setExpression(parsed.expr); if(parsed.gest) playGesture(parsed.gest); }
@@ -2230,6 +2276,8 @@ ${studentText||'（學生未填寫）'}
 - 打招呼、自我介紹、說明來意、道別：技巧欄寫「開場」或「結束」，不要硬套技巧。
 - 非治療性反應標「非治療性：類型」，類型限：不當保證、說教、改變話題、連續發問、否定感受、過早建議、忽略感受、質問為什麼、打斷。
 - 「有沒有／會不會／幾點」＝詢問；「可以多說一點嗎」＝開放式提問；只重複字句＝重述；說出情緒＝反映。
+- 相關性判斷：每句都要先判斷護生這句話是否與「這位病人的狀況、感受或護生自訂的會談目的」有關。與病人無關的內容（閒聊、自言自語、測試麥克風、對旁人說話、與病情和病人處境無關的話題）在技巧欄標 <span class="tech-tag tech-non">與病人無關</span>，教師分析直接指出「這句與病人無關」，不要硬套技巧。
+- 若病人的話標記為「被護生打斷」，該句護生的技巧欄加標「非治療性：打斷」，除非打斷是為了處理病人的急迫需求。
 
 【字數限制——務必遵守】
 - 護生非語言／病人非語言：每格 ≤ 15 字。
@@ -2239,7 +2287,8 @@ ${studentText||'（學生未填寫）'}
 請直接輸出 HTML（不要 markdown、不要 <html>/<body> 標籤），結構如下：
 1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（有鏡頭畫面者依畫面寫並前加「畫面：」，否則前加「推測：」）｜病人語言反應（引用原文）｜病人非語言反應（依診斷與語句推測）｜使用技巧（每個技巧用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">非治療性：類型</span>）｜教師分析（三行：✓…<br>病人 …<br>可說 「…」）
 2. 一個 <h4>整體評估</h4>，依序包含下列小標（用 <b>），每項 ≤ 80 字：
-   - 技巧運用：用過的技巧及次數（例：詢問×5、反映×1）；本案需要但沒用到的技巧（最多 3 個）；非治療性反應次數與類型。
+   - 會談內容相關性：護生的話是否圍繞病人的狀況與會談目的；若有與病人無關的句子，指出是第幾句並說明影響。
+   - 技巧運用：不要統計次數。評論「用得恰當的技巧」（舉 1–2 句實例說明為何恰當）、「用得不恰當或時機不對的技巧」（舉例說明）、以及本案最需要卻沒用到的技巧（最多 2 個，說明在哪一句可以用）。
    - 會談結構：開場／中段／結束各一句評語。
    - 病人反應：信任或開放程度有無提升、轉折在第幾句。
    - 目的達成：對照護生自訂目的，達成／部分／未達成＋一句理由。
