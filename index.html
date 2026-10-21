@@ -516,9 +516,10 @@ input[type=text]:focus{border-color:var(--primary)}
           </thead>
           <tbody id="record-tbody"></tbody>
         </table>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button>
-          <span style="font-size:.78rem;color:var(--text2);align-self:center">提示：本次會談共約 <span id="exchange-hint">0</span> 次互動</span>
+          <span style="font-size:.78rem;color:var(--text2)">提示：本次會談共約 <span id="exchange-hint">0</span> 次互動</span>
+          <span class="ai-status" style="font-size:.78rem;color:var(--accent);margin-left:auto"></span>
         </div>
       </div>
       <div class="row-actions" style="margin-top:16px">
@@ -534,7 +535,7 @@ input[type=text]:focus{border-color:var(--primary)}
       </div>
       <div class="card" style="overflow-x:auto;margin-bottom:20px">
         <table class="record-table" id="analysis-table"><thead><tr><th style="width:40px">序</th><th style="min-width:150px">護生語言</th><th style="min-width:120px">護生非語言</th><th style="min-width:150px">病人語言</th><th style="min-width:120px">病人非語言</th><th style="min-width:170px">使用技巧</th><th style="min-width:170px">自我分析</th><th style="width:44px"></th></tr></thead><tbody id="analysis-tbody"></tbody></table>
-        <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button></div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px"><button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button><span class="ai-status" style="font-size:.78rem;color:var(--accent);margin-left:auto"></span></div>
       </div>
       <div class="card">
         <h3 style="margin-bottom:12px">整體反思</h3>
@@ -1125,11 +1126,11 @@ function toGemini(messages,system,maxTokens){
 }
 // 會談：快為主（flash-lite，約 1 秒）；報告：品質為主（可以慢）。逾時或錯誤自動換下一個模型。
 const GEMINI_CHAT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
-const GEMINI_REPORT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
+const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-2.5-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
 let geminiModelOverride=null;
 function geminiModels(kind){ const st=getSettings(); const base=kind==='report'?GEMINI_REPORT_MODELS:GEMINI_CHAT_MODELS; const m=kind==='report'?base[0]:(geminiModelOverride||st.gModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
 async function geminiFetch(method,body,kind){
-  const st=getSettings(); let lastErr=null; const timeoutMs=kind==='report'?45000:12000;
+  const st=getSettings(); let lastErr=null; const timeoutMs=kind==='report'?150000:12000;
   for(const model of geminiModels(kind)){
     const ac=new AbortController(); const timer=setTimeout(()=>ac.abort(),timeoutMs);
     let res;
@@ -1289,6 +1290,10 @@ async function initConvPhase(){
     <div style="margin-top:8px;font-size:.78rem;font-style:italic;color:var(--text2)">"${c.chief}"</div>
   `;
   document.getElementById('conv-goals-display').textContent=state.goals;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  state.convStart=null; state.convDuration=0;
+  document.getElementById('timer-display').textContent='00:00'; document.getElementById('timer-fill').style.width='0%'; document.getElementById('timer-fill').classList.remove('done'); document.getElementById('timer-pct').textContent='最少10分鐘';
+  document.getElementById('end-confirm').classList.add('hidden');
   moveAvatarTo('avatar-wrap');
   const area=document.getElementById('conv-area');
   area.innerHTML='';
@@ -1357,6 +1362,7 @@ function startTimer(){
   if(timerInterval) return;
   if(!state.convStart) state.convStart=Date.now();
   timerInterval=setInterval(()=>{
+    if(!state.convStart){ state.convStart=Date.now(); }
     const secs=Math.floor((Date.now()-state.convStart)/1000);
     state.convDuration=secs;
     const m=String(Math.floor(secs/60)).padStart(2,'0');
@@ -1724,6 +1730,7 @@ function endConv(force){
   if(window.speechSynthesis) window.speechSynthesis.cancel();
   stopAudio(); stopMouth(); stopBlink(); stopCamera();
   gttsCache.clear(); prepareEmotionalVoices();
+  startBackgroundAnalysis();
   addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
   buildProcessRecord();
   document.getElementById('step-record').classList.add('done');
@@ -1826,11 +1833,12 @@ async function renderExportPhase(){
   document.getElementById('step-export').classList.add('done');
   document.getElementById('student-report-preview').innerHTML=buildStudentReportHTML();
   document.getElementById('ai-generating').classList.remove('hidden');
-  document.getElementById('ai-report-preview').innerHTML='';
-  // Generate AI report
+  document.getElementById('ai-report-preview').innerHTML=aiJobText||'';
   try{
-    const aiText=await generateAiRecord();
-    state.aiRecord=aiText;
+    let aiText;
+    if(state.aiRecord){ aiText=state.aiRecord; }
+    else if(aiJob&&!aiJobError){ document.getElementById('ai-generating').textContent='AI 分析已在背景進行，即將完成…'; aiText=await aiJob; }
+    else { aiText=await generateAiRecord(); state.aiRecord=aiText; }
     document.getElementById('ai-generating').classList.add('hidden');
     document.getElementById('ai-report-preview').innerHTML=aiText;
   }catch(e){
@@ -1913,7 +1921,18 @@ function buildStudentReportHTML(){
   return html;
 }
 
-async function generateAiRecord(){
+// 會談結束即在背景分析；學生填記錄時同步進行
+let aiJob=null, aiJobText='', aiJobDone=false, aiJobError=null;
+function startBackgroundAnalysis(){
+  if(!sampleFn||!state.conversation.some(m=>m.role==='nurse')) return;
+  aiJobText=''; aiJobDone=false; aiJobError=null; state.aiRecord=null;
+  updateAiStatusChips('AI 分析進行中…');
+  aiJob=generateAiRecord(full=>{ aiJobText=full; updateAiStatusChips(`AI 分析進行中…（${full.length} 字）`); })
+    .then(t=>{ state.aiRecord=t; aiJobDone=true; updateAiStatusChips('✅ AI 分析完成'); return t; })
+    .catch(e=>{ aiJobError=e; aiJobDone=true; updateAiStatusChips('⚠️ AI 分析失敗：'+(e.message||'')); throw e; });
+}
+function updateAiStatusChips(msg){ document.querySelectorAll('.ai-status').forEach(el=>{ el.textContent=msg; }); }
+async function generateAiRecord(onProgress){
   const c=getCase(); if(!c) return '<p>無法生成</p>';
   if(!sampleFn){
     return buildAiFallbackRecord(c);
@@ -1940,11 +1959,24 @@ ${convText}
 【學生憑記憶寫的版本（供對照用，若有明顯遺漏或記錯可在整體評估中點出）】
 ${studentText||'（學生未填寫）'}
 
-技巧名稱請只使用以下清單：${TECHNIQUES.join('、')}。若護生的回應屬於非治療性（例如：不當保證、說教、改變話題、一次問多個問題、批判、忽略感受），請在技巧欄標示「非治療性：○○」。
+【技巧判定規則】技巧名稱只能用以下清單：${TECHNIQUES.join('、')}。
+- 一句話可標 1–3 個技巧；判定要看「實際說出口的話」，不要因為意圖好就加分。
+- 非治療性反應請標「非治療性：○○」，常見類型：不當保證（「不用擔心」「一定會好」）、說教／教條式衛教、改變話題、一次問多個問題、封閉式連續問句（像問診）、批判或否定感受、過早給建議、忽略病人剛說的感受、自我揭露過多、打斷、用「為什麼」質問。
+- 區分「詢問」與「開放式提問」：有沒有、會不會、幾點＝詢問；「可以多說一點嗎」「您怎麼看」＝開放式提問。
+- 「反映」必須有反映出病人的情緒或意思，只重複字句是「重述」。
+
+【教師分析的寫法】每一句都要具體，不要空泛：先說這句做得好的地方（若有），再說病人的回應透露了什麼（情緒、需求、防衛、信任變化），最後給一句「可以這樣說：『…』」的示範語句（口語、符合台灣護理師講話方式、不超過 40 字）。護生沒有自我介紹、沒有說明來意、沒有確認病人意願、結束時沒有總結或預告下次，都要指出。
 
 請直接輸出 HTML（不要 markdown、不要 <html>/<body> 標籤），結構如下：
 1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（若有提供該句的鏡頭畫面則依畫面描述並前加「畫面：」，否則依語句合理推測並前加「推測：」）｜病人語言反應（引用原文）｜病人非語言反應（依診斷、情境、語句合理推測）｜使用技巧（用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">）｜教師分析與建議（針對這一句：做得好的地方、病人反應透露什麼、可以怎麼說更好，並給一句示範語句）
-2. 一個 <h4>整體評估</h4> 段落，包含：會談整體優點（2-3點）、建議加強之處（2-3點）、會談目的達成程度、學生記憶版本與實際逐字稿的落差（若有）。
+2. 一個 <h4>整體評估</h4> 段落，依序包含下列小標（用 <b>）：
+   - 會談結構：開場（自我介紹、說明來意、取得同意）、中段（主題是否聚焦、是否跟隨病人的線索）、結束（總結、預告、道別）各做到什麼程度。
+   - 治療性溝通技巧運用：統計本次使用最多的 3 個技巧、完全沒用到但本案很需要的技巧（例如鼓勵描述感受、反映、善用沉默），以及非治療性反應出現次數與類型。
+   - 病人反應與關係變化：病人從會談開始到結束，開放程度／信任是否提升，在哪一句轉折，為什麼。
+   - 會談目的達成程度：對照護生自訂的目的與本案護理問題，逐項說「達成／部分達成／未達成」及理由。
+   - 最需要改進的 3 件事：具體、可操作，各附一句示範語句。
+   - 學生記憶版本與實際逐字稿的落差（若學生有填）：遺漏了哪些重要句子、記錯的地方、以及這些落差對記錄品質的影響。
+   - 總評：以 1–5 分給「建立關係」「傾聽與回應」「探索與聚焦」「結束與總結」四個向度評分（用一個小表格），並寫一段 80–120 字的鼓勵性總結。
 
 全部使用繁體中文、台灣護理用語，稱呼對方為「病人」，不要用「案主」或「個案」。`;
 
@@ -1958,8 +1990,8 @@ ${studentText||'（學生未填寫）'}
   }
   if(nImg){ parts.push({text:`\n以上共 ${nImg} 張護生的鏡頭畫面。請務必根據畫面描述每一句的「護生非語言反應」（眼神是否看著病人、表情、頭部動作、身體姿勢、手部），有畫面的句子不要寫「推測」，而是寫「畫面：…」；並在整體評估最後新增一段「非語言行為回饋」，具體指出做得好的和需要調整的（例如低頭看稿、面無表情、身體後仰、缺乏點頭回應）。`}); }
   const input=nImg?[{role:'user',parts}]:prompt;
-  const onDelta=(full)=>{ const el=document.getElementById('ai-report-preview'); if(el) el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g) g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
-  const res=await apiSampleStream(input,{maxTokens:5000,kind:'report',onDelta});
+  const onDelta=(full)=>{ onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
+  const res=await apiSampleStream(input,{maxTokens:6000,kind:'report',onDelta});
   return res.text;
 }
 
