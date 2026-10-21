@@ -663,7 +663,7 @@ input[type=text]:focus{border-color:var(--primary)}
         </select></div>
       <div id="prov-gemini">
         <div><label>Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.5-flash-lite"></div>
+        <div style="margin-top:8px"><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
         <div style="font-size:.78rem;color:var(--text2);margin-top:4px">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 用 Google 帳號按「Create API key」即可，免費層不需信用卡。</div>
       </div>
       <div id="prov-anthropic" class="hidden">
@@ -1345,7 +1345,7 @@ function openSettings(){
   const st=getSettings();
   document.getElementById('set-provider').value=st.provider||'gemini';
   document.getElementById('set-gkey').value=st.gKey||'';
-  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.5-flash-lite';
+  document.getElementById('set-gmodel').value=st.gModel||'gemini-3.1-flash-lite';
   toggleProviderFields();
   document.getElementById('set-apikey').value=st.apiKey||'';
   document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
@@ -1382,7 +1382,7 @@ function toGemini(messages,system,maxTokens){
     generationConfig:{maxOutputTokens:maxTokens||1024,temperature:0.9}};
 }
 // 會談：快為主（flash-lite，約 1 秒）；報告：品質為主（可以慢）。逾時或錯誤自動換下一個模型。
-const GEMINI_CHAT_MODELS=['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
+const GEMINI_CHAT_MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash','gemini-2.5-flash','gemini-3.7-flash'];
 const GEMINI_REPORT_MODELS=['gemini-3.5-flash','gemini-3.7-flash','gemini-2.5-flash','gemini-3.5-flash-lite','gemini-3.1-flash-lite'];
 let geminiModelOverride=null;
 function geminiModels(kind){ const st=getSettings(); const base=kind==='report'?GEMINI_REPORT_MODELS:GEMINI_CHAT_MODELS; const m=kind==='report'?base[0]:(geminiModelOverride||st.gModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
@@ -1591,19 +1591,19 @@ function setupRecognition(){
     setStatus('🎤 聆聽中…說完稍停一下就會送出');
     startTimer();
   };
+  let lastInterim='', interimTimer=null, committedAt=0, committedText='';
+  const commit=(t)=>{ t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return; committedAt=Date.now(); committedText=t; pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); handleNurseSpeech(t); try{ recognition.stop(); }catch(e){} };
   recognition.onresult=(e)=>{
     let interim=''; let final='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
+    for(let i=0;i<e.results.length;i++){
       if(e.results[i].isFinal) final+=e.results[i][0].transcript;
       else interim+=e.results[i][0].transcript;
     }
-    document.getElementById('interim-text').textContent=interim||final;
-    if(final){
-      // 把短時間內連續的 final 片段合併成一句（避免被切成兩段）
-      pendingFinal+=final.trim();
-      clearTimeout(finalTimer);
-      finalTimer=setTimeout(()=>{ const t=pendingFinal.trim(); pendingFinal=''; if(t) handleNurseSpeech(t); },700);
-    }
+    const shown=(final+interim).trim();
+    document.getElementById('interim-text').textContent=shown;
+    // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
+    if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),800); }
+    else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),250); }
   };
   recognition.onerror=(e)=>{
     isRecording=false;
@@ -1688,7 +1688,9 @@ async function handleNurseSpeech(text){
     const body=parsePatientReply(full).text;
     bubble.textContent=body; scrollConv();
     // 逐句送出語音
-    const m=body.slice(spokenUpTo).match(/^[\s\S]*?[。！？!?；;…]+(?=\s|$|[^。！？!?；;…])/);
+    const restText=body.slice(spokenUpTo);
+    let m=restText.match(/^[\s\S]*?[。！？!?；;…]+(?=\s|$|[^。！？!?；;…])/);
+    if(!m&&spokenUpTo===0){ const mc=restText.match(/^[^，,]{6,}[，,]/); if(mc) m=mc; }   // 第一句：到第一個逗號就先開口
     if(m&&m[0].length>=4){ speaker.push(m[0]); spokenUpTo+=m[0].length; }
   };
   try{
