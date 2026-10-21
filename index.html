@@ -1377,7 +1377,7 @@ async function testProxy(){
     if(r.status===401){ msg.textContent='❌ 課程代碼錯誤'; return; }
     if(!r.ok){ msg.textContent='❌ '+(j.error||('HTTP '+r.status)); return; }
     azTok=null;
-    const g=await fetch(st.proxyUrl+'/gemini/'+(st.gModel||GEMINI_CHAT_MODELS[0])+':generateContent',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({contents:[{parts:[{text:'回覆「好」一個字'}]}]})});
+    const g=await fetch(st.proxyUrl+'/gemini/'+(st.gModel||GEMINI_CHAT_MODELS[0])+':generateContent?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({contents:[{parts:[{text:'回覆「好」一個字'}]}]})});
     const gj=await g.json().catch(()=>({}));
     msg.textContent=g.ok?'✅ 代理正常（Gemini 與 Azure 語音都可用，區域 '+j.region+'）':'⚠ Azure 可用，但 Gemini 失敗：'+(gj.error?.message||gj.error||g.status);
   }catch(e){ msg.textContent='❌ 無法連線：'+e.message; }

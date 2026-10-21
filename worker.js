@@ -80,7 +80,9 @@ export default {
     }
 
     // Gemini 呼叫需有有效的練習 sid（教師或未啟用次數限制時免檢查）
-    const needSid = quotaOn && !isTeacher && url.pathname.startsWith('/gemini/');
+    // 設定頁的「測試代理連線」：?test=1 且請求很小，免登記
+    const isTinyTest = url.searchParams.get('test') === '1' && parseInt(req.headers.get('content-length') || '9999', 10) < 400;
+    const needSid = quotaOn && !isTeacher && !isTinyTest && url.pathname.startsWith('/gemini/');
     if (needSid) {
       const sid = req.headers.get('X-Session') || '';
       if (!sid || !(await env.QUOTA.get('sid:' + sid))) return json({ error: '練習尚未登記或已逾時，請重新開始會談' }, 403);
