@@ -464,7 +464,7 @@ input[type=text]:focus{border-color:var(--primary)}
           <div class="card">
             <div style="margin-bottom:16px">
               <label>學生姓名（練習者）</label>
-              <input type="text" id="student-name" placeholder="請輸入您的姓名" style="max-width:240px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="student-name" placeholder="請輸入您的姓名" style="max-width:240px"><input type="text" id="student-id" placeholder="學號（繳交作業用）" style="max-width:220px"></div>
             </div>
             <div style="margin-bottom:16px">
               <label>今日會談目的 <span style="color:var(--danger)">*</span></label>
@@ -683,6 +683,13 @@ input[type=text]:focus{border-color:var(--primary)}
           <div id="ai-generating" class="info-box info-warn">AI 正在分析會談過程，請稍候…</div>
           <div id="ai-report-preview" style="font-size:.82rem"></div>
         </div>
+        <div class="card" id="submit-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">會把學生版 PDF、AI 版 PDF、逐字稿與會談影片上傳到老師的雲端硬碟。</div></div>
+            <button class="btn btn-primary" id="submit-btn" onclick="submitToTeacher()">📤 繳交練習</button>
+          </div>
+          <div id="submit-status" style="margin-top:10px;font-size:.85rem;line-height:1.7"></div>
+        </div>
         <div class="row-actions"><button class="btn btn-primary" onclick="renderPhase('review')">🎬 回顧會談過程 →</button></div>
       </div>
     </div>
@@ -721,6 +728,14 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
       </div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span> <a href="https://github.com/inursing/nursing-bpr/blob/main/worker.js" target="_blank" rel="noopener" style="margin-left:6px">Worker 程式與設定步驟</a></div>
+      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--text2)">教師工具：練習次數限制（只在教師自己的裝置填）</summary>
+        <div style="display:grid;gap:8px;margin-top:8px">
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">Worker 的 <code>MAX_SESSIONS</code> 設定每位學生可用課堂金鑰的練習次數（以學號計）。填入教師密語（Worker 的 <code>TEACHER_TOKEN</code>）後，你自己的裝置不受限制，也能查看與重設學生次數。此密語不會放進設定連結／QR。</div>
+          <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="與 Worker 的 TEACHER_TOKEN 相同"></div>
+          <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
+          <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
+        </div>
+      </details>
       <hr class="divider" style="margin:4px 0">
       <div style="font-weight:700;font-size:.9rem">② 發給學生的設定連結 / QR Code</div>
       <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 只含代理網址、課程代碼與病人設定，<b>不含任何金鑰</b>。</div>
@@ -744,7 +759,14 @@ input[type=text]:focus{border-color:var(--primary)}
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。留空即用預設。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
+      <div style="font-size:.75rem;color:var(--text2);margin-top:-6px">太短會在換氣時就把話送出；太長病人反應會變慢。建議 1.4–2.0 秒。</div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話：病人說話時可直接開口，病人會停下來（預設開啟；若裝置有回音誤判可關閉）</label>
+      <hr class="divider" style="margin:4px 0">
+      <div style="font-weight:700;font-size:.9rem">⑥ 學生繳交（存到老師的 Google Drive）</div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 Google Apps Script 部署一個收件程式（<a href="https://github.com/inursing/nursing-bpr/blob/main/drive-inbox.gs" target="_blank" rel="noopener">程式與步驟</a>），把「網頁應用程式網址」貼在這裡；設定連結／QR 會一併帶給學生。學生在「產出報告」頁按「繳交練習」就會上傳到你的雲端硬碟。</div>
+      <div><label>收件網址（Apps Script 網頁應用程式）</label><input type="text" id="set-drive" placeholder="https://script.google.com/macros/s/…/exec"></div>
+      <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
       <hr class="divider" style="margin:4px 0">
       <details id="own-key-settings">
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem">④ 學生課後練習：使用自己的金鑰</summary>
@@ -1083,6 +1105,7 @@ function renderGoalsPhase(){
   `;
   document.getElementById('goals-case-detail').innerHTML=buildMedicalRecord(c);
   if(state.studentName) document.getElementById('student-name').value=state.studentName;
+  if(state.studentId) document.getElementById('student-id').value=state.studentId;
   if(state.goals) document.getElementById('goals-input').value=state.goals;
 }
 function startConv(){
@@ -1090,7 +1113,7 @@ function startConv(){
   const goals=document.getElementById('goals-input').value.trim();
   if(!name){toast('請填寫學生姓名');document.getElementById('student-name').focus();return}
   if(!goals){toast('請填寫會談目的');document.getElementById('goals-input').focus();return}
-  state.studentName=name;
+  state.studentName=name; state.studentId=document.getElementById('student-id').value.trim(); state.sid=null;
   state.goals=goals;
   state.plannedTech=[];
   state.conversation=[];
@@ -1215,6 +1238,8 @@ function makeSetupLink(){
   saveSettings(); openSettings();
   const st=getSettings(); const cfg={azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
   if(proxyOn()){ cfg.proxyUrl=st.proxyUrl; cfg.classCode=st.classCode; cfg.gKey=''; cfg.azKey=''; cfg.azRegion=''; }
+  if(st.driveUrl) cfg.driveUrl=st.driveUrl;
+  if(st.pauseSec) cfg.pauseSec=st.pauseSec;
   else { cfg.azKey=st.azKey; cfg.azRegion=st.azRegion; if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey; }
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1264,14 +1289,17 @@ function openSettings(){
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-backchannel').checked=!!st.backchannel;
   document.getElementById('set-bargein').checked=st.bargeIn!==false;
+  document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
   document.getElementById('set-ownkey').checked=!!st.ownKey;
+  document.getElementById('set-drive').value=st.driveUrl||'';
+  document.getElementById('set-teacher').value=st.teacherToken||'';
   document.getElementById('set-proxy').value=st.proxyUrl||'';
   document.getElementById('set-class').value=st.classCode||'';
   updateLinkHints();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,ownKey:document.getElementById('set-ownkey').checked,proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:document.getElementById('set-drive').value.trim(),teacherToken:document.getElementById('set-teacher').value.trim(),proxyUrl:document.getElementById('set-proxy').value.trim().replace(/\/+$/,''),classCode:document.getElementById('set-class').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1280,7 +1308,30 @@ function toggleProviderFields(){ const p=document.getElementById('set-provider')
 function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
 // AI 是否走代理（學生勾選「用自己的金鑰」時不走）；語音只要有代理就一律走代理
 function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return proxyConfigured(); }
-function proxyHeaders(extra){ const st=getSettings(); return Object.assign({'X-Class-Code':st.classCode||''},extra||{}); }
+function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||''}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
+// 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
+async function ensureSession(){
+  if(!proxyOn()||state.sid) return true;
+  const st=getSettings();
+  const r=await fetch(st.proxyUrl+'/session/start',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({studentId:state.studentId||'',name:state.studentName||''})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){ throw Object.assign(new Error(j.error||('登記失敗 '+r.status)),{code:'quota'}); }
+  state.sid=j.sid; saveState();
+  if(j.limited) toast(`課堂練習第 ${j.used} 次（還剩 ${j.remaining} 次）`,4000);
+  return true;
+}
+async function teacherQuota(action,studentId,count){
+  const st=getSettings(); const out=document.getElementById('quota-list'); if(!proxyConfigured()){ out.textContent='請先設定代理網址'; return; }
+  if(!st.teacherToken){ out.textContent='請先填教師密語'; return; }
+  try{
+    let r; if(action==='reset') r=await fetch(st.proxyUrl+'/admin/quota',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({studentId,count:count||0})});
+    else r=await fetch(st.proxyUrl+'/admin/quota',{headers:proxyHeaders()});
+    const j=await r.json(); if(!r.ok) throw new Error(j.error||r.status);
+    if(action==='reset'){ toast('已重設'); return teacherQuota('list'); }
+    const rows=(j.students||[]).sort((a,b)=>a.studentId.localeCompare(b.studentId));
+    out.innerHTML=rows.length?`<div style="margin-bottom:4px">上限 ${j.max||'不限'} 次／人，共 ${rows.length} 位學生</div>`+rows.map(r=>`<div style="display:flex;gap:8px;align-items:center;padding:2px 0"><code>${escHtml(r.studentId)}</code> 已用 ${r.used} 次 <button class="btn btn-outline btn-sm" type="button" onclick="teacherQuota('reset','${escHtml(r.studentId)}',0)">重設為 0</button></div>`).join(''):'還沒有學生使用課堂金鑰。';
+  }catch(e){ out.textContent='❌ '+e.message; }
+}
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
   const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到下方「④ 進階」直接填金鑰。</span>';
   const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
@@ -1288,6 +1339,13 @@ function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById
   if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
   document.getElementById('own-key-settings').open=own||(!on&&!!gk);
   document.getElementById('adv-settings').open=false; document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
+async function testDrive(){
+  saveSettings(); openSettings(); const msg=document.getElementById('drive-msg');
+  if(!driveUrl()){ msg.textContent='請先貼上 script.google.com 開頭的網址'; return; }
+  msg.textContent='測試中…';
+  try{ const r=await drivePost({classCode:getSettings().classCode||'',date:'測試',folder:'連線測試',file:{name:'測試.txt',type:'text/plain',data:btoa('ok')}}); msg.innerHTML='✅ 收件正常，已在你的雲端建立「行為過程紀錄_學生繳交／測試／連線測試／測試.txt」'; }
+  catch(e){ msg.textContent='❌ '+e.message; }
+}
 async function testProxy(){
   saveSettings(); openSettings(); const msg=document.getElementById('proxy-msg'); const st=getSettings();
   if(!proxyConfigured()){ msg.textContent='請先填代理網址'; return; }
@@ -1424,7 +1482,7 @@ function startRecording(){
   if(!camStream||(recorder&&recorder.state==='recording')) return;
   try{
     const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
-    recorder=new MediaRecorder(camStream,mime?{mimeType:mime}:{});
+    recorder=new MediaRecorder(camStream,Object.assign(mime?{mimeType:mime}:{},{videoBitsPerSecond:260000,audioBitsPerSecond:24000}));
     recChunks=[]; recBlob=null;
     recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
     recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); };
@@ -1524,7 +1582,7 @@ function setupRecognition(){
   recognition.onstart=()=>{
     isRecording=true;
     document.getElementById('mic-btn').classList.add('recording');
-    setStatus('🎤 聆聽中…說完稍停一下就會送出');
+    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
@@ -1541,8 +1599,10 @@ function setupRecognition(){
     if(isSpeaking&&(!bargeInOn()||isEcho(shown))){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
-    if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),800); }
-    else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),250); }
+    // 停頓超過設定秒數（預設 1.6 秒）才視為說完；中途換氣、想詞不會被送出
+    const pause=pauseMs();
+    if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
+    else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),Math.max(400,Math.round(pause*0.6))); }
   };
   recognition.onerror=(e)=>{
     isRecording=false;
@@ -1562,6 +1622,7 @@ function setupRecognition(){
 function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();}catch(e){} } }
 function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&(bargeInOn()||!isSpeaking)&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
 function bargeInOn(){ const st=getSettings(); return st.bargeIn!==false; }
+function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:1.6)*1000); }
 // 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
 function isEcho(t){ if(!curReply||!t) return false; const body=(curReply.body||'').replace(/[\s，。！？、…「」]/g,''); const x=t.replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return false; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1)>=0.5; }
 // 護生插話：立刻停止病人說話，把已說出的部分記為被打斷
@@ -1657,6 +1718,7 @@ async function handleNurseSpeech(text){
   };
   try{
     if(sampleFn){
+      await ensureSession();
       const systemMsg=buildPatientSystem(c);
       const trimmed=convHistory.slice(Math.max(0,convHistory.length-30));
       const res=await apiSampleStream(trimmed,{system:systemMsg,maxTokens:400,onDelta});
@@ -1665,7 +1727,9 @@ async function handleNurseSpeech(text){
       response=fallbackPatientResponse(c,text);
     }
   }catch(e){
-    console.error(e); toast('AI 回應失敗：'+(e.message||'')); 
+    console.error(e);
+    if(e&&e.code==='quota'){ toast(e.message,8000); bubble.textContent='（'+e.message+'）'; liveEl.querySelector('.bubble-ts').textContent=''; reply.done=true; curReply=null; isSpeaking=false; if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; } document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤'; setStatus('⚠ '+e.message); state.conversation.pop(); convHistory.pop(); return; }
+    toast('AI 回應失敗：'+(e.message||''));
     response=fallbackPatientResponse(c,text);
   }
   if(gen!==convGen||reply.done) return;   // 已被護生打斷
@@ -2365,7 +2429,7 @@ function buildAiFallbackRecord(c){
   `;
 }
 
-async function makePdf(title,innerHtml,filename){
+async function makePdf(title,innerHtml,filename,returnBlob){
   if(!window.html2pdf){ toast('PDF 產生器尚未載入，請稍後再試'); return; }
   toast('正在產生 PDF…');
   // 以固定的列印樣式在隱藏容器中排版（A4 橫向，白底黑字，不受深色模式影響）
@@ -2393,6 +2457,7 @@ async function makePdf(title,innerHtml,filename){
       jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
       pagebreak:{mode:['css','legacy']}
     }).from(root).outputPdf('blob');
+    if(returnBlob) return blob;
     saveBlob(filename,blob);
     toast('PDF 已產生');
   }catch(e){ if(e&&e.code!=='cancelled') toast('PDF 產生失敗：'+(e.message||'')); }
@@ -2408,6 +2473,48 @@ async function downloadAiReport(){
   await makePdf('行為過程記錄（AI 版）',body,`AI行為過程記錄_${state.studentName}_${c.name}.pdf`);
 }
 
+// ===== 繳交給老師（Google Drive，經 Apps Script） =====
+function driveUrl(){ const st=getSettings(); return /^https:\/\/script\.google\.com\//.test(st.driveUrl||'')?st.driveUrl:''; }
+function blobToBase64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
+async function drivePost(payload){
+  const r=await fetch(driveUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});
+  const t=await r.text(); let j; try{ j=JSON.parse(t); }catch(e){ throw new Error('老師的收件程式回應異常（請老師確認部署設定為「所有人」）'); }
+  if(!j.ok) throw new Error(j.error||'上傳失敗'); return j;
+}
+async function submitToTeacher(){
+  const st=getSettings(); const box=document.getElementById('submit-status'); const btn=document.getElementById('submit-btn');
+  if(!driveUrl()){ box.innerHTML='<span style="color:var(--danger)">老師尚未設定收件雲端（設定連結／QR 內會包含），請向老師確認。</span>'; return; }
+  const c=getCase(); if(!c){ toast('沒有會談資料'); return; }
+  if(!state.studentName){ toast('請先填寫姓名'); return; }
+  const CHUNK=30*1024*1024; // Apps Script 單次請求上限約 50MB（含 base64 膨脹），分段保守取 30MB
+  btn.disabled=true; const lines=[]; const show=()=>{ box.innerHTML=lines.join('<br>'); };
+  const log=(t)=>{ lines.push(t); show(); }; const upd=(t)=>{ lines[lines.length-1]=t; show(); };
+  const now=new Date(); const date=now.toLocaleDateString('sv-SE'); const hm=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
+  const folder=[state.studentId||'無學號',state.studentName,hm,c.name].join('_');
+  const files=[];
+  try{
+    log('⏳ 產生學生版 PDF…');
+    syncReflections&&syncReflections(); syncRecordFromDOM&&syncRecordFromDOM();
+    const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`學生版行為過程記錄_${state.studentName}.pdf`,type:'application/pdf',blob:sBlob}); upd('✅ 學生版 PDF');
+    if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`AI版行為過程記錄_${state.studentName}.pdf`,type:'application/pdf',blob:aBlob}); upd('✅ AI 版 PDF'); }
+    else log('⚠ AI 版記錄尚未產生，這次不含 AI 版（可稍後再繳交一次）');
+    const transcript={studentName:state.studentName,studentId:state.studentId||'',case:{id:c.id,name:c.name,dept:c.deptLabel,dx:c.dx},goals:state.goals,date:now.toISOString(),durationSec:state.convDuration||0,conversation:state.conversation.map(m=>({role:m.role,text:m.text,ts:m.ts,expr:m.expr||null,interrupted:!!m.interrupted})),processRecord:state.processRecord,reflections:state.reflections||null};
+    files.push({name:'逐字稿與記錄.json',type:'application/json',blob:new Blob([JSON.stringify(transcript,null,1)],{type:'application/json'})});
+    if(recBlob&&recBlob.size){ const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm'; if(recBlob.size<=CHUNK) files.push({name:`會談影片_${state.studentName}.${ext}`,type:recBlob.type||'video/webm',blob:recBlob}); else { const n=Math.ceil(recBlob.size/CHUNK); for(let i=0;i<n;i++) files.push({name:`會談影片_${state.studentName}_第${i+1}段共${n}段.${ext}.part`,type:'application/octet-stream',blob:recBlob.slice(i*CHUNK,(i+1)*CHUNK)}); log('ℹ 影片較大，分成 '+n+' 段上傳（老師端可合併）'); } }
+    else log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
+    let folderUrl='';
+    for(const f of files){
+      const mb=(f.blob.size/1048576).toFixed(1); log(`⏳ 上傳 ${f.name}（${mb} MB）…`);
+      const data=await blobToBase64(f.blob);
+      const r=await drivePost({classCode:st.classCode||'',date,folder,file:{name:f.name,type:f.type,data}});
+      folderUrl=r.folder||folderUrl; upd(`✅ ${f.name}（${mb} MB）`);
+    }
+    state.submitted={at:now.toISOString(),folder}; saveState();
+    log(`<b style="color:#1a7f37">🎉 繳交完成！</b> 已存到老師的雲端：${date} / ${escHtml(folder)}`);
+    toast('繳交完成');
+  }catch(e){ log('<span style="color:var(--danger)">❌ '+escHtml(e.message||String(e))+'</span><br>可以稍後再按一次「繳交練習」重試。'); }
+  finally{ btn.disabled=false; }
+}
 function generateExport(){
   syncReflections();
   syncRecordFromDOM();
@@ -2534,18 +2641,18 @@ function escHtml(s){
 }
 
 let toastTimer=null;
-function toast(msg){
+function toast(msg,ms){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),ms||2600);
 }
 
 // ===== PERSISTENCE (per-browser convenience) =====
 const SAVE_KEY='bpr-practice-v1';
 function saveState(){
   try{
-    const {phase,caseId,studentName,goals,plannedTech,convDuration,processRecord,reflections}=state;
+    const {phase,caseId,studentName,studentId,goals,plannedTech,convDuration,processRecord,reflections,submitted,sid}=state;
     const conversation=state.conversation.map(m=>{const {frames,...rest}=m; return rest;});
     localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections,savedAt:Date.now()}));
   }catch(e){}
@@ -2555,7 +2662,7 @@ function loadState(){
 }
 function resumeSaved(){
   const s=loadState(); if(!s||!s.caseId) return;
-  Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
+  Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',studentId:s.studentId||'',submitted:s.submitted||null,sid:s.sid||null,goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
   ['goals','conv','record','analysis','export'].forEach(p=>document.getElementById('step-'+p).classList.add('done'));
   renderCases();
   if(state.conversation.length){ renderPhase('record'); toast('已恢復上次的會談記錄'); }
