@@ -450,7 +450,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <div class="stage-box" id="avatar-wrap">
               <div class="stage-label" id="avatar-label">病人</div>
               <div id="rec-indicator" class="hidden"><span class="rec-dot"></span>錄影中</div>
-              <div id="avatar-3d" style="position:absolute;inset:0"></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
+              <div id="avatar-engine" style="position:absolute;inset:0"><div id="avatar-3d" style="position:absolute;inset:0"></div><div id="avatar-simli" class="hidden" style="position:absolute;inset:0;background:#000"><video id="simli-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video><audio id="simli-audio" autoplay></audio></div></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
             </div>
             <div class="stage-box" id="cam-wrap">
               <div class="stage-label" id="cam-label">護生鏡頭</div>
@@ -679,6 +679,19 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
       </div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
+      <hr class="divider" style="margin:4px 0">
+      <div style="font-weight:700;font-size:.9rem">病人引擎（V3）</div>
+      <select id="set-engine" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+        <option value="3d">3D 擬真人物（免費）</option>
+        <option value="simli">Simli 真人影像（需 Simli 金鑰）</option>
+      </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/-1"><label>Simli API 金鑰</label><input type="text" id="set-simli-key" placeholder="由 app.simli.com 取得"></div>
+        <div><label>男性病人 Face ID</label><input type="text" id="set-simli-m" placeholder="例：8ef039c1-…"></div>
+        <div><label>女性病人 Face ID</label><input type="text" id="set-simli-f" placeholder="例：1d032d8b-…"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">Face ID 可在 app.simli.com 的臉孔庫複製（內建亞洲面孔），或上傳照片自製。<button class="btn btn-outline btn-sm" type="button" onclick="listSimliFaces()">列出我的臉孔</button> <button class="btn btn-outline btn-sm" type="button" onclick="testSimli()">▶ 連線測試（約 20 秒）</button> <span id="simli-msg"></span></div>
+      <div id="simli-face-list" style="font-size:.75rem;color:var(--text2);line-height:1.6"></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
       <hr class="divider" style="margin:4px 0">
@@ -882,7 +895,7 @@ function renderPhase(p){
   if(p==='record') renderRecordTable();
   if(p==='analysis') renderAnalysisPhase();
   if(p==='export') renderExportPhase();
-  if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); }
+  if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); if(p!=='conv') stopSimli(); }
   window.scrollTo(0,0);
 }
 
@@ -1072,6 +1085,98 @@ let currentUtterance=null;
 // ===== AVATAR (3D bridge; implementation in the module script at the bottom) =====
 const EXPR_MAP={'難過':'sad','哀傷':'sad','悲傷':'sad','焦慮':'anxious','擔心':'anxious','緊張':'anxious','害怕':'anxious','疼痛':'pain','痛':'pain','不悅':'angry','生氣':'angry','煩躁':'angry','防衛':'angry','疲憊':'tired','疲倦':'tired','累':'tired','微笑':'smile','放鬆':'smile','高興':'smile','平靜':'neutral','中性':'neutral'};
 const GEST_MAP={'點頭':'nod','低頭':'down','別過頭':'away','看向別處':'away','移開視線':'away','手按胸口':'chest','按住傷口':'chest','摸胸口':'chest','嘆氣':'sigh','深呼吸':'sigh','揮手':'wave','搖頭':'shake','遮臉':'cover','擦眼淚':'cover','無':''};
+// ===== V3：Simli 真人影像引擎 =====
+function simliOn(){ const st=getSettings(); return st.engine==='simli'&&!!st.simliKey; }
+function simliFaceFor(c){ const st=getSettings(); return c.gender==='女'?st.simliF:st.simliM; }
+class SimliSession{
+  constructor(){ this.pc=null; this.ws=null; this.ready=false; this.queueEnd=0; this.started=false; this.closed=false; }
+  async start(faceId,onStatus){
+    const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
+    if(!faceId) throw new Error('未設定此性別病人的 Face ID');
+    say('取得連線票…');
+    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:true,maxSessionLength:3600,maxIdleTime:900})});
+    if(!tr.ok) throw new Error('Simli 連線票失敗 '+tr.status+'：'+(await tr.text()).slice(0,120));
+    const token=(await tr.json()).session_token;
+    let iceServers=[{urls:'stun:stun.l.google.com:19302'}];
+    try{ const ir=await fetch('https://api.simli.ai/compose/ice',{headers:{'x-simli-api-key':st.simliKey}}); if(ir.ok){ const j=await ir.json(); if(Array.isArray(j)&&j.length) iceServers=j; } }catch(e){}
+    say('建立影像連線…');
+    const pc=new RTCPeerConnection({iceServers}); this.pc=pc;
+    pc.addTransceiver('audio',{direction:'recvonly'}); pc.addTransceiver('video',{direction:'recvonly'});
+    const v=document.getElementById('simli-video'), a=document.getElementById('simli-audio');
+    pc.ontrack=(evt)=>{ const el=evt.track.kind==='video'?v:a; if(el.srcObject!==evt.streams[0]) el.srcObject=evt.streams[0]; el.play().catch(()=>{}); };
+    const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+    await new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(); let last=-1,same=0; const t=setInterval(()=>{ const n=(pc.localDescription&&pc.localDescription.sdp.match(/a=candidate/g)||[]).length; if(pc.iceGatheringState==='complete'||(n===last&&n>0&&++same>=4)){clearInterval(t);res();} last=n; },250); setTimeout(()=>{clearInterval(t);res();},3000); });
+    const ws=new WebSocket(`wss://api.simli.ai/compose/webrtc/p2p?session_token=${encodeURIComponent(token)}&enableSFU=false`); this.ws=ws; ws.binaryType='arraybuffer';
+    await new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(new Error('Simli 連線逾時')),20000);
+      ws.onopen=()=>{ ws.send(JSON.stringify({sdp:pc.localDescription.sdp,type:pc.localDescription.type})); };
+      ws.onmessage=async(e)=>{
+        if(typeof e.data==='string'){
+          const d=e.data;
+          if(d==='START'){ this.started=true; setTimeout(()=>{ try{ ws.send(new Uint8Array(64000)); }catch(err){} },100); clearTimeout(timeout); this.ready=true; say(''); resolve(); return; }
+          if(d==='STOP'){ this.stop(); return; }
+          if(d.startsWith('pong')) return;
+          try{ const j=JSON.parse(d); if(j.type==='answer'){ await pc.setRemoteDescription(j); } }catch(err){}
+        }
+      };
+      ws.onerror=()=>{ clearTimeout(timeout); reject(new Error('Simli WebSocket 錯誤')); };
+      ws.onclose=()=>{ this.ready=false; if(!this.closed){ console.warn('Simli 連線已關閉'); } };
+    });
+  }
+  sendPCM(int16){
+    if(!this.ws||this.ws.readyState!==1) return;
+    const bytes=new Uint8Array(int16.buffer,int16.byteOffset,int16.byteLength);
+    for(let i=0;i<bytes.length;i+=6000) this.ws.send(bytes.subarray(i,Math.min(i+6000,bytes.length)));
+  }
+  clear(){ try{ this.ws&&this.ws.readyState===1&&this.ws.send('SKIP'); }catch(e){} this.queueEnd=0; }
+  stop(){ this.closed=true; try{ this.ws&&this.ws.readyState===1&&this.ws.send('DONE'); }catch(e){} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.pc&&this.pc.close(); }catch(e){} this.pc=null; this.ws=null; this.ready=false; }
+}
+let simli=null;
+async function blobToPCM16k(blob){
+  ensureAudioCtx(); const ctx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
+  const n=Math.ceil(buf.duration*16000);
+  const off=new OfflineAudioContext(1,n,16000); const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
+  const out=await off.startRendering(); const ch=out.getChannelData(0); const pcm=new Int16Array(ch.length);
+  for(let i=0;i<ch.length;i++){ const v=Math.max(-1,Math.min(1,ch[i])); pcm[i]=v<0?v*32768:v*32767; }
+  return {pcm,duration:buf.duration};
+}
+// 把一段語音送給 Simli 播放，並在估計播完時 resolve（維持逐句順序與 UI 狀態）
+async function simliSpeak(blobOrObj){
+  const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj;
+  if(!simli||!simli.ready) return;
+  const {pcm,duration}=await blobToPCM16k(blob);
+  const now=performance.now()/1000; const startAt=Math.max(now,simli.queueEnd||now);
+  simli.sendPCM(pcm); simli.queueEnd=startAt+duration;
+  startMouth();
+  await new Promise(r=>setTimeout(r,Math.max(0,(simli.queueEnd-now)*1000)+150));
+  if(performance.now()/1000>=simli.queueEnd-0.05) stopMouth();
+}
+async function startSimliFor(c,label){
+  const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
+  wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.remove('hidden'); ld.textContent='連線真人影像中…';
+  if(simli) simli.stop();
+  simli=new SimliSession();
+  try{ await simli.start(simliFaceFor(c),m=>{ if(m) ld.textContent=m; }); ld.classList.add('hidden'); }
+  catch(e){ ld.innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">真人影像連線失敗：'+escHtml(e.message||'')+'<br><span style="font-size:.72rem">改用 3D 人物。請檢查 Simli 金鑰、Face ID 或分鐘額度。</span></div>'; simli=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); setTimeout(()=>ld.classList.add('hidden'),4000); }
+}
+function stopSimli(){ if(simli){ simli.stop(); simli=null; } document.getElementById('avatar-simli').classList.add('hidden'); document.getElementById('avatar-3d').classList.remove('hidden'); }
+async function listSimliFaces(){
+  saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('simli-face-list');
+  if(!st.simliKey){ out.textContent='請先填 Simli 金鑰'; return; }
+  try{ const r=await fetch('https://api.simli.ai/faces',{headers:{'x-simli-api-key':st.simliKey}}); if(!r.ok) throw new Error(r.status); const j=await r.json();
+    out.innerHTML=(j||[]).length?'我的臉孔：'+j.map(f=>`<code style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${f.id}');toast('已複製 '+'${f.id}')">${f.id}</code>`).join('、')+'（點一下複製）':'帳號內還沒有自製臉孔；內建臉孔請到 app.simli.com 複製 Face ID。'; }
+  catch(e){ out.textContent='取得失敗：'+e.message; }
+}
+async function testSimli(){
+  saveSettings(); openSettings(); const msg=document.getElementById('simli-msg'); const c=getCase()||CASES[0];
+  if(!simliOn()){ msg.textContent='請先選擇 Simli 引擎並填金鑰'; return; }
+  document.getElementById('settings-modal').classList.add('hidden');
+  renderPhase('conv'); document.getElementById('stage').classList.add('solo'); moveAvatarTo('avatar-wrap');
+  await startSimliFor(c);
+  if(simli){ toast('已連線，播放測試語音'); try{ const obj=azureReady()?await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'):null; if(obj) await simliSpeak(obj); else toast('未設定 Azure，無法送語音'); }catch(e){ toast('語音失敗：'+e.message); } }
+  setTimeout(()=>{ stopSimli(); goStep('cases'); },15000);
+}
 function setExpression(e){ window.Avatar3D&&Avatar3D.setExpression(e||'neutral'); }
 function playGesture(g){ window.Avatar3D&&g&&Avatar3D.gesture(g); }
 function startMouth(){ window.Avatar3D&&Avatar3D.startMouth(); }
@@ -1115,7 +1220,7 @@ const SET_KEY='bpr-settings-v2';
 function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
 function makeSetupLink(){
   saveSettings(); openSettings();
-  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
+  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands,engine:st.engine,simliKey:st.simliKey,simliM:st.simliM,simliF:st.simliF};
   if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey;
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1147,10 +1252,14 @@ function openSettings(){
   document.getElementById('set-az-vm').value=st.azVM||'';
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
+  document.getElementById('set-engine').value=st.engine||'3d';
+  document.getElementById('set-simli-key').value=st.simliKey||'';
+  document.getElementById('set-simli-m').value=st.simliM||'';
+  document.getElementById('set-simli-f').value=st.simliF||'';
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1339,7 +1448,7 @@ async function initConvPhase(){
   area.innerHTML='';
   convHistory=[];
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
-  loadAvatarFor(c);
+  if(simliOn()){ startSimliFor(c); } else { stopSimli(); loadAvatarFor(c); }
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
   if(!camStream) startCamera();
@@ -1632,7 +1741,7 @@ const AZ_VISEME=['viseme_sil','viseme_aa','viseme_aa','viseme_O','viseme_E','vis
 // 音訊播放 + 以音量驅動嘴型
 let audioCtx=null, analyser=null, curAudio=null, mouthRAF=null;
 function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); }
-function stopAudio(){ if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
+function stopAudio(){ if(simli&&simli.ready) simli.clear(); if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
 function playBlob(blobOrObj,hint){
   const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj; const visemes=blobOrObj&&blobOrObj.visemes||null;
   return new Promise((resolve)=>{
@@ -1660,7 +1769,7 @@ class SentenceSpeaker{
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
-      if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
+      if(blob&&simli&&simli.ready) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
     this.playing=false; }
 }
 let _curExpr='neutral';
@@ -1689,7 +1798,7 @@ function speakTTS(text){
 }
 async function speakBackchannel(t){
   const c=getCase(); if(!azureReady()) return;
-  try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; await playBlob(blob); }catch(e){}
+  try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; if(simli&&simli.ready) await simliSpeak(blob); else await playBlob(blob); }catch(e){}
 }
 // ===== 回放用：Gemini 情緒語音（會談結束後背景合成） =====
 const gttsCache=new Map(); let gttsJob=null;
@@ -1730,7 +1839,7 @@ async function prepareEmotionalVoices(){
 async function speakPatientLine(e){
   stopAudio(); window.speechSynthesis&&speechSynthesis.cancel();
   const blob=gttsCache.get(e.i);
-  if(blob){ SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); await playBlob(blob,/[？?]\s*$/.test(e.text)?'question':'statement'); }
+  if(blob){ SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); if(simli&&simli.ready) await simliSpeak(blob); else await playBlob(blob,/[？?]\s*$/.test(e.text)?'question':'statement'); }
   else speakTTS(e.text);
 }
 async function testAzureVoice(){
@@ -1781,7 +1890,7 @@ function endConv(force){
   if(recognition) try{recognition.stop()}catch(e){}
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   if(window.speechSynthesis) window.speechSynthesis.cancel();
-  stopAudio(); stopMouth(); stopBlink(); stopCamera();
+  stopAudio(); stopMouth(); stopBlink(); stopCamera(); stopSimli();
   gttsCache.clear(); prepareEmotionalVoices();
   startBackgroundAnalysis();
   addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
@@ -2150,7 +2259,7 @@ function generateExport(){
 // ===== PHASE 7: REVIEW (synchronized replay) =====
 const EXPR_ZH={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
 const GEST_ZH={nod:'點頭','g-nod':'點頭',down:'低頭','g-down':'低頭',away:'別過頭','g-away':'別過頭',chest:'手按胸口','g-chest':'手按胸口',sigh:'嘆氣','g-sigh':'嘆氣',wave:'揮手','g-wave':'揮手',shake:'搖頭','g-shake':'搖頭',cover:'擦眼淚','g-cover':'擦眼淚'};
-const AVATAR_EL_ID='avatar-3d';
+const AVATAR_EL_ID='avatar-engine';
 function moveAvatarTo(containerId){
   const av=document.getElementById(AVATAR_EL_ID), host=document.getElementById(containerId);
   if(av&&host&&av.parentElement!==host) host.appendChild(av);
@@ -2171,6 +2280,7 @@ function renderReviewPhase(){
   replay.duration=lastRel;
   // avatar into review stage
   moveAvatarTo('review-avatar');
+  if(simliOn()&&c){ startSimliFor(c); } else { stopSimli(); }
   document.getElementById('review-avatar-label').textContent=c?`病人・${c.name}（${c.age}歲）`:'病人';
   if(c) setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious');
   // video
