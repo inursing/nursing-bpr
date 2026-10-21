@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1a6fa3">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- iOS 桌面圖示模式不支援語音辨識，故讓 iPhone 的主畫面圖示在 Safari 中開啟 -->
+<meta name="apple-mobile-web-app-capable" content="no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="行為過程紀錄">
@@ -425,6 +426,7 @@ input[type=text]:focus{border-color:var(--primary)}
 
 </style>
 
+<div id="ios-standalone-warn" class="hidden" style="background:#b42318;color:#fff;padding:10px 14px;font-size:.85rem;line-height:1.6;text-align:center">⚠️ iPhone 從桌面圖示開啟時無法使用語音辨識。請改用 <b>Safari</b> 開啟網址：<br><span style="user-select:all;background:rgba(255,255,255,.18);padding:2px 6px;border-radius:4px">inursing.github.io/nursing-bpr/</span>　<button class="btn btn-sm" style="background:#fff;color:#b42318" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.origin+location.pathname).then(()=>toast('已複製網址，請到 Safari 貼上'))">複製網址</button><br><span style="font-size:.75rem;opacity:.9">之後可以把舊的桌面圖示刪掉，用 Safari 重新「加入主畫面」，新圖示會直接在 Safari 中開啟。</span></div>
 <div id="app">
   <div id="topbar">
     <div class="logo">🏥</div>
@@ -1265,6 +1267,7 @@ function downloadQr(){
   img.onload=()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=1104; const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,1104,1104); ctx.drawImage(img,40,40); const a=document.createElement('a'); a.download='行為過程紀錄練習_設定QR.png'; a.href=cv.toDataURL('image/png'); a.click(); };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
+window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
 function applySetupFromHash(){
   try{
     const m=location.hash.match(/^#setup=([A-Za-z0-9+/=]+)/); if(!m) return;
