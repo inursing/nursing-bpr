@@ -452,7 +452,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <div class="stage-box" id="avatar-wrap">
               <div class="stage-label" id="avatar-label">病人</div>
               <div id="rec-indicator" class="hidden"><span class="rec-dot"></span>錄影中</div>
-              <div id="avatar-engine" style="position:absolute;inset:0"><div id="avatar-3d" style="position:absolute;inset:0"></div><div id="avatar-simli" class="hidden" style="position:absolute;inset:0;background:#000"><video id="simli-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video><audio id="simli-audio" autoplay></audio></div></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
+              <div id="avatar-engine" style="position:absolute;inset:0"><div id="avatar-3d" style="position:absolute;inset:0"></div></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入 3D 病人中…</div>
             </div>
             <div class="stage-box" id="cam-wrap">
               <div class="stage-label" id="cam-label">護生鏡頭</div>
@@ -687,27 +687,6 @@ input[type=text]:focus{border-color:var(--primary)}
       </div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-hands"> 啟用病人手部動作（實驗性，預設關閉）</label>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-backchannel"> 病人回答前偶爾先有「嗯」的反應聲（預設關閉）</label>
-      <hr class="divider" style="margin:4px 0">
-      <div style="font-weight:700;font-size:.9rem">病人引擎（V3）</div>
-      <select id="set-engine" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
-        <option value="3d">3D 擬真人物（免費）</option>
-        <option value="simli">Simli 真人影像（需 Simli 金鑰）</option>
-        <option value="liveavatar">HeyGen LiveAvatar 真人影像（需 LiveAvatar 金鑰）</option>
-      </select>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div style="grid-column:1/-1"><label>Simli API 金鑰</label><input type="text" id="set-simli-key" placeholder="由 app.simli.com 取得"></div>
-        <div><label>男性病人 Face ID</label><input type="text" id="set-simli-m" placeholder="例：8ef039c1-…"></div>
-        <div><label>女性病人 Face ID</label><input type="text" id="set-simli-f" placeholder="例：1d032d8b-…"></div>
-      </div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">Face ID 可在 app.simli.com 的臉孔庫複製（內建亞洲面孔），或上傳照片自製。<button class="btn btn-outline btn-sm" type="button" onclick="listSimliFaces()">列出我的臉孔</button> <button class="btn btn-outline btn-sm" type="button" onclick="testSimli()">▶ 連線測試（約 20 秒）</button> <span id="simli-msg"></span></div>
-      <div id="simli-face-list" style="font-size:.75rem;color:var(--text2);line-height:1.6"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div style="grid-column:1/-1"><label>LiveAvatar API 金鑰</label><input type="text" id="set-la-key" placeholder="由 app.liveavatar.com 取得"></div>
-        <div><label>男性病人 Avatar ID</label><input type="text" id="set-la-m" placeholder="UUID"></div>
-        <div><label>女性病人 Avatar ID</label><input type="text" id="set-la-f" placeholder="UUID"></div>
-      </div>
-      <div style="font-size:.78rem;color:var(--text2);line-height:1.6"><button class="btn btn-outline btn-sm" type="button" onclick="listLiveAvatars()">列出公開數位人</button> <button class="btn btn-outline btn-sm" type="button" onclick="testLiveAvatar()">▶ LiveAvatar 連線測試</button> <span id="la-msg"></span></div>
-      <div id="la-list" style="font-size:.75rem;color:var(--text2);line-height:1.6;max-height:220px;overflow:auto"></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
       <hr class="divider" style="margin:4px 0">
@@ -720,7 +699,7 @@ input[type=text]:focus{border-color:var(--primary)}
     </div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <!-- Case detail modal -->
 <div class="modal-overlay hidden" id="case-modal" onclick="closeModal(event)">
   <div class="modal" id="modal-content">
@@ -1022,7 +1001,6 @@ function renderGoalsPhase(){
   if(state.goals) document.getElementById('goals-input').value=state.goals;
 }
 function startConv(){
-  window.__videoEngineDisabled=false;
   const name=document.getElementById('student-name').value.trim();
   const goals=document.getElementById('goals-input').value.trim();
   if(!name){toast('請填寫學生姓名');document.getElementById('student-name').focus();return}
@@ -1102,190 +1080,11 @@ let currentUtterance=null;
 // ===== AVATAR (3D bridge; implementation in the module script at the bottom) =====
 const EXPR_MAP={'難過':'sad','哀傷':'sad','悲傷':'sad','焦慮':'anxious','擔心':'anxious','緊張':'anxious','害怕':'anxious','疼痛':'pain','痛':'pain','不悅':'angry','生氣':'angry','煩躁':'angry','防衛':'angry','疲憊':'tired','疲倦':'tired','累':'tired','微笑':'smile','放鬆':'smile','高興':'smile','平靜':'neutral','中性':'neutral'};
 const GEST_MAP={'點頭':'nod','低頭':'down','別過頭':'away','看向別處':'away','移開視線':'away','手按胸口':'chest','按住傷口':'chest','摸胸口':'chest','嘆氣':'sigh','深呼吸':'sigh','揮手':'wave','搖頭':'shake','遮臉':'cover','擦眼淚':'cover','無':''};
-// ===== V3：Simli 真人影像引擎 =====
-function simliOn(){ const st=getSettings(); return st.engine==='simli'&&!!st.simliKey; }
-function simliFaceFor(c){ const st=getSettings(); return c.gender==='女'?st.simliF:st.simliM; }
-class SimliSession{
-  constructor(){ this.pc=null; this.ws=null; this.ready=false; this.queueEnd=0; this.started=false; this.closed=false; }
-  async start(faceId,onStatus){
-    const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
-    if(!faceId) throw new Error('未設定此性別病人的 Face ID');
-    say('取得連線票…');
-    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:true,maxSessionLength:3600,maxIdleTime:900})});
-    if(!tr.ok) throw new Error('Simli 連線票失敗 '+tr.status+'：'+(await tr.text()).slice(0,120));
-    const token=(await tr.json()).session_token;
-    let iceServers=[{urls:'stun:stun.l.google.com:19302'}];
-    try{ const ir=await fetch('https://api.simli.ai/compose/ice',{headers:{'x-simli-api-key':st.simliKey}}); if(ir.ok){ const j=await ir.json(); if(Array.isArray(j)&&j.length) iceServers=j; } }catch(e){}
-    say('建立影像連線…');
-    const pc=new RTCPeerConnection({iceServers}); this.pc=pc;
-    pc.addTransceiver('audio',{direction:'recvonly'}); pc.addTransceiver('video',{direction:'recvonly'});
-    const v=document.getElementById('simli-video'), a=document.getElementById('simli-audio');
-    pc.ontrack=(evt)=>{ const el=evt.track.kind==='video'?v:a; if(el.srcObject!==evt.streams[0]) el.srcObject=evt.streams[0]; el.play().catch(()=>{}); };
-    const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
-    await new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(); let last=-1,same=0; const t=setInterval(()=>{ const n=(pc.localDescription&&pc.localDescription.sdp.match(/a=candidate/g)||[]).length; if(pc.iceGatheringState==='complete'||(n===last&&n>0&&++same>=4)){clearInterval(t);res();} last=n; },250); setTimeout(()=>{clearInterval(t);res();},3000); });
-    const ws=new WebSocket(`wss://api.simli.ai/compose/webrtc/p2p?session_token=${encodeURIComponent(token)}&enableSFU=false`); this.ws=ws; ws.binaryType='arraybuffer';
-    await new Promise((resolve,reject)=>{
-      const timeout=setTimeout(()=>reject(new Error('Simli 連線逾時')),20000);
-      ws.onopen=()=>{ ws.send(JSON.stringify({sdp:pc.localDescription.sdp,type:pc.localDescription.type})); };
-      ws.onmessage=async(e)=>{
-        if(typeof e.data==='string'){
-          const d=e.data;
-          if(d==='START'){ this.started=true; setTimeout(()=>{ try{ ws.send(new Uint8Array(64000)); }catch(err){} },100); clearTimeout(timeout); this.ready=true; say(''); resolve(); return; }
-          if(d==='STOP'){ this.stop(); return; }
-          if(d.startsWith('pong')) return;
-          try{ const j=JSON.parse(d); if(j.type==='answer'){ await pc.setRemoteDescription(j); } }catch(err){}
-        }
-      };
-      ws.onerror=()=>{ clearTimeout(timeout); reject(new Error('Simli WebSocket 錯誤')); };
-      ws.onclose=()=>{ this.ready=false; if(!this.closed){ console.warn('Simli 連線已關閉'); } };
-    });
-  }
-  // 依真實時間節奏送出（每塊 6000 bytes ≈ 187ms 音訊），前面預留約 0.6 秒，避免一次灌入造成忽快忽慢
-  async sendPCM(int16){
-    if(!this.ws||this.ws.readyState!==1) return;
-    const bytes=new Uint8Array(int16.buffer,int16.byteOffset,int16.byteLength);
-    const chunk=6000, chunkMs=chunk/2/16000*1000; const lead=3;
-    const start=Math.max(performance.now(),this._paceEnd||0); let n=0;
-    for(let i=0;i<bytes.length;i+=chunk){
-      if(!this.ws||this.ws.readyState!==1||this._gen!==this.__curGen) break;
-      this.ws.send(bytes.subarray(i,Math.min(i+chunk,bytes.length))); n++;
-      const due=start+Math.max(0,n-lead)*chunkMs; const wait=due-performance.now(); if(wait>0) await new Promise(r=>setTimeout(r,wait));
-    }
-    this._paceEnd=start+n*chunkMs;
-  }
-  clear(){ try{ this.ws&&this.ws.readyState===1&&this.ws.send('SKIP'); }catch(e){} this.queueEnd=0; this._paceEnd=0; this.__curGen=(this.__curGen||0)+1; this._gen=this.__curGen; }
-  stop(){ this.closed=true; try{ this.ws&&this.ws.readyState===1&&this.ws.send('DONE'); }catch(e){} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.pc&&this.pc.close(); }catch(e){} this.pc=null; this.ws=null; this.ready=false; }
-}
-let simli=null, liveav=null;
-function vidEngine(){ if(simli&&simli.ready) return simli; if(liveav&&liveav.ready) return liveav; return null; }
-function laOn(){ const st=getSettings(); return st.engine==='liveavatar'&&!!st.laKey; }
-function laAvatarFor(c){ const st=getSettings(); return c.gender==='女'?st.laF:st.laM; }
-async function blobToPCM(blob,rate){
-  ensureAudioCtx(); const ctx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-  const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
-  const n=Math.ceil(buf.duration*rate);
-  const off=new OfflineAudioContext(1,n,rate); const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
-  const out=await off.startRendering(); const ch=out.getChannelData(0); const pcm=new Int16Array(ch.length);
-  for(let i=0;i<ch.length;i++){ const v=Math.max(-1,Math.min(1,ch[i])); pcm[i]=v<0?v*32768:v*32767; }
-  return {pcm,duration:buf.duration};
-}
-function b64FromBytes(u8){ let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192)); return btoa(s); }
-class LiveAvatarSession{
-  constructor(){ this.ready=false; this.room=null; this.ws=null; this.closed=false; this.waiters={}; this.keep=null; this.sessionId=null; }
-  async start(avatarId,onStatus){
-    const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
-    if(!avatarId) throw new Error('未設定此性別病人的 Avatar ID');
-    if(!window.LivekitClient) throw new Error('影像元件未載入（livekit-client）');
-    say('取得連線票…');
-    const tr=await fetch('https://api.liveavatar.com/v1/sessions/token',{method:'POST',headers:{'Content-Type':'application/json','X-API-KEY':st.laKey},body:JSON.stringify({mode:'LITE',avatar_id:avatarId,is_sandbox:false,video_settings:{quality:'high',encoding:'H264'}})});
-    if(!tr.ok) throw new Error('LiveAvatar token 失敗 '+tr.status+'：'+(await tr.text()).slice(0,140));
-    const tok=(await tr.json()).data||{}; this.sessionId=tok.session_id;
-    say('啟動數位人…');
-    const sr=await fetch('https://api.liveavatar.com/v1/sessions/start',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok.session_token},body:'{}'});
-    if(!sr.ok) throw new Error('LiveAvatar start 失敗 '+sr.status+'：'+(await sr.text()).slice(0,140));
-    const d=(await sr.json()).data||{};
-    say('連接影像…');
-    const LK=window.LivekitClient; const room=new LK.Room({adaptiveStream:true,dynacast:true}); this.room=room;
-    const v=document.getElementById('simli-video'), a=document.getElementById('simli-audio');
-    room.on(LK.RoomEvent.TrackSubscribed,(track)=>{ if(track.kind==='video'){ track.attach(v); v.play().catch(()=>{}); } else if(track.kind==='audio'){ track.attach(a); a.play().catch(()=>{}); } });
-    await room.connect(d.livekit_url,d.livekit_client_token);
-    if(!d.ws_url) throw new Error('LiveAvatar 未回傳事件通道');
-    const ws=new WebSocket(d.ws_url); this.ws=ws;
-    await new Promise((resolve,reject)=>{
-      const timeout=setTimeout(()=>reject(new Error('LiveAvatar 連線逾時')),25000);
-      ws.onmessage=(e)=>{ let j; try{ j=JSON.parse(e.data); }catch(err){ return; }
-        if(j.type==='session.state_updated'&&j.state==='connected'){ clearTimeout(timeout); this.ready=true; say(''); resolve(); }
-        if(j.type==='agent.speak_ended'||j.type==='agent.speak_interrupted'){ const w=this.waiters[j.source_event_id]; if(w){ w(); delete this.waiters[j.source_event_id]; } }
-        if(j.type==='error') console.warn('LiveAvatar error',j.error);
-      };
-      ws.onerror=()=>{ clearTimeout(timeout); reject(new Error('LiveAvatar WebSocket 錯誤')); };
-      ws.onclose=()=>{ this.ready=false; };
-    });
-    this.keep=setInterval(()=>{ try{ ws.readyState===1&&ws.send(JSON.stringify({type:'session.keep_alive'})); }catch(e){} },45000);
-  }
-  send(o){ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify(o)); }
-  async speak(blob){
-    const {pcm,duration}=await blobToPCM(blob,24000);
-    const bytes=new Uint8Array(pcm.buffer); const chunk=48000; // 1 秒
-    const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()));
-    let first=true;
-    for(let i=0;i<bytes.length;i+=chunk){ const part=bytes.subarray(i,Math.min(i+chunk,bytes.length)); this.send({type:'agent.speak',event_id:first?id:undefined,audio:b64FromBytes(part)}); first=false; }
-    this.send({type:'agent.speak_end'});
-    await new Promise(res=>{ this.waiters[id]=res; setTimeout(res,(duration+3)*1000); });
-  }
-  listening(on){ this.send({type:on?'agent.start_listening':'agent.stop_listening'}); }
-  clear(){ this.send({type:'agent.interrupt'}); }
-  stop(){ this.closed=true; if(this.keep){clearInterval(this.keep);this.keep=null} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.room&&this.room.disconnect(); }catch(e){} this.ws=null; this.room=null; this.ready=false; }
-}
-async function startLiveAvatarFor(c){
-  const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
-  setStatus('真人影像連線中…（可先開始說話）');
-  if(liveav) liveav.stop(); if(simli){ simli.stop(); simli=null; }
-  liveav=new LiveAvatarSession();
-  try{ await liveav.start(laAvatarFor(c),m=>{ if(m) setStatus('真人影像：'+m); }); wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.add('hidden'); setStatus(listenWanted?'🎤 聆聽中':'按下麥克風開始聆聽'); }
-  catch(e){ liveav=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); ld.classList.add('hidden'); window.__videoEngineDisabled=true; toast('真人影像無法使用（'+(e.message||'').replace(/^LiveAvatar \w+ 失敗 \d+：/,'').slice(0,80)+'），本次改用 3D 病人'); }
-}
-async function listLiveAvatars(){
-  saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('la-list');
-  if(!st.laKey){ out.textContent='請先填 LiveAvatar 金鑰'; return; }
-  try{ const r=await fetch('https://api.liveavatar.com/v1/avatars/public?page_size=100',{headers:{'X-API-KEY':st.laKey}}); if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,100)); const j=await r.json(); const list=(j.data&&(j.data.results||j.data.items||j.data))||j.results||[];
-    out.innerHTML=Array.isArray(list)&&list.length?list.map(a=>`<div style="display:inline-block;width:110px;margin:4px;text-align:center;vertical-align:top"><img src="${a.preview_url||a.preview_image_url||a.thumbnail_url||''}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;background:#ddd"><div style="font-size:.7rem">${escHtml(a.name||'')}</div><code style="font-size:.6rem;cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${a.id||a.avatar_id}');toast('已複製 ID')">${(a.id||a.avatar_id||'').slice(0,8)}…</code></div>`).join(''):'沒有取得清單：'+JSON.stringify(j).slice(0,200); }
-  catch(e){ out.textContent='取得失敗：'+e.message; }
-}
-async function testLiveAvatar(){
-  saveSettings(); openSettings(); const msg=document.getElementById('la-msg'); const c=getCase()||CASES[0];
-  if(!laOn()){ msg.textContent='請先選擇 LiveAvatar 引擎並填金鑰'; return; }
-  document.getElementById('settings-modal').classList.add('hidden');
-  renderPhase('conv'); document.getElementById('stage').classList.add('solo'); moveAvatarTo('avatar-wrap');
-  await startLiveAvatarFor(c);
-  if(liveav){ toast('已連線，播放測試語音'); try{ const obj=azureReady()?await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'):null; if(obj) await liveav.speak(obj.blob||obj); else toast('未設定 Azure，無法送語音'); }catch(e){ toast('語音失敗：'+e.message); } }
-  setTimeout(()=>{ stopSimli(); goStep('cases'); },20000);
-}
-async function blobToPCM16k(blob){
-  ensureAudioCtx(); const ctx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-  const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
-  const n=Math.ceil(buf.duration*16000);
-  const off=new OfflineAudioContext(1,n,16000); const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
-  const out=await off.startRendering(); const ch=out.getChannelData(0); const pcm=new Int16Array(ch.length);
-  for(let i=0;i<ch.length;i++){ const v=Math.max(-1,Math.min(1,ch[i])); pcm[i]=v<0?v*32768:v*32767; }
-  return {pcm,duration:buf.duration};
-}
-// 把一段語音送給 Simli 播放，並在估計播完時 resolve（維持逐句順序與 UI 狀態）
-async function simliSpeak(blobOrObj){
-  const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj;
-  if(liveav&&liveav.ready){ startMouth(); await liveav.speak(blob); stopMouth(); return; }
-  if(!simli||!simli.ready) return;
-  const {pcm,duration}=await blobToPCM16k(blob);
-  startMouth();
-  await simli.sendPCM(pcm);            // 依節奏送完 ≈ 音訊長度
-  await new Promise(r=>setTimeout(r,450)); // 留一點播放緩衝
-  stopMouth();
-}
-async function startSimliFor(c,label){
-  const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
-  setStatus('真人影像連線中…（可先開始說話）');
-  if(simli) simli.stop();
-  simli=new SimliSession();
-  try{ await simli.start(simliFaceFor(c),m=>{ if(m) setStatus('真人影像：'+m); }); wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.add('hidden'); setStatus(listenWanted?'🎤 聆聽中':'按下麥克風開始聆聽'); }
-  catch(e){ simli=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); ld.classList.add('hidden'); window.__videoEngineDisabled=true; toast('真人影像無法使用（'+(e.message||'').slice(0,80)+'），本次改用 3D 病人'); }
-}
-function stopSimli(){ if(simli){ simli.stop(); simli=null; } if(liveav){ liveav.stop(); liveav=null; } document.getElementById('avatar-simli').classList.add('hidden'); document.getElementById('avatar-3d').classList.remove('hidden'); }
-async function listSimliFaces(){
-  saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('simli-face-list');
-  if(!st.simliKey){ out.textContent='請先填 Simli 金鑰'; return; }
-  try{ const r=await fetch('https://api.simli.ai/faces',{headers:{'x-simli-api-key':st.simliKey}}); if(!r.ok) throw new Error(r.status); const j=await r.json();
-    out.innerHTML=(j||[]).length?'我的臉孔：'+j.map(f=>`<code style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${f.id}');toast('已複製 '+'${f.id}')">${f.id}</code>`).join('、')+'（點一下複製）':'帳號內還沒有自製臉孔；內建臉孔請到 app.simli.com 複製 Face ID。'; }
-  catch(e){ out.textContent='取得失敗：'+e.message; }
-}
-async function testSimli(){
-  saveSettings(); openSettings(); const msg=document.getElementById('simli-msg'); const c=getCase()||CASES[0];
-  if(!simliOn()){ msg.textContent='請先選擇 Simli 引擎並填金鑰'; return; }
-  document.getElementById('settings-modal').classList.add('hidden');
-  renderPhase('conv'); document.getElementById('stage').classList.add('solo'); moveAvatarTo('avatar-wrap');
-  await startSimliFor(c);
-  if(simli){ toast('已連線，播放測試語音'); try{ const obj=azureReady()?await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'):null; if(obj) await simliSpeak(obj); else toast('未設定 Azure，無法送語音'); }catch(e){ toast('語音失敗：'+e.message); } }
-  setTimeout(()=>{ stopSimli(); goStep('cases'); },15000);
-}
+// ===== 真人影像引擎已移除（Simli / LiveAvatar），僅保留 3D 病人 =====
+function vidEngine(){ return null; }
+function simliOn(){ return false; } function laOn(){ return false; }
+async function simliSpeak(){ }
+function stopSimli(){ }
 function setExpression(e){ window.Avatar3D&&Avatar3D.setExpression(e||'neutral'); }
 function playGesture(g){ window.Avatar3D&&g&&Avatar3D.gesture(g); }
 function startMouth(){ window.Avatar3D&&Avatar3D.startMouth(); }
@@ -1329,7 +1128,7 @@ const SET_KEY='bpr-settings-v2';
 function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
 function makeSetupLink(){
   saveSettings(); openSettings();
-  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands,engine:st.engine,simliKey:st.simliKey,simliM:st.simliM,simliF:st.simliF,laKey:st.laKey,laM:st.laM,laF:st.laF};
+  const st=getSettings(); const cfg={azKey:st.azKey,azRegion:st.azRegion,azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
   if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey;
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1362,17 +1161,10 @@ function openSettings(){
   document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-backchannel').checked=!!st.backchannel;
-  document.getElementById('set-engine').value=st.engine||'3d';
-  document.getElementById('set-simli-key').value=st.simliKey||'';
-  document.getElementById('set-simli-m').value=st.simliM||'';
-  document.getElementById('set-simli-f').value=st.simliF||'';
-  document.getElementById('set-la-key').value=st.laKey||'';
-  document.getElementById('set-la-m').value=st.laM||'';
-  document.getElementById('set-la-f').value=st.laF||'';
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked,engine:document.getElementById('set-engine').value,simliKey:document.getElementById('set-simli-key').value.trim(),simliM:document.getElementById('set-simli-m').value.trim(),simliF:document.getElementById('set-simli-f').value.trim(),laKey:document.getElementById('set-la-key').value.trim(),laM:document.getElementById('set-la-m').value.trim(),laF:document.getElementById('set-la-f').value.trim()};
+  const st={provider:document.getElementById('set-provider').value,gKey:document.getElementById('set-gkey').value.trim(),gModel:document.getElementById('set-gmodel').value.trim()||'gemini-2.5-flash',apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim(),hands:document.getElementById('set-hands').checked,backchannel:document.getElementById('set-backchannel').checked};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1569,7 +1361,6 @@ async function initConvPhase(){
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
   // 3D 模型一律先載入（真人影像連不上時可立即退回，不用再等）
   stopSimli(); loadAvatarFor(c);
-  if(simliOn()&&!window.__videoEngineDisabled){ startSimliFor(c); } else if(laOn()&&!window.__videoEngineDisabled){ startLiveAvatarFor(c); }
   warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
@@ -1596,7 +1387,7 @@ function setupRecognition(){
   recognition.continuous=true;
   recognition.interimResults=true;
   recognition.onstart=()=>{
-    isRecording=true; if(liveav&&liveav.ready) liveav.listening(true);
+    isRecording=true;
     document.getElementById('mic-btn').classList.add('recording');
     setStatus('🎤 聆聽中…說完稍停一下就會送出');
     startTimer();
@@ -1670,7 +1461,7 @@ async function handleNurseSpeech(text){
   if(!text) return;
   const ts=Date.now();
   addBubble('nurse',text,ts);
-  playGesture('g-nod'); if(liveav&&liveav.ready) liveav.listening(false);
+  playGesture('g-nod');
   const entry={role:'nurse',text,ts,frames:[]};
   const f0=captureNurseFrame(); if(f0) entry.frames.push(f0);
   state.conversation.push(entry);
@@ -2450,7 +2241,7 @@ function renderReviewPhase(){
   replay.duration=lastRel;
   // avatar into review stage
   moveAvatarTo('review-avatar');
-  if(simliOn()&&c){ startSimliFor(c); } else if(laOn()&&c){ startLiveAvatarFor(c); } else { stopSimli(); }
+  stopSimli();
   document.getElementById('review-avatar-label').textContent=c?`病人・${c.name}（${c.age}歲）`:'病人';
   if(c) setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious');
   // video
@@ -2603,7 +2394,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
@@ -2826,7 +2616,7 @@ function animate(){
 const mouthMorph={};
 animate();
 
-window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setViseme,setSpeakHint,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;},_boneNames:()=>Object.keys(bones),_setBones:(c)=>{gest={def:{bones:c,hold:9999},t:5,done:false}},_handY:()=>{const h=bones['RightHand'],sh=bones['RightShoulder'];if(!h||!sh)return null;const a=new THREE.Vector3(),b=new THREE.Vector3();h.getWorldPosition(a);sh.getWorldPosition(b);return {hand:a.toArray().map(v=>+v.toFixed(2)),shoulder:b.toArray().map(v=>+v.toFixed(2))}}};
+window.Avatar3D={_meshInfo:()=>{const out=[];model&&model.traverse(o=>{if(o.isMesh){const m=Array.isArray(o.material)?o.material[0]:o.material;out.push([o.name,m&&m.name,!!(m&&m.map),m&&m.color?m.color.getHexString():'']);}});return out;},load,setExpression,startMouth,stopMouth,gesture,setViseme,setSpeakHint,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;},_boneNames:()=>Object.keys(bones),_setBones:(c)=>{gest={def:{bones:c,hold:9999},t:5,done:false}},_handY:()=>{const h=bones['RightHand'],sh=bones['RightShoulder'];if(!h||!sh)return null;const a=new THREE.Vector3(),b=new THREE.Vector3();h.getWorldPosition(a);sh.getWorldPosition(b);return {hand:a.toArray().map(v=>+v.toFixed(2)),shoulder:b.toArray().map(v=>+v.toFixed(2))}}};
 </script>
 
 </body>
