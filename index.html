@@ -473,7 +473,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('end-confirm').classList.add('hidden')">繼續會談</button>
           </div>
           <div class="info-box info-warn" style="margin-top:12px;font-size:.8rem">
-            💡 點麥克風說話，病人會以語音、表情與動作回應。右側鏡頭會錄下您的表情與姿勢，會談結束後可在「分析反思」回放。請允許麥克風與鏡頭權限。
+            💡 點麥克風說話，病人會以語音、表情與動作回應。右側鏡頭會錄下您的表情與姿勢，會談結束後可在「回顧會談」同步回放。請允許麥克風與鏡頭權限。
           </div>
         </div>
         <div id="conv-side" class="hidden" style="margin-top:16px">
@@ -633,6 +633,15 @@ input[type=text]:focus{border-color:var(--primary)}
       <div><label>模型名稱</label><input type="text" id="set-model" placeholder="claude-sonnet-5-5"></div>
       <div><label>男性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-m" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
       <div><label>女性病人 3D 頭像網址（Ready Player Me .glb）</label><input type="text" id="set-av-f" placeholder="https://models.readyplayer.me/xxxx.glb"></div>
+      <hr class="divider" style="margin:4px 0">
+      <div style="font-weight:700;font-size:.9rem">病人語音（Azure 語音服務；留空則用瀏覽器內建語音）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label>Azure 語音金鑰</label><input type="text" id="set-az-key" placeholder="32 碼金鑰"></div>
+        <div><label>區域（Region）</label><input type="text" id="set-az-region" placeholder="例如 eastasia、japaneast"></div>
+        <div><label>男性聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
+        <div><label>女性聲音</label><input type="text" id="set-az-vf" placeholder="zh-TW-HsiaoChenNeural"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">台灣腔聲音：女 zh-TW-HsiaoChenNeural、zh-TW-HsiaoYuNeural；男 zh-TW-YunJheNeural。情緒會以語速、音高、停頓表現。<button class="btn btn-outline btn-sm" type="button" onclick="testAzureVoice()">🔊 測試語音</button></div>
       <div style="font-size:.78rem;color:var(--text2);line-height:1.6">在 <a href="https://readyplayer.me/" target="_blank" rel="noopener">readyplayer.me</a> 免費建立頭像（可選性別、年齡感、髮色、衣著）後，複製 .glb 網址貼到上方；留空則使用內建示範頭像。</div>
       <div class="row-actions"><button class="btn btn-primary" onclick="saveSettings()">儲存</button></div>
     </div>
@@ -1006,10 +1015,14 @@ function openSettings(){
   document.getElementById('set-model').value=st.model||'claude-sonnet-5-5';
   document.getElementById('set-av-m').value=st.avM||'';
   document.getElementById('set-av-f').value=st.avF||'';
+  document.getElementById('set-az-key').value=st.azKey||'';
+  document.getElementById('set-az-region').value=st.azRegion||'';
+  document.getElementById('set-az-vm').value=st.azVM||'';
+  document.getElementById('set-az-vf').value=st.azVF||'';
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveSettings(){
-  const st={apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim()};
+  const st={apiKey:document.getElementById('set-apikey').value.trim(),model:document.getElementById('set-model').value.trim()||'claude-sonnet-5-5',avM:document.getElementById('set-av-m').value.trim(),avF:document.getElementById('set-av-f').value.trim(),azKey:document.getElementById('set-az-key').value.trim(),azRegion:document.getElementById('set-az-region').value.trim().toLowerCase(),azVM:document.getElementById('set-az-vm').value.trim(),azVF:document.getElementById('set-az-vf').value.trim()};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1026,6 +1039,28 @@ async function apiSample(input,opts={}){
   if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('API 錯誤 '+res.status+' '+t); }
   const j=await res.json();
   return {text:(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')};
+}
+async function apiSampleStream(input,opts={}){
+  const st=getSettings();
+  if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰'),{code:'no_key'});
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:st.model||'claude-sonnet-5-5',max_tokens:opts.maxTokens||400,system:opts.system||undefined,messages,stream:true})
+  });
+  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('API 錯誤 '+res.status+' '+t); }
+  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop();
+    for(const line of lines){
+      if(!line.startsWith('data:')) continue;
+      try{ const j=JSON.parse(line.slice(5).trim()); if(j.type==='content_block_delta'&&j.delta&&j.delta.text){ full+=j.delta.text; opts.onDelta&&opts.onDelta(full,j.delta.text); } }catch(e){}
+    }
+  }
+  return {text:full};
 }
 function saveBlob(filename,blob){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click();
@@ -1157,6 +1192,7 @@ function setupRecognition(){
 }
 
 function toggleMic(){
+  ensureAudioCtx();
   if(isSpeaking) return;
   if(isRecording){recognition.stop();return}
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
@@ -1193,46 +1229,69 @@ async function handleNurseSpeech(text){
   const entry={role:'nurse',text,ts};
   state.conversation.push(entry);
   convHistory.push({role:'user',content:`護生說：「${text}」`});
-  setStatus('AI 正在回應…');
+  setStatus('病人正在回應…');
   isSpeaking=true;
   document.getElementById('mic-btn').classList.add('waiting');
   document.getElementById('mic-btn').textContent='⏳';
-  // Show typing indicator
-  const typingEl=document.createElement('div');
-  typingEl.className='bubble-wrap patient';
-  typingEl.innerHTML=`<div class="avatar">👤</div><div class="typing"><span></span><span></span><span></span></div>`;
-  document.getElementById('conv-area').appendChild(typingEl);
-  scrollConv();
-  let response='';
+  const c=getCase();
+  // 即時反應：先給一個簡短的回應聲（嗯／好），同時等 AI 想好要說什麼
+  const bc=pickBackchannel(c,text);
+  if(bc) speakBackchannel(bc);
+  // 即時顯示的病人氣泡
+  const liveEl=document.createElement('div');
+  liveEl.className='bubble-wrap patient';
+  liveEl.innerHTML=`<div class="avatar">👤</div><div><div class="bubble"><div class="typing" style="padding:0;background:transparent"><span></span><span></span><span></span></div></div><div class="bubble-ts"></div></div>`;
+  document.getElementById('conv-area').appendChild(liveEl); scrollConv();
+  const bubble=liveEl.querySelector('.bubble');
+  let response='', parsedHeader=null, spokenUpTo=0;
+  const speaker=new SentenceSpeaker();
+  const onDelta=(full)=>{
+    if(!parsedHeader){ if(/[】\]]/.test(full)){ parsedHeader=parsePatientReply(full); setExpression(parsedHeader.expr); if(parsedHeader.gest) playGesture(parsedHeader.gest); } else return; }
+    const body=parsePatientReply(full).text;
+    bubble.textContent=body; scrollConv();
+    // 逐句送出語音
+    const m=body.slice(spokenUpTo).match(/^[\s\S]*?[。！？!?；;…]+(?=\s|$|[^。！？!?；;…])/);
+    if(m&&m[0].length>=4){ speaker.push(m[0]); spokenUpTo+=m[0].length; }
+  };
   try{
     if(sampleFn){
-      const c=getCase();
       const systemMsg=buildPatientSystem(c);
-      const trimmed=convHistory.slice(Math.max(0,convHistory.length-16));
-      const res=await sampleFn(trimmed,{system:systemMsg,maxTokens:300});
+      const trimmed=convHistory.slice(Math.max(0,convHistory.length-30));
+      const res=await apiSampleStream(trimmed,{system:systemMsg,maxTokens:400,onDelta});
       response=res.text||'（病人沉默）';
     } else {
-      response=fallbackPatientResponse(getCase(),text);
+      response=fallbackPatientResponse(c,text);
     }
   }catch(e){
-    console.error(e);
-    response=fallbackPatientResponse(getCase(),text);
+    console.error(e); toast('AI 回應失敗：'+(e.message||'')); 
+    response=fallbackPatientResponse(c,text);
   }
-  typingEl.remove();
   const parsed=parsePatientReply(response);
   response=parsed.text||response;
-  setExpression(parsed.expr); if(parsed.gest) playGesture(parsed.gest);
-  setCaption(response);
-  addBubble('patient',response,Date.now());
+  if(!parsedHeader){ setExpression(parsed.expr); if(parsed.gest) playGesture(parsed.gest); }
+  bubble.textContent=response;
+  const d=new Date(); liveEl.querySelector('.bubble-ts').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  scrollConv();
   state.conversation.push({role:'patient',text:response,ts:Date.now(),expr:parsed.expr,gest:parsed.gest});
-  convHistory.push({role:'assistant',content:response});
+  convHistory.push({role:'assistant',content:(parsedHeader||parsed).expr?`【表情：${EXPR_ZH_OUT[(parsedHeader||parsed).expr]||'平靜'}｜動作：${GEST_ZH_OUT[(parsedHeader||parsed).gest]||'無'}】`+response:response});
+  // 剩餘未唸的部分
+  const rest=response.slice(spokenUpTo).trim(); if(rest) speaker.push(rest);
+  speaker.finish();
   isSpeaking=false;
   document.getElementById('mic-btn').classList.remove('waiting');
   document.getElementById('mic-btn').textContent='🎤';
   document.getElementById('end-conv-btn').disabled=false;
   setStatus('按下麥克風繼續說話');
   saveState();
-  speakTTS(response);
+}
+const EXPR_ZH_OUT={neutral:'平靜',sad:'難過',anxious:'焦慮',pain:'疼痛',angry:'不悅',tired:'疲憊',smile:'微笑'};
+const GEST_ZH_OUT={nod:'點頭',down:'低頭',away:'別過頭',chest:'手按胸口',sigh:'嘆氣',wave:'揮手',shake:'搖頭',cover:'擦眼淚','':'無'};
+function pickBackchannel(c,nurseText){
+  if(!azureReady()) return null;
+  const q=/[嗎呢？?]$/.test(nurseText.trim());
+  const pool=q?['嗯…','嗯。','這個喔…']:['嗯。','嗯嗯。','好。'];
+  if(Math.random()<0.35) return null; // 不是每句都有
+  return pool[Math.floor(Math.random()*pool.length)];
 }
 
 function buildPatientSystem(c){
@@ -1252,6 +1311,10 @@ function buildPatientSystem(c){
 2. 用台灣人平常說話的自然語氣和用詞（例如「不好意思」「麻煩你」「醫生說…」「我是想說…」），像真人在病房裡講話。不要用書面語，不要用中國大陸用語（如「挺好的」「搞定」「打針兒」）。不要夾雜台語或方言字，不要堆疊語助詞（不要一直「喔」「啦」「唉唷」），文字會被朗讀出來，要念起來順。
 2-1. 回應必須針對護生那句話的內容，像真人一樣有來有往：被打招呼就回打招呼、被問名字就回答、被問痛不痛就說痛的情形。不要用「還好啦」「嗯」這種敷衍詞當開場，除非規則3說明你刻意在防衛。
 2-2. 第一次見面的回應要合理，例如護生說「您好，我是護生○○」，你可以回「你好，你是今天照顧我的嗎？」或「好，謝謝。」
+2-3. 【先接話，再說自己的】每句回應的第一句必須直接承接護生剛說的內容（回答她的問題、回應她的關心、或對她說的話表達感受），之後才可以帶出自己想說的。不要自顧自地講和護生那句話無關的事。
+2-4. 【記得脈絡】記住這段會談前面說過什麼：護生已經問過的不要當作沒問過，自己已經說過的擔心不要原封不動再講一次；可以延續、深化，或帶出新的面向。
+2-5. 偶爾可以反問護生一個真實病人會問的問題（「這樣正常嗎？」「你們通常都怎麼處理？」），讓對話有來有往，但不要每句都反問。
+2-6. 句子要短、口語，像真的在講話，一句話通常不超過 25 個字；可以有停頓（用「…」）和不完整的句子。
 3. 【回應量的判斷，最重要】回答多少要看護生怎麼問：
    - 封閉式問句（有沒有、會不會、痛不痛）→ 只簡短回答一句，不主動多說。
    - 開放式問句、反映感受、同理心、給予時間和尊重 → 逐漸打開，可說2-4句，透露更多內心擔憂。
@@ -1302,25 +1365,95 @@ function pickVoice(gender){
   const match=list=>list.find(v=>voiceGender(v)===gender);
   return match(tw)||tw[0]||match(other)||other[0]||null;
 }
+function azureReady(){ const st=getSettings(); return !!(st.azKey&&st.azRegion); }
+function azureVoiceFor(c){ const st=getSettings(); return c.gender==='女'?(st.azVF||'zh-TW-HsiaoChenNeural'):(st.azVM||'zh-TW-YunJheNeural'); }
+// 情緒 → 語速 / 音高 / 音量；年長者整體放慢
+const PROSODY={neutral:{rate:'-5%',pitch:'0%',vol:'0%'},sad:{rate:'-18%',pitch:'-6%',vol:'-15%'},anxious:{rate:'+6%',pitch:'+4%',vol:'-5%'},pain:{rate:'-20%',pitch:'-4%',vol:'-10%'},angry:{rate:'+4%',pitch:'-3%',vol:'+5%'},tired:{rate:'-22%',pitch:'-8%',vol:'-20%'},smile:{rate:'0%',pitch:'+5%',vol:'0%'}};
+const STYLE_MAP={sad:'sad',anxious:'fearful',pain:'sad',angry:'angry',tired:'calm',smile:'cheerful',neutral:'calm'};
+function buildSSML(text,c,expr){
+  const voice=azureVoiceFor(c); const p=PROSODY[expr]||PROSODY.neutral;
+  let rate=parseInt(p.rate), pitch=parseInt(p.pitch);
+  if(c.age>=70){ rate-=10; } if(c.age>=60&&c.gender==='男'){ pitch-=3; }
+  // 括號動作不唸；「…」轉成停頓
+  let t=text.replace(/[（(][^）)]*[）)]/g,'').replace(/…+/g,'<break time="450ms"/>').replace(/[，,]\s*/g,'，<break time="120ms"/>');
+  t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;break time="(\d+ms)"\/&gt;/g,'<break time="$1"/>');
+  const useStyle=/^zh-CN-/i.test(voice); // 僅 zh-CN 部分聲音支援 style
+  const inner=`<prosody rate="${rate>=0?'+':''}${rate}%" pitch="${pitch>=0?'+':''}${pitch}%" volume="${p.vol}">${t}</prosody>`;
+  return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-TW"><voice name="${voice}">${useStyle?`<mstts:express-as style="${STYLE_MAP[expr]||'calm'}">${inner}</mstts:express-as>`:inner}</voice></speak>`;
+}
+const azCache=new Map();
+async function azureSynth(text,c,expr){
+  const st=getSettings(); const key=azureVoiceFor(c)+'|'+expr+'|'+text;
+  if(azCache.has(key)) return azCache.get(key);
+  const res=await fetch(`https://${st.azRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,{
+    method:'POST',headers:{'Ocp-Apim-Subscription-Key':st.azKey,'Content-Type':'application/ssml+xml','X-Microsoft-OutputFormat':'audio-24khz-48kbitrate-mono-mp3','User-Agent':'nursing-bpr'},
+    body:buildSSML(text,c,expr)});
+  if(!res.ok) throw new Error('Azure 語音 '+res.status);
+  const blob=await res.blob(); if(azCache.size>60) azCache.delete(azCache.keys().next().value); azCache.set(key,blob); return blob;
+}
+// 音訊播放 + 以音量驅動嘴型
+let audioCtx=null, analyser=null, curAudio=null, mouthRAF=null;
+function ensureAudioCtx(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.connect(audioCtx.destination);}catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); }
+function stopAudio(){ if(curAudio){ try{curAudio.pause(); curAudio.src='';}catch(e){} curAudio=null; } if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} window.Avatar3D&&Avatar3D.setMouthLevel(null); stopMouth(); }
+function playBlob(blob){
+  return new Promise((resolve)=>{
+    ensureAudioCtx();
+    const a=new Audio(URL.createObjectURL(blob)); curAudio=a;
+    let src=null;
+    try{ if(audioCtx){ src=audioCtx.createMediaElementSource(a); src.connect(analyser); } }catch(e){}
+    const data=new Uint8Array(analyser?analyser.fftSize:0);
+    const tick=()=>{ if(curAudio!==a) return; let lvl=0; if(analyser){ analyser.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const v=(data[i]-128)/128; sum+=v*v;} lvl=Math.min(1,Math.sqrt(sum/data.length)*6); } if(window.Avatar3D) Avatar3D.setMouthLevel(lvl); mouthRAF=requestAnimationFrame(tick); };
+    a.onplay=()=>{ if(!analyser) startMouth(); tick(); };
+    const done=()=>{ if(mouthRAF){cancelAnimationFrame(mouthRAF);mouthRAF=null} if(window.Avatar3D) Avatar3D.setMouthLevel(null); stopMouth(); URL.revokeObjectURL(a.src); if(curAudio===a) curAudio=null; resolve(); };
+    a.onended=done; a.onerror=done;
+    a.play().catch(()=>{ done(); });
+  });
+}
+// 逐句語音佇列：邊生成邊唸，並預先抓下一句
+class SentenceSpeaker{
+  constructor(){ this.q=[]; this.playing=false; this.finished=false; this.c=getCase(); this.expr=null; SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); SentenceSpeaker.current=this; stopAudio(); window.speechSynthesis&&speechSynthesis.cancel(); }
+  push(t){ t=t.trim(); if(!t) return; const expr=currentExprName(); this.q.push({t,expr,p:azureReady()?azureSynth(t,this.c,expr).catch(()=>null):null}); this.run(); }
+  finish(){ this.finished=true; }
+  cancel(){ this.cancelled=true; this.q=[]; }
+  async run(){ if(this.playing) return; this.playing=true;
+    while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
+      if(blob) await playBlob(blob); else await browserSpeak(item.t,this.c); }
+    this.playing=false; }
+}
+let _curExpr='neutral';
+function currentExprName(){ return _curExpr; }
+const _origSetExpression=setExpression;
+setExpression=function(e){ _curExpr=e||'neutral'; return _origSetExpression(e); };
+function browserSpeak(text,c){
+  return new Promise(resolve=>{
+    if(!('speechSynthesis' in window)) return resolve();
+    const spoken=text.replace(/[（(][^）)]*[）)]/g,'，').replace(/，{2,}/g,'，').replace(/^，|，$/g,'');
+    if(!spoken.trim()) return resolve();
+    const utter=new SpeechSynthesisUtterance(spoken); utter.lang='zh-TW';
+    const v=pickVoice(c.gender); if(v) utter.voice=v;
+    const vs=c.voice||{}; let pitch=vs.pitch??1;
+    if(!v||voiceGender(v)!==c.gender){ pitch=c.gender==='男'?Math.min(pitch,0.7):Math.max(pitch,1.2); }
+    utter.pitch=pitch; utter.rate=vs.rate??0.95;
+    utter.onstart=startMouth; utter.onend=()=>{stopMouth();resolve()}; utter.onerror=()=>{stopMouth();resolve()};
+    currentUtterance=utter; window.speechSynthesis.speak(utter);
+  });
+}
+// 整段朗讀（回放、備援用）
 function speakTTS(text){
-  if(!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const c=getCase()||{};
-  // 括號內的動作描述不念出來，只念說話內容
-  const spoken=text.replace(/[（(][^）)]*[）)]/g,'，').replace(/，{2,}/g,'，').replace(/^，|，$/g,'');
-  const utter=new SpeechSynthesisUtterance(spoken);
-  utter.lang='zh-TW';
-  const v=pickVoice(c.gender);
-  if(v) utter.voice=v;
-  const vs=c.voice||{};
-  let pitch=vs.pitch??1;
-  // 找不到符合性別的聲音時，用音高補償：男壓低、女抬高
-  if(!v||voiceGender(v)!==c.gender){ pitch=c.gender==='男'?Math.min(pitch,0.7):Math.max(pitch,1.2); }
-  utter.pitch=pitch;
-  utter.rate=vs.rate??0.95;
-  utter.onstart=startMouth; utter.onend=stopMouth; utter.onerror=stopMouth;
-  currentUtterance=utter;
-  window.speechSynthesis.speak(utter);
+  const c=getCase()||{}; const sp=new SentenceSpeaker();
+  const parts=text.split(/(?<=[。！？!?；;])/).map(x=>x.trim()).filter(Boolean);
+  (parts.length?parts:[text]).forEach(p=>sp.push(p)); sp.finish();
+}
+async function speakBackchannel(t){
+  const c=getCase(); if(!azureReady()) return;
+  try{ const blob=await azureSynth(t,c,'neutral'); if(!isSpeaking) return; if(SentenceSpeaker.current&&SentenceSpeaker.current.q.length) return; await playBlob(blob); }catch(e){}
+}
+async function testAzureVoice(){
+  saveSettings(); openSettings();
+  if(!azureReady()){ toast('請先填金鑰與區域'); return; }
+  const c=getCase()||CASES[0];
+  try{ const blob=await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'); await playBlob(blob); toast('Azure 語音正常'); }
+  catch(e){ toast('Azure 語音失敗：'+(e.message||'')+'，請檢查金鑰與區域'); }
 }
 
 function addBubble(role,text,ts){
@@ -1363,7 +1496,7 @@ function endConv(force){
   if(recognition) try{recognition.stop()}catch(e){}
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   if(window.speechSynthesis) window.speechSynthesis.cancel();
-  stopMouth(); stopBlink(); stopCamera();
+  stopAudio(); stopMouth(); stopBlink(); stopCamera();
   addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
   buildProcessRecord();
   document.getElementById('step-record').classList.add('done');
@@ -1739,12 +1872,12 @@ function replayPlay(){
 function replayPause(){
   if(replay.hasVideo){ document.getElementById('review-video').pause(); }
   else { if(replay.timer){clearInterval(replay.timer);replay.timer=null} replay.clockOffset=replayNow(); replay.playing=false; }
-  window.speechSynthesis&&speechSynthesis.cancel(); stopMouth(); updatePlayBtn();
+  window.speechSynthesis&&speechSynthesis.cancel(); stopAudio(); stopMouth(); updatePlayBtn();
 }
-function replayStop(){ if(replay.timer){clearInterval(replay.timer);replay.timer=null} replay.playing=false; replay.clockOffset=0; const v=document.getElementById('review-video'); if(v){try{v.pause()}catch(e){}} window.speechSynthesis&&speechSynthesis.cancel(); stopMouth(); }
+function replayStop(){ if(replay.timer){clearInterval(replay.timer);replay.timer=null} replay.playing=false; replay.clockOffset=0; const v=document.getElementById('review-video'); if(v){try{v.pause()}catch(e){}} window.speechSynthesis&&speechSynthesis.cancel(); stopAudio(); stopMouth(); }
 function replaySeek(sec,silent){
   const wasPlaying=replay.playing;
-  window.speechSynthesis&&speechSynthesis.cancel(); stopMouth();
+  window.speechSynthesis&&speechSynthesis.cancel(); stopAudio(); stopMouth();
   if(replay.hasVideo){ const v=document.getElementById('review-video'); v.currentTime=sec; }
   else { replay.clockOffset=sec; replay.clockStart=performance.now(); }
   // reset fired pointer to first event after sec; restore last patient expression before sec
@@ -1883,7 +2016,7 @@ const fill=new THREE.DirectionalLight(0xdbe9ff,.7); fill.position.set(-1.5,1.6,1
 const rim=new THREE.DirectionalLight(0xffffff,.5); rim.position.set(0,2,-2); scene.add(rim);
 
 let model=null, morphMeshes=[], bones={}, baseRot={};
-let exprTarget={}, exprCur={}, mouthOn=false, visemeCur=null, visemeNext=0, blinkAt=2, blinkPhase=0;
+let exprTarget={}, exprCur={}, mouthOn=false, visemeCur=null, visemeNext=0, blinkAt=2, blinkPhase=0, mouthLevel=null, mouthSmooth=0;
 let gest=null, clock=new THREE.Clock();
 
 function resize(){
@@ -1950,7 +2083,13 @@ function animate(){
       setMorph(k,v);
     }
     // mouth / visemes
-    if(mouthOn){
+    if(mouthLevel!==null){
+      mouthSmooth=lerp(mouthSmooth,mouthLevel,1-Math.pow(.0001,dt));
+      visemeNext-=dt; if(visemeNext<=0){ visemeCur=VISEMES[Math.floor(Math.random()*VISEMES.length)]; visemeNext=.08+Math.random()*.08; }
+      for(const v of VISEMES){ const cur=mouthMorph[v]||0; mouthMorph[v]=lerp(cur,v===visemeCur?mouthSmooth*.9:0,1-Math.pow(.0005,dt)); setMorph(v,mouthMorph[v]); }
+      const jaw=lerp(mouthMorph.jaw||0,mouthSmooth*.55,1-Math.pow(.0003,dt)); mouthMorph.jaw=jaw;
+      setMorph('jawOpen',Math.max(exprCur.jawOpen||0,jaw));
+    } else if(mouthOn){
       visemeNext-=dt;
       if(visemeNext<=0){ visemeCur=VISEMES[Math.floor(Math.random()*VISEMES.length)]; visemeNext=.09+Math.random()*.09; }
       for(const v of VISEMES){ const cur=mouthMorph[v]||0; mouthMorph[v]=lerp(cur,v===visemeCur?.75:0,1-Math.pow(.0005,dt)); setMorph(v,mouthMorph[v]); }
@@ -1983,7 +2122,7 @@ function animate(){
 const mouthMorph={};
 animate();
 
-window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture};
+window.Avatar3D={load,setExpression,startMouth,stopMouth,gesture,setMouthLevel:(l)=>{mouthLevel=l;if(l===null)mouthSmooth=0;}};
 </script>
 
 </body>
