@@ -1017,6 +1017,7 @@ function renderGoalsPhase(){
   if(state.goals) document.getElementById('goals-input').value=state.goals;
 }
 function startConv(){
+  window.__videoEngineDisabled=false;
   const name=document.getElementById('student-name').value.trim();
   const goals=document.getElementById('goals-input').value.trim();
   if(!name){toast('請填寫學生姓名');document.getElementById('student-name').focus();return}
@@ -1213,11 +1214,11 @@ class LiveAvatarSession{
 }
 async function startLiveAvatarFor(c){
   const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
-  wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.remove('hidden'); ld.textContent='連線真人影像中…';
+  setStatus('真人影像連線中…（可先開始說話）');
   if(liveav) liveav.stop(); if(simli){ simli.stop(); simli=null; }
   liveav=new LiveAvatarSession();
-  try{ await liveav.start(laAvatarFor(c),m=>{ if(m) ld.textContent=m; }); ld.classList.add('hidden'); }
-  catch(e){ ld.innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">真人影像連線失敗：'+escHtml(e.message||'')+'<br><span style="font-size:.72rem">改用 3D 人物。請檢查 LiveAvatar 金鑰、Avatar ID 或點數。</span></div>'; liveav=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); setTimeout(()=>ld.classList.add('hidden'),5000); }
+  try{ await liveav.start(laAvatarFor(c),m=>{ if(m) setStatus('真人影像：'+m); }); wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.add('hidden'); setStatus(listenWanted?'🎤 聆聽中':'按下麥克風開始聆聽'); }
+  catch(e){ liveav=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); ld.classList.add('hidden'); window.__videoEngineDisabled=true; toast('真人影像無法使用（'+(e.message||'').replace(/^LiveAvatar \w+ 失敗 \d+：/,'').slice(0,80)+'），本次改用 3D 病人'); }
 }
 async function listLiveAvatars(){
   saveSettings(); openSettings(); const st=getSettings(); const out=document.getElementById('la-list');
@@ -1257,11 +1258,11 @@ async function simliSpeak(blobOrObj){
 }
 async function startSimliFor(c,label){
   const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
-  wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.remove('hidden'); ld.textContent='連線真人影像中…';
+  setStatus('真人影像連線中…（可先開始說話）');
   if(simli) simli.stop();
   simli=new SimliSession();
-  try{ await simli.start(simliFaceFor(c),m=>{ if(m) ld.textContent=m; }); ld.classList.add('hidden'); }
-  catch(e){ ld.innerHTML='<div style="padding:12px;text-align:center;line-height:1.6">真人影像連線失敗：'+escHtml(e.message||'')+'<br><span style="font-size:.72rem">改用 3D 人物。請檢查 Simli 金鑰、Face ID 或分鐘額度。</span></div>'; simli=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); setTimeout(()=>ld.classList.add('hidden'),4000); }
+  try{ await simli.start(simliFaceFor(c),m=>{ if(m) setStatus('真人影像：'+m); }); wrap.classList.remove('hidden'); d3.classList.add('hidden'); ld.classList.add('hidden'); setStatus(listenWanted?'🎤 聆聽中':'按下麥克風開始聆聽'); }
+  catch(e){ simli=null; wrap.classList.add('hidden'); d3.classList.remove('hidden'); ld.classList.add('hidden'); window.__videoEngineDisabled=true; toast('真人影像無法使用（'+(e.message||'').slice(0,80)+'），本次改用 3D 病人'); }
 }
 function stopSimli(){ if(simli){ simli.stop(); simli=null; } if(liveav){ liveav.stop(); liveav=null; } document.getElementById('avatar-simli').classList.add('hidden'); document.getElementById('avatar-3d').classList.remove('hidden'); }
 async function listSimliFaces(){
@@ -1556,7 +1557,9 @@ async function initConvPhase(){
   area.innerHTML='';
   convHistory=[];
   document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;
-  if(simliOn()){ startSimliFor(c); } else if(laOn()){ startLiveAvatarFor(c); } else { stopSimli(); loadAvatarFor(c); }
+  // 3D 模型一律先載入（真人影像連不上時可立即退回，不用再等）
+  stopSimli(); loadAvatarFor(c);
+  if(simliOn()&&!window.__videoEngineDisabled){ startSimliFor(c); } else if(laOn()&&!window.__videoEngineDisabled){ startLiveAvatarFor(c); }
   warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
@@ -1663,8 +1666,8 @@ async function handleNurseSpeech(text){
   state.conversation.push(entry);
   setTimeout(()=>{ const f1=captureNurseFrame(); if(f1) entry.frames.push(f1); },2500);
   convHistory.push({role:'user',content:`護生說：「${text}」`});
-  setStatus('病人正在回應…');
   isSpeaking=true; pauseListening();
+  const thinkT0=Date.now(); window.__thinkTimer&&clearInterval(window.__thinkTimer); window.__thinkTimer=setInterval(()=>{ const sec=Math.round((Date.now()-thinkT0)/1000); if(isSpeaking) setStatus('⏳ 病人正在想怎麼回答…（'+sec+' 秒）'); },500); setStatus('⏳ 病人正在想怎麼回答…');
   document.getElementById('mic-btn').classList.add('waiting');
   document.getElementById('mic-btn').textContent='⏳';
   const c=getCase();
@@ -1680,6 +1683,7 @@ async function handleNurseSpeech(text){
   let response='', parsedHeader=null, spokenUpTo=0;
   const speaker=new SentenceSpeaker();
   const onDelta=(full)=>{
+    if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; setStatus('🗣 病人回應中…'); }
     if(!parsedHeader){ if(/[】\]]/.test(full)){ parsedHeader=parsePatientReply(full); setExpression(parsedHeader.expr); if(parsedHeader.gest) playGesture(parsedHeader.gest); } else return; }
     const body=parsePatientReply(full).text;
     bubble.textContent=body; scrollConv();
@@ -1711,6 +1715,7 @@ async function handleNurseSpeech(text){
   // 剩餘未唸的部分
   const rest=response.slice(spokenUpTo).trim(); if(rest) speaker.push(rest);
   speaker.finish();
+  if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; }
   isSpeaking=false;
   document.getElementById('mic-btn').classList.remove('waiting');
   document.getElementById('mic-btn').textContent='🎤';
