@@ -1094,7 +1094,7 @@ class SimliSession{
     const st=getSettings(); const say=m=>{onStatus&&onStatus(m)};
     if(!faceId) throw new Error('未設定此性別病人的 Face ID');
     say('取得連線票…');
-    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:true,maxSessionLength:3600,maxIdleTime:900})});
+    const tr=await fetch('https://api.simli.ai/compose/token',{method:'POST',headers:{'Content-Type':'application/json','x-simli-api-key':st.simliKey},body:JSON.stringify({faceId,handleSilence:false,maxSessionLength:3600,maxIdleTime:900})});
     if(!tr.ok) throw new Error('Simli 連線票失敗 '+tr.status+'：'+(await tr.text()).slice(0,120));
     const token=(await tr.json()).session_token;
     let iceServers=[{urls:'stun:stun.l.google.com:19302'}];
@@ -1123,12 +1123,20 @@ class SimliSession{
       ws.onclose=()=>{ this.ready=false; if(!this.closed){ console.warn('Simli 連線已關閉'); } };
     });
   }
-  sendPCM(int16){
+  // 依真實時間節奏送出（每塊 6000 bytes ≈ 187ms 音訊），前面預留約 0.6 秒，避免一次灌入造成忽快忽慢
+  async sendPCM(int16){
     if(!this.ws||this.ws.readyState!==1) return;
     const bytes=new Uint8Array(int16.buffer,int16.byteOffset,int16.byteLength);
-    for(let i=0;i<bytes.length;i+=6000) this.ws.send(bytes.subarray(i,Math.min(i+6000,bytes.length)));
+    const chunk=6000, chunkMs=chunk/2/16000*1000; const lead=3;
+    const start=Math.max(performance.now(),this._paceEnd||0); let n=0;
+    for(let i=0;i<bytes.length;i+=chunk){
+      if(!this.ws||this.ws.readyState!==1||this._gen!==this.__curGen) break;
+      this.ws.send(bytes.subarray(i,Math.min(i+chunk,bytes.length))); n++;
+      const due=start+Math.max(0,n-lead)*chunkMs; const wait=due-performance.now(); if(wait>0) await new Promise(r=>setTimeout(r,wait));
+    }
+    this._paceEnd=start+n*chunkMs;
   }
-  clear(){ try{ this.ws&&this.ws.readyState===1&&this.ws.send('SKIP'); }catch(e){} this.queueEnd=0; }
+  clear(){ try{ this.ws&&this.ws.readyState===1&&this.ws.send('SKIP'); }catch(e){} this.queueEnd=0; this._paceEnd=0; this.__curGen=(this.__curGen||0)+1; this._gen=this.__curGen; }
   stop(){ this.closed=true; try{ this.ws&&this.ws.readyState===1&&this.ws.send('DONE'); }catch(e){} try{ this.ws&&this.ws.close(); }catch(e){} try{ this.pc&&this.pc.close(); }catch(e){} this.pc=null; this.ws=null; this.ready=false; }
 }
 let simli=null;
@@ -1146,11 +1154,10 @@ async function simliSpeak(blobOrObj){
   const blob=blobOrObj&&blobOrObj.blob?blobOrObj.blob:blobOrObj;
   if(!simli||!simli.ready) return;
   const {pcm,duration}=await blobToPCM16k(blob);
-  const now=performance.now()/1000; const startAt=Math.max(now,simli.queueEnd||now);
-  simli.sendPCM(pcm); simli.queueEnd=startAt+duration;
   startMouth();
-  await new Promise(r=>setTimeout(r,Math.max(0,(simli.queueEnd-now)*1000)+150));
-  if(performance.now()/1000>=simli.queueEnd-0.05) stopMouth();
+  await simli.sendPCM(pcm);            // 依節奏送完 ≈ 音訊長度
+  await new Promise(r=>setTimeout(r,450)); // 留一點播放緩衝
+  stopMouth();
 }
 async function startSimliFor(c,label){
   const wrap=document.getElementById('avatar-simli'), d3=document.getElementById('avatar-3d'), ld=document.getElementById('avatar-loading');
@@ -1501,6 +1508,7 @@ function setupRecognition(){
 
 function toggleMic(){
   ensureAudioCtx();
+  if(!recognition) setupRecognition();
   if(isSpeaking) return;
   if(isRecording){recognition.stop();return}
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
