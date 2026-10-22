@@ -1216,7 +1216,7 @@ async function checkVoice(){
   const m=document.getElementById('check-voice-msg'); const c=getCase()||CASES[0]; ensureAudioCtx();
   m.textContent='播放中…';
   const who=`${c.name}（${c.gender}性，${c.age} 歲）`;
-  try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.innerHTML=`✅ Azure ${c.gender==='女'?'女聲':'男聲'} ${azureVoiceFor(c)}　病人：${who}`; }
+  try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.innerHTML=`✅ ${await patientSpeechName(c)}　病人：${who}`; }
        else { const v=pickVoice(c.gender); await browserSpeak('你好，我是今天住在這一床的病人。',c); m.innerHTML=(v&&voiceGender(v)===c.gender?'✅ ':'⚠️ ')+`瀏覽器內建語音「${v?v.name:'無'}」　病人：${who}`+((!v||voiceGender(v)!==c.gender)?'<br><span style="color:var(--danger)">此裝置沒有符合病人性別的內建聲音，將保留文字，不以異性聲音替代。請確認老師的語音代理已設定，或換用電腦／Android。</span>':''); } }
   catch(e){ m.innerHTML='⚠️ Azure 語音失敗：'+escHtml(e.message||'')+'<br>會改用瀏覽器內建語音，僅使用符合病人性別的聲音。請檢查網路或向老師確認代理設定。'; }
 }
@@ -1988,8 +1988,14 @@ function renderCaseVoiceSettings(){
     const current=profiles[c.id]?.name||azureVoiceFor(c);
     return '<div class="case-voice-row"><label for="case-voice-'+c.id+'">'+c.name+' · '+c.age+'歲 · '+c.gender+'</label><select id="case-voice-'+c.id+'">'+names.map(name=>'<option '+(name===current?'selected ':'')+'value="'+name+'">'+name+'</option>').join('')+'</select><label for="case-rate-'+c.id+'">語速</label><input id="case-rate-'+c.id+'" type="number" min="0.85" max="1.1" step="0.05" value="'+(profiles[c.id]?.rate||1)+'"><button class="btn btn-outline btn-sm" type="button" onclick="testCaseVoice('+c.id+')">試聽</button><span id="case-voice-status-'+c.id+'" class="chart-note">年齡感尚待試聽確認</span></div>';
   }).join('');
+  getPatientSpeechConfig().then(cfg=>cfg.cases.forEach(id=>{
+    const select=document.getElementById('case-voice-'+id),rate=document.getElementById('case-rate-'+id),status=document.getElementById('case-voice-status-'+id);
+    if(select){select.disabled=true;select.innerHTML='<option>ElevenLabs · 已確認的病人聲音</option>';}
+    if(rate)rate.disabled=true;
+    if(status)status.textContent='教師測試：'+(id===1?'65歲男聲':'78歲女聲')+'；其他裝置維持 Azure';
+  }));
 }
-function readCaseVoiceSettings(){return Object.fromEntries(CASES.map(c=>[c.id,{name:document.getElementById('case-voice-'+c.id)?.value||azureVoiceFor(c),rate:Math.max(.85,Math.min(1.1,parseFloat(document.getElementById('case-rate-'+c.id)?.value)||1))}]))}
+function readCaseVoiceSettings(){return Object.fromEntries(CASES.map(c=>[c.id,{name:document.getElementById('case-voice-'+c.id)?.disabled?azureVoiceFor(c):(document.getElementById('case-voice-'+c.id)?.value||azureVoiceFor(c)),rate:Math.max(.85,Math.min(1.1,parseFloat(document.getElementById('case-rate-'+c.id)?.value)||1))}]))}
 async function testCaseVoice(id){
   const c=CASES.find(c=>c.id===id), status=document.getElementById('case-voice-status-'+id);
   if(!azureReady()){status.textContent='請先儲存語音代理設定，再試聽候選聲線。';return;}
@@ -2013,6 +2019,37 @@ function buildSSML(text,c,expr){
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-TW"><voice name="${voice}">${useStyle?`<mstts:express-as style="${STYLE_MAP[expr]||'calm'}">${inner}</mstts:express-as>`:inner}</voice></speak>`;
 }
 const azCache=new Map();
+let patientSpeechConfig=null, patientSpeechConfigKey='', patientSpeechConfigUntil=0;
+const patientSpeechPending=new Map();
+async function getPatientSpeechConfig(){
+  if(!proxyConfigured()) return {cases:[]};
+  const st=getSettings(), key=st.proxyUrl+'|'+st.classCode+'|'+st.teacherToken;
+  if(patientSpeechConfig&&key===patientSpeechConfigKey&&Date.now()<patientSpeechConfigUntil)return patientSpeechConfig;
+  patientSpeechConfigKey=key;patientSpeechConfigUntil=Date.now()+60000;
+  patientSpeechConfig=(async()=>{try{
+    const r=await fetch(st.proxyUrl+'/speech/status',{headers:proxyHeaders(),signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return {cases:[]};const data=await r.json();return {cases:Array.isArray(data.cases)?data.cases.filter(id=>id===1||id===5):[]};
+  }catch{return {cases:[]};}})();
+  return patientSpeechConfig;
+}
+async function elevenPatientSpeech(text,c){
+  const key='eleven_v4_turbo|'+c.id+'|'+text;
+  if(azCache.has(key))return azCache.get(key);
+  if(patientSpeechPending.has(key))return patientSpeechPending.get(key);
+  const pending=(async()=>{
+    const spoken=text.replace(/[（(][^）)]*[）)]/g,'').replace(/\[[^\]]*\]/g,'').trim();
+    const r=await fetch(getSettings().proxyUrl+'/speech/synthesize',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:c.id,text:spoken}),signal:AbortSignal.timeout(23000)});
+    if(!r.ok){let message='ElevenLabs 語音失敗';try{message=(await r.json()).error||message;}catch{}throw new Error(message);}
+    const out={blob:await r.blob(),visemes:null,provider:'elevenlabs'};
+    if(!out.blob.size)throw new Error('ElevenLabs 未回傳音訊');
+    if(azCache.size>60)azCache.delete(azCache.keys().next().value);azCache.set(key,out);return out;
+  })();
+  patientSpeechPending.set(key,pending);
+  try{return await pending;}finally{patientSpeechPending.delete(key);}
+}
+async function patientSpeechName(c){
+  const cfg=await getPatientSpeechConfig();return cfg.cases.includes(c.id)?'ElevenLabs · 已確認的'+(c.id===1?'王先生65歲男聲':'林女士78歲女聲'):'Azure '+azureVoiceFor(c);
+}
 // 回傳 {blob, visemes:[{t,id}]}；有 SDK 時用 SDK 取得音素時間（嘴型精準），否則 REST
 // 常駐一條 Azure 連線重複使用（省去每句 0.5–1 秒的握手），呼叫序列化
 let azSyn=null, azSynKey='', azSynTok='', azVisemes=[], azChain=Promise.resolve();
@@ -2041,6 +2078,7 @@ function azureSynthSDK(text,c,expr){
 // 會談開始時先暖機並預抓常用的回應聲
 function warmAzure(){ /* Synthesize only sentences that will actually be played. */ }
 async function azureSynth(text,c,expr){
+  if((await getPatientSpeechConfig()).cases.includes(c.id))return elevenPatientSpeech(text,c);
   const st=getSettings(); const key=azureVoiceFor(c)+'|'+expr+'|'+text;
   if(azCache.has(key)) return azCache.get(key);
   let out;
@@ -2120,7 +2158,7 @@ function currentExprName(){ return _curExpr; }
 const _origSetExpression=setExpression;
 setExpression=function(e){ _curExpr=e||'neutral'; return _origSetExpression(e); };
 function browserSpeak(text,c){
-  if(!browserSpeak._warned&&azureReady()){ browserSpeak._warned=true; toast('Azure 語音暫時無法使用，改用內建語音（僅使用符合病人性別的聲音）',5000); }
+  if(!browserSpeak._warned&&azureReady()){ browserSpeak._warned=true; toast('雲端病人語音暫時無法使用，改用內建語音（聲線可能與試聽不同）',5000); }
   return new Promise(resolve=>{
     if(!('speechSynthesis' in window)) return resolve();
     const spoken=text.replace(/[（(][^）)]*[）)]/g,'，').replace(/，{2,}/g,'，').replace(/^，|，$/g,'');
@@ -2188,7 +2226,7 @@ async function testAzureVoice(){
   saveSettings(); openSettings();
   if(!azureReady()){ toast('請先填金鑰與區域'); return; }
   const c=getCase()||CASES[0];
-  try{ const blob=await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'); await playBlob(blob); toast('Azure 語音正常'); }
+  try{ const blob=await azureSynth('你好，我是今天住在這一床的病人，麻煩你了。',c,'neutral'); await playBlob(blob); toast((await patientSpeechName(c))+' 語音正常'); }
   catch(e){ toast('Azure 語音失敗：'+(e.message||'')+'，請檢查金鑰與區域'); }
 }
 

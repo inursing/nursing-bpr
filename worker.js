@@ -7,6 +7,7 @@
 //   OPENAI_KEY    = 你的 OpenAI API 金鑰（Secret；平台設定選「OpenAI GPT」時使用）
 //   AZURE_KEY     = 你的 Azure 語音金鑰（Secret）
 //   AZURE_REGION  = 例如 eastasia（Text 即可）
+//   ELEVENLABS_KEY = ElevenLabs 語音 API 金鑰（Secret；僅教師裝置測試）
 //   CLASS_CODE    = 自訂課程代碼，例如 n2026fall（Secret；每學期可以換）
 //   ALLOWED_ORIGIN= （可選）只允許某個網站呼叫，例如 https://inursing.github.io
 //   MAX_SESSIONS  = 每位學生可用課堂金鑰練習的次數，例如 3（Text；留空＝不限制）
@@ -38,6 +39,37 @@ export default {
     if (env.CLASS_CODE && req.headers.get('X-Class-Code') !== env.CLASS_CODE) return json({ error: '課程代碼錯誤' }, 401);
 
     const isTeacher = !!env.TEACHER_TOKEN && req.headers.get('X-Teacher-Token') === env.TEACHER_TOKEN;
+    const patientVoices = {1:'VWAVJ9V9uViHiR8dUFkU',5:'kIL4Puk4YO3p9mVQPW76'};
+    if (url.pathname === '/speech/status' && req.method === 'GET') {
+      return json({provider:'elevenlabs',cases:isTeacher&&env.ELEVENLABS_KEY?[1,5]:[],model:'eleven_v4_turbo'});
+    }
+    if (url.pathname === '/speech/synthesize') {
+      if (req.method !== 'POST') return json({error:'method not allowed'},405);
+      if (!isTeacher) return json({error:'新聲音目前僅供教師測試'},403);
+      if (!env.ELEVENLABS_KEY) return json({error:'ElevenLabs 語音金鑰尚未設定'},503);
+      let b;try{b=await req.json();}catch{return json({error:'invalid JSON'},400);}
+      if (![1,5].includes(b.caseId) || typeof b.text!=='string' || !b.text.trim() || b.text.length>600) return json({error:'不支援的病人或語音文字長度'},400);
+      try {
+        // v4 Turbo uses Text to Dialogue WebSocket; keep its credential server-side.
+        const r=await fetch('https://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=eleven_v4_turbo&output_format=mp3_44100_128',{
+          headers:{'Upgrade':'websocket','xi-api-key':env.ELEVENLABS_KEY},signal:AbortSignal.timeout(10000)
+        });
+        if (!r.webSocket) return json({error:'ElevenLabs 語音連線失敗（HTTP '+r.status+'），未自動重試',status:r.status},502);
+        const ws=r.webSocket;ws.accept();
+        const audio=await new Promise((resolve,reject)=>{
+          const chunks=[];let size=0,done=false;
+          const finish=(error)=>{if(done)return;done=true;clearTimeout(timer);try{ws.close(1000,'complete');}catch{};if(error)reject(error);else{const out=new Uint8Array(size);let offset=0;for(const chunk of chunks){out.set(chunk,offset);offset+=chunk.length;}resolve(out);}};
+          const timer=setTimeout(()=>finish(new Error('speech timeout')),20000);
+          ws.addEventListener('message',event=>{if(done)return;try{const msg=JSON.parse(event.data);if(msg.error){finish(new Error('speech rejected'));return;}if(msg.audio){const raw=atob(msg.audio);const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));size+=bytes.length;if(size>3000000){finish(new Error('audio too large'));return;}chunks.push(bytes);}if(msg.is_final)finish(size?null:new Error('empty audio'));}catch{finish(new Error('invalid speech response'));}});
+          ws.addEventListener('error',()=>finish(new Error('speech connection failed')));
+          ws.addEventListener('close',()=>{if(!done)finish(new Error('speech interrupted'));});
+          ws.send(JSON.stringify({voices:[patientVoices[b.caseId]]}));
+          ws.send(JSON.stringify({inputs:[{text:b.text,voice_id:patientVoices[b.caseId],new_turn:true}]}));
+          ws.send(JSON.stringify({close_socket:true}));
+        });
+        return new Response(audio,{headers:{...cors,'Content-Type':'audio/mpeg','Cache-Control':'no-store','X-Speech-Provider':'elevenlabs'}});
+      } catch {return json({error:'ElevenLabs 語音連線逾時，未自動重試'},502);}
+    }
     // One-patient teacher pilot. Only temporary tokens reach the browser.
     if (url.pathname === '/simli/status' || url.pathname === '/simli/session') {
       if (!isTeacher) return json({ error: 'Live 測試僅限已設定教師密語的裝置' }, 403);
