@@ -796,7 +796,7 @@ input[type=text]:focus{border-color:var(--primary)}
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑥ 進階（一般不需要）</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div><label>OpenAI 模型（會談）</label><input type="text" id="set-oamodel" placeholder="gpt-5-mini"></div>
+            <div><label>OpenAI 模型（會談）</label><input type="text" id="set-oamodel" placeholder="gpt-6-luna"></div>
             <div><label>OpenAI 模型（AI 報告）</label><input type="text" id="set-oareport" placeholder="gpt-5"></div>
           </div>
           <div><label>OpenAI 金鑰（不經代理時）</label><input type="text" id="set-oakey" placeholder="sk-…"></div>
@@ -1263,7 +1263,12 @@ function loadAvatarFor(c){
 
 // ===== SETTINGS / API =====
 const SET_KEY='bpr-settings-v2';
-function getSettings(){ try{return JSON.parse(localStorage.getItem(SET_KEY)||'{}')}catch(e){return {}} }
+function getSettings(){
+  try{const st=JSON.parse(localStorage.getItem(SET_KEY)||'{}');
+    if(st.chatEconomyVersion!==1){st.oaModel='gpt-6-luna';st.chatEconomyVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    return st;
+  }catch(e){return {oaModel:'gpt-6-luna'}}
+}
 function makeSetupLink(){
   saveSettings(); openSettings();
   const st=getSettings(); const cfg={azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
@@ -1305,6 +1310,7 @@ function applySetupFromHash(){
   }catch(e){ console.warn('setup link',e); }
 }
 function openSettings(){
+  renderOpenaiUsage();
   const st=getSettings();
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('set-proxy',st.proxyUrl||''); set('set-class',st.classCode||''); set('set-teacher',st.teacherToken||'');
@@ -1322,7 +1328,7 @@ function openSettings(){
 }
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
-  const st={provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
+  const st={chatEconomyVersion:1,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
@@ -1389,16 +1395,33 @@ async function testProxy(){
 // 使用 OpenAI？（老師選 OpenAI 且學生沒勾「用自己的金鑰」）
 function useOpenAI(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return (st.aiProvider||'openai')==='openai'&&(proxyConfigured()||!!st.oaKey); }
 function aiReady(){ const st=getSettings(); if(useOpenAI()) return true; if(proxyOn()) return true; return !!st.gKey; }
-const OPENAI_CHAT_MODELS=['gpt-5-mini','gpt-4.1-mini','gpt-4o-mini'];
+const OPENAI_USAGE_KEY='bpr-openai-usage-v1';
+function readOpenaiUsage(){try{return JSON.parse(localStorage.getItem(OPENAI_USAGE_KEY)||'[]')}catch(e){return []}}
+function recordOpenaiUsage(j,kind){
+  if(!j.usage) return;
+  const u=j.usage, rows=readOpenaiUsage();
+  if(j.id&&rows.some(r=>r.id===j.id)) return;
+  rows.push({id:j.id||'',at:Date.now(),kind:kind==='report'?'分析報告':'會談／連線測試',model:j.model||'',input:u.prompt_tokens||0,cached:u.prompt_tokens_details?.cached_tokens||0,output:u.completion_tokens||0,reasoning:u.completion_tokens_details?.reasoning_tokens||0});
+  try{localStorage.setItem(OPENAI_USAGE_KEY,JSON.stringify(rows.slice(-100)))}catch(e){}
+  renderOpenaiUsage();
+}
+function renderOpenaiUsage(){
+  let el=document.getElementById('openai-usage');
+  if(!el){const field=document.getElementById('set-oamodel');if(!field) return;el=document.createElement('div');el.id='openai-usage';el.className='info-box';field.parentElement.parentElement.after(el);}
+  const rows=readOpenaiUsage(), input=rows.reduce((n,r)=>n+r.input,0), output=rows.reduce((n,r)=>n+r.output,0), last=rows[rows.length-1];
+  el.textContent='OpenAI 用量（此瀏覽器最近100筆有回傳用量的請求）：'+rows.length+' 次；輸入 '+input+' tokens；輸出 '+output+' tokens。'+(last?'最近：'+last.kind+'／'+last.model+'，輸入 '+last.input+'（快取 '+last.cached+'）、輸出 '+last.output+'（含推理 '+last.reasoning+'）。':'')+' 不含其他裝置、Simli、Azure、未回傳用量的失敗或中斷請求；帳單以服務商為準。';
+}
+const OPENAI_CHAT_MODELS=['gpt-6-luna'];
 const OPENAI_REPORT_MODELS=['gpt-5','gpt-5-mini','gpt-4.1'];
 let openaiModelOverride=null;
-function openaiModels(kind){ const st=getSettings(); const base=kind==='report'?OPENAI_REPORT_MODELS:OPENAI_CHAT_MODELS; const m=kind==='report'?(st.oaReport||base[0]):(openaiModelOverride||st.oaModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
+function openaiModels(kind){ const st=getSettings(); const base=kind==='report'?OPENAI_REPORT_MODELS:OPENAI_CHAT_MODELS; return [kind==='report'?(st.oaReport||base[0]):(st.oaModel||base[0])]; }
 function toOpenAI(messages,system,maxTokens,model,kind,stream){
   const msgs=[]; if(system) msgs.push({role:'system',content:system});
   for(const m of messages){ msgs.push(m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image_url',image_url:{url:p.image,detail:'low'}}:{type:'text',text:p.text||''})}:{role:m.role,content:m.content}); }
   const body={model,messages:msgs,stream:!!stream};
-  if(/^gpt-5|^o\d/.test(model)){ body.max_completion_tokens=maxTokens||1024; body.reasoning_effort=kind==='report'?'low':'minimal'; }
+  if(/^gpt-[56]|^o\d/.test(model)){ body.max_completion_tokens=maxTokens||1024; body.reasoning_effort=model==='gpt-6-luna'?'none':(/^gpt-6/.test(model)?'low':(kind==='report'?'low':'minimal')); }
   else { body.max_tokens=maxTokens||1024; body.temperature=0.9; }
+  if(stream) body.stream_options={include_usage:true};
   return body;
 }
 async function openaiFetch(messages,opts,stream){
@@ -1421,7 +1444,7 @@ async function openaiFetch(messages,opts,stream){
 }
 async function openaiSample(input,opts={}){
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await openaiFetch(messages,opts,false); const j=await res.json(); clearTimeout(res.__timer);
+  const res=await openaiFetch(messages,opts,false); const j=await res.json(); clearTimeout(res.__timer); recordOpenaiUsage(j,opts.kind);
   return {text:j.choices?.[0]?.message?.content||''};
 }
 async function openaiSampleStream(input,opts={}){
@@ -1434,7 +1457,7 @@ async function openaiSampleStream(input,opts={}){
     const lines=buf.split('\n'); buf=lines.pop();
     for(const line of lines){
       if(!line.startsWith('data:')) continue; const d=line.slice(5).trim(); if(d==='[DONE]') continue;
-      try{ const j=JSON.parse(d); const t=j.choices?.[0]?.delta?.content||''; if(t){ full+=t; opts.onDelta&&opts.onDelta(full,t); } }catch(e){}
+      try{ const j=JSON.parse(d); recordOpenaiUsage(j,opts.kind); const t=j.choices?.[0]?.delta?.content||''; if(t){ full+=t; opts.onDelta&&opts.onDelta(full,t); } }catch(e){}
     }
   }
   return {text:full};
@@ -1785,7 +1808,7 @@ function startTimer(){
 }
 
 async function handleNurseSpeech(text){
-  if(!text) return;
+  if(!text||isSpeaking||(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) return;
   const ts=Date.now();
   addBubble('nurse',text,ts);
   playGesture('g-nod');
@@ -1875,57 +1898,28 @@ function pickBackchannel(c,nurseText){
   return pool[Math.floor(Math.random()*pool.length)];
 }
 
+function patientChartForChat(c){
+  const chart=window.CASE_CHARTS[c.id]||{};
+  // Preserve every clinical fact but send medication orders only once.
+  const {meds,...facts}=chart;
+  return {...facts,meds:(meds||[]).map(m=>({order:m.order||{drug:m.name,dose:m.dose,route:m.route,freq:m.freq},purpose:m.purpose,watch:m.watch}))};
+}
 function buildPatientSystem(c){
-  return `你正在扮演一位台灣的住院病患，角色設定如下：
-姓名代號：${c.name}，性別：${c.gender}，年齡：${c.age}歲
-所在科別：${c.deptLabel}
-診斷：${c.dx}
-目前個案說的話："${c.chief}"
-個性特點：${c.personality}
-情緒狀態：${c.emotional}
-背景情境：${c.context}
-【補充模擬病歷】${JSON.stringify(window.CASE_CHARTS[c.id]||{})}
-病歷資料是照護團隊的背景資訊，不代表病人能背出全部數值或藥名；你應依既有理解自然表達。不能改寫既定藥物、檢驗或住院經過。hidden是尚未主動說出的個人顧慮，須依會談脈絡逐漸透露，不要一次全部告訴護生。
-【此刻的會談情境】${c.scene}
-【你對自己病情與照護的了解程度（只有這些，而且有錯誤觀念）】${c.knowledge}
-護理問題：${c.nursing.join('、')}
-說話習慣：${c.talk}
-
-【扮演規則】
-1. 完全以第一人稱回應，真實扮演這個病患，絕不跳出角色、不解釋自己是AI。
-2. 用台灣人平常說話的自然語氣和用詞（例如「不好意思」「麻煩你」「醫生說…」「我是想說…」），像真人在病房裡講話。不要用書面語，不要用中國大陸用語（如「挺好的」「搞定」「打針兒」）。不要夾雜台語或方言字，不要堆疊語助詞（不要一直「喔」「啦」「唉唷」），文字會被朗讀出來，要念起來順。
-2-1. 不要用「嗯」「好」「喔」「嗯嗯」這類語助詞當句子的開頭；直接從內容開始說（例如護生問「睡得好嗎？」就回「沒有，差不多兩三點才睡著。」）。回應必須針對護生那句話的內容，像真人一樣有來有往：被打招呼就回打招呼、被問名字就回答、被問痛不痛就說痛的情形。不要用「還好啦」「嗯」這種敷衍詞當開場，除非規則3說明你刻意在防衛。
-2-2. 第一次見面的回應要合理，例如護生說「您好，我是護生○○」，你可以回「你好。」「好，麻煩你了。」
-2-3. 【先接話，再說自己的】每句回應的第一句必須直接承接護生剛說的內容（回答她的問題、回應她的關心、或對她說的話表達感受），之後才可以帶出自己想說的。不要自顧自地講和護生那句話無關的事。
-2-4. 【記得脈絡】記住這段會談前面說過什麼：護生已經問過的不要當作沒問過，自己已經說過的擔心不要原封不動再講一次；可以延續、深化，或帶出新的面向。
-2-5. 像病人自然接話，對不懂或在意的事情可以提問，不必每輪反問，也不以固定次數或間隔限制合理疑問。
-2-6. 通常每輪只談一個重點，用1–3句口語自然表達；必要時可簡短、停頓或多說一些，不湊字數、不刻意每句加省略號。讓護生有接話空間。
-2-7. 【你是外行人，不是醫護】你只有一般民眾的常識，而且帶著上面列出的錯誤觀念。絕對不要用醫護專業用語（不說「傷口癒合情形」「自我照顧」「衛教」「血糖控制目標」「疼痛評估」這類字眼），用自己的話講（「那個破掉的地方」「打針那個」「醫生說的那個藥」）。你不知道該怎麼照顧自己，不會主動講出正確的照護方法，更不會替護生整理重點或提出照護計畫；對護生的衛教，你會聽、會點頭，但可能聽不懂、記不住、或有疑問（「那是不是以後都不能…？」）。醫生跟你說過的話，你只記得片段，而且常常記不準。
-3. 【基本態度：有禮、願意回答，但不主動、不討好】你是一位一般的台灣住院病人，對護理人員客氣、不會頂撞，但也不會熱情配合或主動幫忙把話題推進：護生問什麼你答什麼，不問的你不說；不要搶著替護生總結、不要自己提出建議、不要說「謝謝你的關心」這類客套話超過一次。護生技巧的好壞影響的是你「說得多深、多真」：
-   - 封閉式問句（有沒有、會不會、痛不痛）→ 如實簡短回答，可以多補一句相關的事實，但不主動談心情。
-   - 開放式問句、反映感受、同理心、給予時間 → 逐漸打開，可說 2–4 句，慢慢透露內心真正的擔憂。
-   - 一次問太多問題、說教、急著衛教、輕率保證（「不用擔心」）、打斷 → 你仍然客氣配合，但只會給表面的回答（「好」「嗯，我知道」「還可以啦」），把心事收回去；不要生氣、不要反駁、不要轉身不理。
-   - 護生沒有自我介紹或沒說明來意就開始問問題時，你可以客氣地問一下（「不好意思，你是？」「你是今天的護理師嗎？」），這是真實病人會做的事；問過一次後就照常配合，不要一直追問。
-   - 依性格調整：話少的人即使被問得好也不會一下子講很多；話多的人連封閉式問句也會多說一點。
-3-0. 【護生講的和你的狀況不符時，要提出疑問】護生若說到和你的病情、治療、情境不一致的事（例如你沒有開刀卻談傷口照顧、你沒有糖尿病卻談血糖、說你今天要做某個你沒聽過的檢查、把別床病人的事講到你身上、提到你沒說過的事），你要像真人一樣疑惑地問回去：「咦，我有要做那個嗎？」「我沒有開刀啊，你是不是弄錯了？」「這個醫生沒跟我說過耶。」不要順著錯的內容往下講。護生若談的主題和你此刻的狀況完全無關（例如病人在喘卻一直談出院後運動），你可以委婉表示現在比較在意的是什麼。
-3-1. 【護生說錯要糾正】護生叫錯你的姓、稱呼錯性別、說錯你的病或手術、說錯床號或年齡時，要像真人一樣馬上客氣地更正（「我姓王，不姓陳」「我是做心臟的，不是開刀」），不要將錯就錯。護生若把前面你說過的話記錯，也要更正。
-3-2. 【要有人味，不是機器式配合】配合不等於有求必應。真實病人會有這些反應，請自然地出現（不要每句都有，整場 3–5 次即可）：
-   - 身體狀況插進來：講到一半因為痛、喘、累而停頓，或說「等我一下」「我喝個水」。
-   - 想迴避的話題：某些事「這個我不太想講」「以後再說吧」，之後護生處理得好才願意談。
-   - 心不在焉或岔題：想到家裡的事、問一句檢查結果什麼時候出來、抱怨一下醫院的飯或隔壁床太吵。
-   - 情緒起伏：前一句還好，提到某個點突然沉默、眼眶紅、或語氣變硬；也可能自我安慰「算了，想這些也沒用」。
-   - 同一個問題被問第二次會有點困惑（「剛剛不是問過了？」），但不生氣。
-   - 會談太久或你很累時，可以委婉說「我有點累了，可以先這樣嗎？」。
-   這些反應要符合你的性格與此刻情境，是點綴，不要讓會談變成對抗。
-4. 【開場要像一般病人，不要一開始就抱怨】會談剛開始時，你就是「此刻的會談情境」裡那個狀態的人：有人進來就客氣地回應（「你好」「喔，好」「麻煩你了」），回答護生的問題時簡短、就事論事。前 2–3 輪不要主動說出心裡的擔心、不要主動抱怨、不要主動講病情以外的事；身體不適只在被問到時才如實說。只有當護生用開放式提問、反映你的感受、或表現出真的在聽的時候，才一層一層地透露真正的擔憂；護生若只是例行問診，你就只給例行的回答。「目前個案說的話」那一句是你心裡最深的話，是會談進行得好時才可能說出口的，不是開場白。
-5. 體現目前的身體狀況（疼痛、疲憊、呼吸困難等），可用括號簡短標示動作，如（喘氣）（沉默一下），但不要每句都加。
-6. 不提供醫療建議，不替護生總結，只是病患的視角。對專業問題可反問護生。
-7. 【輸出格式】每次回應的第一行開頭必須是一個標籤，格式固定為：【表情：X｜動作：Y】，接著才是病患說的話。
-   X 從這些選一個：平靜、難過、焦慮、疼痛、不悅、疲憊、微笑。
-   Y 從這些選一個：無、點頭、低頭、別過頭、手按胸口、嘆氣、搖頭、擦眼淚、揮手。
-   表情與動作要符合你當下的情緒和身體狀況（例如疼痛時手按胸口或傷口、難過時低頭或擦眼淚、防衛時別過頭）。標籤之後不要再加其他標題或說明。
-
-請現在以病患身份回應護生最新的一句話。`;
+  return `你是台灣住院病人，與護生做模擬會談。始終以病人第一人稱說自然台灣國語，不是醫護或AI助理。
+姓名：${c.name}；${c.age}歲${c.gender}；${c.deptLabel}；診斷：${c.dx}
+個性：${c.personality}；情緒：${c.emotional}；背景：${c.context}
+此刻：${c.scene}；說話習慣：${c.talk}
+自己的理解與錯誤觀念：${c.knowledge}
+內心深處尚未透露的話：${c.chief}
+護理需求：${c.nursing.join('、')}
+模擬病歷：${JSON.stringify(patientChartForChat(c))}
+病歷是背景，不代表你能背出藥名或數字；不得改寫既定病史、用藥、過敏、檢驗及住院經過。未記載的細節說不清楚，不自行新增。hidden為隱藏顧慮。
+對話規則：
+1. 先直接回答護生最新的話，再補充一個相關重點。每輪通常1–3句，口語簡短，留接話空間；不說教、不主動給正確照護計畫，不每輪反問，不反覆使用嗯、喔或省略號。
+2. 開場客氣，前2–3輪不主動傾倒擔憂。封閉問句給簡短事實；開放提問、同理或反映感受時，才逐層透露顧慮。被說教、輕率保證或一次問太多時，仍有禮但收回心事。依個性、疼痛或疲憊自然調整，不為製造戲劇新增急症。
+3. 記住前面的話；重複問題可客氣提醒。對方說錯姓名、年齡、性別、疾病、治療或先前內容，要立即自然更正，不能順著錯誤說。沒有介紹時可以問一次身分。不懂的專業問題可反問，不冒充醫療人員。
+4. 偶爾可停頓、迴避敏感話題或表示疲累，符合情境即可，不強制次數，不固定搖晃。括號動作少用，不推斷護生未提供的非語言表現。
+輸出第一行固定：【表情：X｜動作：Y】後接病人的話。X選平靜、難過、焦慮、疼痛、不悅、疲憊、微笑；Y選無、點頭、低頭、別過頭、手按胸口、嘆氣、搖頭、擦眼淚、揮手。只輸出標籤與病人說話，使用繁體中文。`;
 }
 
 function fallbackPatientResponse(c,text){
@@ -2034,7 +2028,7 @@ function azureSynthSDK(text,c,expr){
   const p=azChain.then(run,run); azChain=p.catch(()=>{}); return p;
 }
 // 會談開始時先暖機並預抓常用的回應聲
-function warmAzure(){ if(!azureReady()||!window.SpeechSDK) return; const c=getCase(); if(!c) return; ['嗯。','嗯嗯。','好。','嗯…','這個喔…'].forEach(t=>azureSynth(t,c,'neutral').catch(()=>{})); }
+function warmAzure(){ /* Synthesize only sentences that will actually be played. */ }
 async function azureSynth(text,c,expr){
   const st=getSettings(); const key=azureVoiceFor(c)+'|'+expr+'|'+text;
   if(azCache.has(key)) return azCache.get(key);
@@ -2326,7 +2320,7 @@ function syncReflections(){
 }
 
 // ===== PHASE 6: EXPORT =====
-async function renderExportPhase(){
+async function renderExportPhase(generate=false){
   syncReflections();
   syncRecordFromDOM();
   document.getElementById('step-export').classList.add('done');
@@ -2336,8 +2330,17 @@ async function renderExportPhase(){
   try{
     let aiText;
     const key=reportInputKey();
+    if(!state.conversation.some((m,i,a)=>m.role==='nurse'&&m.text?.trim()&&a[i+1]?.role==='patient'&&a[i+1].text?.trim())){
+      document.getElementById('ai-generating').textContent='尚無有效會談，未呼叫 AI。請先完成護生與病人的對話。';
+      document.getElementById('ai-report-preview').innerHTML=''; return;
+    }
+    if(state.aiRecord&&state.aiRecordInputKey===key) aiRecordKey=key;
     if(state.aiRecord && aiRecordKey===key){ aiText=state.aiRecord; }
     else {
+      if(!generate&&(!aiJob||aiRecordKey!==key||aiJobError)){
+        document.getElementById('ai-generating').innerHTML='產生分析會使用 AI 額度。<button class="btn btn-primary btn-sm" onclick="renderExportPhase(true)">產生 AI 分析</button>';
+        document.getElementById('ai-report-preview').innerHTML=''; return;
+      }
       if(!aiJob || aiRecordKey!==key || aiJobError){
         aiRecordKey=key; aiJobError=null; state.aiRecord=null;
         const job=generateAiRecord(); aiJob=job;
@@ -2346,11 +2349,12 @@ async function renderExportPhase(){
       aiText=await aiJob;
       if(reportInputKey()!==key) return;
       state.aiRecord=aiText;
+      state.aiRecordInputKey=key; saveState();
     }
     document.getElementById('ai-generating').classList.add('hidden');
     document.getElementById('ai-report-preview').innerHTML=aiText;
   }catch(e){
-    document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成：'+escHtml(e&&e.message||'')+' <button class="btn btn-outline btn-sm" onclick="renderExportPhase()">重試</button>';
+    document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成：'+escHtml(e&&e.message||'')+' <button class="btn btn-outline btn-sm" onclick="renderExportPhase(true)">重試分析（使用額度）</button>';
   }
 }
 
@@ -2429,13 +2433,13 @@ function buildStudentReportHTML(){
   return html;
 }
 
-// 會談結束即在背景分析；學生填記錄時同步進行
+// Ending the conversation clears stale output; analysis is requested explicitly.
 let aiJob=null, aiJobText='', aiJobDone=false, aiJobError=null;
 function startBackgroundAnalysis(){
-  aiJob=null; aiJobText=''; aiJobDone=false; aiJobError=null; state.aiRecord=null;
+  aiJob=null; aiJobText=''; aiJobDone=false; aiJobError=null; state.aiRecord=null; state.aiRecordInputKey=null;
 }
 function reportInputKey(){
-  return JSON.stringify([state.caseId,state.goals,state.conversation,state.processRecord,state.reflections]);
+  return JSON.stringify([state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),state.processRecord,state.reflections]);
 }
 let aiRecordKey=null;
 function updateAiStatusChips(msg){ document.querySelectorAll('.ai-status').forEach(el=>{ el.textContent=msg; }); }
@@ -2532,7 +2536,7 @@ ${JSON.stringify(state.reflections||{})}
 
 全部使用繁體中文、台灣護理用語，稱呼對方為「病人」，不要用「案主」或「個案」。`;
 
-  // 護生鏡頭截圖（每句最多 2 張，總數上限 40 張）
+  // 每句最多一張，最多20張；只在產出報告時傳送，不隨每輪會談傳送。
   const parts=[{text:prompt}];
   let nImg=0, k=0;
   for(const m of state.conversation){ if(m.role!=='nurse') continue; k++;
@@ -2543,20 +2547,18 @@ ${JSON.stringify(state.reflections||{})}
   if(nImg){ parts.push({text:'以上是部分護生說話時的瞬間截圖。僅描述對應句次中清晰可見的事實；不推斷眼神接觸、情緒、人格或整段會談的非語言表現。未附圖的句子寫「未觀察」。'}); }
   const input=nImg?[{role:'user',parts}]:prompt;
   const onDelta=(full)=>{ onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
-  const complete=t=>(t.match(/<td\b/gi)||[]).length>=Math.max(1,pairs.length)*8&&/<\/table>/.test(t)&&/整體評估/.test(t)&&/學習評量/.test(t)&&t.length>400;
+  const complete=t=>(t.match(/<td\b/gi)||[]).length>=Math.max(1,pairs.length)*7&&/<\/table>/.test(t)&&/整體評估/.test(t)&&/學習評量/.test(t)&&t.length>400;
   let text=''; let lastErr=null;
-  for(let attempt=0;attempt<3;attempt++){
+  for(let attempt=0;attempt<1;attempt++){
     try{
       geminiModelOverride=null;
-      const useInput=attempt<2?input:prompt;   // 第三次改用純文字（不附截圖）
+      const useInput=input;
       const res=await apiSampleStream(useInput,{maxTokens:6000,kind:'report',onDelta});
       text=res.text||'';
       if(complete(text)) return text;
       lastErr=new Error('報告不完整（'+text.length+' 字）');
-      // 內容不完整：下一輪改用下一個模型
-      GEMINI_REPORT_MODELS.push(GEMINI_REPORT_MODELS.shift());
+      // Do not silently regenerate an incomplete paid report.
     }catch(e){ lastErr=e; }
-    onProgress&&onProgress(text+'\n<!-- retry -->');
   }
   throw lastErr||new Error('AI 報告失敗');
 }
@@ -2813,7 +2815,7 @@ function saveState(){
   try{
     const {phase,caseId,studentName,studentId,goals,plannedTech,convDuration,processRecord,reflections,submitted,sid}=state;
     const conversation=state.conversation.map(m=>{const {frames,...rest}=m; return rest;});
-    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,goals,plannedTech,conversation,convDuration,processRecord,reflections,savedAt:Date.now()}));
+    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,studentId,goals,plannedTech,conversation,convDuration,processRecord,reflections,aiRecord:state.aiRecord,aiRecordInputKey:state.aiRecordInputKey,savedAt:Date.now()}));
   }catch(e){}
 }
 function loadState(){
@@ -2822,6 +2824,7 @@ function loadState(){
 function resumeSaved(){
   const s=loadState(); if(!s||!s.caseId) return;
   Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',studentId:s.studentId||'',submitted:s.submitted||null,sid:s.sid||null,goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
+  state.aiRecord=s.aiRecord||null; state.aiRecordInputKey=s.aiRecordInputKey||null;
   ['goals','conv','record','analysis','export'].forEach(p=>document.getElementById('step-'+p).classList.add('done'));
   renderCases();
   if(state.conversation.length){ renderPhase('record'); toast('已恢復上次的會談記錄'); }
