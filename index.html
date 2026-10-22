@@ -615,20 +615,29 @@ input[type=text]:focus{border-color:var(--primary)}
         <h3 style="margin-bottom:12px">整體反思</h3>
         <div style="display:grid;gap:12px">
           <div>
-            <label>1. 此次會談，您認為最成功的部分是什麼？為什麼？</label>
-            <textarea id="reflect1" placeholder="請描述…"></textarea>
+            <label for="reflect1">1. 會談目的的達成情況</label>
+            <p class="reflection-guide">回看原先的會談目的，哪些已達成、部分達成或尚未達成？請以具體對話與病人的回應說明依據。</p>
+            <textarea id="reflect1" placeholder="原先目的為…；達成情況…；支持此判斷的對話是…"></textarea>
           </div>
           <div>
-            <label>2. 此次會談，有哪些地方可以改善？如果重來，您會如何調整？</label>
-            <textarea id="reflect2" placeholder="請描述…"></textarea>
+            <label for="reflect2">2. 技巧運用優點</label>
+            <p class="reflection-guide">哪一個溝通技巧運用得較合適？您當時如何回應，病人有什麼反應？為什麼認為這樣的回應有幫助？</p>
+            <textarea id="reflect2" placeholder="我使用了…技巧；當時說／做了…；病人回應…"></textarea>
           </div>
           <div>
-            <label>3. 個案在此次會談中的情緒/需求，您如何評估？是否有未達到的目標？</label>
-            <textarea id="reflect3" placeholder="請描述…"></textarea>
+            <label for="reflect3">3. 技巧運用缺點及困難</label>
+            <p class="reflection-guide">哪一段回應不如預期，或讓您不知道如何接話？請描述當時的困難、可能原因，以及對會談造成的影響。</p>
+            <textarea id="reflect3" placeholder="在…這段互動，我遇到…；可能原因…；對會談的影響…"></textarea>
           </div>
           <div>
-            <label>4. 透過此次練習，您對護病溝通有什麼新的體會或學習？</label>
-            <textarea id="reflect4" placeholder="請描述…"></textarea>
+            <label for="reflect4">4. 本次發現的護理健康問題</label>
+            <p class="reflection-guide">從本次會談聽見或觀察到哪些生理、心理、生活或支持需求？哪些已有對話依據，哪些仍需進一步確認？</p>
+            <textarea id="reflect4" placeholder="我發現…問題／需求；依據是…；仍需確認…"></textarea>
+          </div>
+          <div>
+            <label for="reflect5">5. 心得反思（包括下次會如何調整）</label>
+            <p class="reflection-guide">這次會談帶給您什麼體會？若再次面對類似情境，您會調整哪一句話或哪個行動？請寫出可實行的做法。</p>
+            <textarea id="reflect5" placeholder="這次我體會到…；下次遇到…時，我會改說／改做…"></textarea>
           </div>
         </div>
         <div class="row-actions" style="margin-top:16px">
@@ -764,7 +773,7 @@ input[type=text]:focus{border-color:var(--primary)}
 
       <hr class="divider" style="margin:0">
       <div style="font-weight:700;font-size:.9rem">③ 會談</div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2.5" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2.5 秒</span></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
 
       <hr class="divider" style="margin:0">
@@ -978,6 +987,7 @@ function publicCaseChart(c){const {hidden,...record}=window.CASE_CHARTS[c.id];re
 // ===== STATE =====
 let state = {
   phase:'cases',
+  furthestPhase:0,
   caseId:null,
   studentName:'',
   goals:'',
@@ -986,7 +996,8 @@ let state = {
   convStart:null,
   convDuration:0,
   processRecord:[],
-  reflections:{r1:'',r2:'',r3:'',r4:''},
+  reflections:{r1:'',r2:'',r3:'',r4:'',r5:''},
+  reflectionVersion:2,
   aiRecord:null,
 };
 
@@ -997,13 +1008,23 @@ const PHASES = ['cases','goals','conv','record','analysis','export','review'];
 function goStep(p){
   if(p===state.phase) return;
   const idx=PHASES.indexOf(p);
-  const cur=PHASES.indexOf(state.phase);
-  // Only allow going back or to done steps
+  const cur=Math.max(PHASES.indexOf(state.phase),state.furthestPhase||0);
+  // Revisited pages must not erase the highest step already reached.
   const el = document.getElementById('step-'+p);
   if(idx>cur && !el.classList.contains('done')) return;
   renderPhase(p);
 }
 function renderPhase(p){
+  if(!PHASES.includes(p))return;
+  if(state.phase==='conv'&&p!=='conv') stopConversationMedia();
+  syncRecordFromDOM();
+  if(state.phase==='analysis')syncReflections();
+  if(state.phase==='goals'){
+    state.studentName=document.getElementById('student-name').value.trim();
+    state.studentId=document.getElementById('student-id').value.trim();
+    state.goals=document.getElementById('goals-input').value.trim();
+  }
+  state.furthestPhase=Math.max(state.furthestPhase||0,PHASES.indexOf(state.phase),PHASES.indexOf(p));
   state.phase=p; document.body.classList.toggle('conv-active',p==='conv');
   PHASES.forEach(ph=>{
     document.getElementById('phase-'+ph)?.classList.add('hidden');
@@ -1015,7 +1036,7 @@ function renderPhase(p){
     const idx=PHASES.indexOf(sp);
     const cur=PHASES.indexOf(p);
     el.classList.remove('active','done');
-    if(idx<cur) el.classList.add('done');
+    if(idx<=state.furthestPhase&&idx!==cur) el.classList.add('done');
     if(idx===cur) el.classList.add('active');
   });
   if(p==='goals') renderGoalsPhase();
@@ -1025,6 +1046,7 @@ function renderPhase(p){
   if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); if(p!=='conv') stopSimli(); }
   window.LivePatient&&LivePatient.refresh();
   window.scrollTo(0,0);
+  if(state.caseId)saveState();
 }
 
 // ===== PHASE 1: CASES =====
@@ -1050,10 +1072,14 @@ function renderCases(){
   `).join('');
 }
 function selectCase(id){
+  if(state.caseId===id){renderCases();return;}
   state.caseId=id;
+  state.furthestPhase=1;
   state.conversation=[];
   state.processRecord=[];
   state.aiRecord=null;
+  state.aiRecordInputKey=null;
+  state.reflections={r1:'',r2:'',r3:'',r4:'',r5:''};
   renderCases();
   // Mark step 1 done after selection
   document.getElementById('step-goals').classList.add('done');
@@ -1125,6 +1151,12 @@ function renderGoalsPhase(){
   if(state.goals) document.getElementById('goals-input').value=state.goals;
 }
 function startConv(){
+  if((state.furthestPhase||0)>=3&&(state.conversation.length||state.processRecord.length)){
+    state.studentName=document.getElementById('student-name').value.trim()||state.studentName;
+    state.studentId=document.getElementById('student-id').value.trim();
+    state.goals=document.getElementById('goals-input').value.trim()||state.goals;
+    renderPhase('record');return;
+  }
   const name=document.getElementById('student-name').value.trim();
   const goals=document.getElementById('goals-input').value.trim();
   if(!name){toast('請填寫學生姓名');document.getElementById('student-name').focus();return}
@@ -1279,6 +1311,7 @@ function getSettings(){
   try{const st=JSON.parse(localStorage.getItem(SET_KEY)||'{}');
     if(st.chatEconomyVersion!==1){st.oaModel='gpt-6-luna';st.chatEconomyVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.caseVoiceVersion!==1){st.caseVoices={...st.caseVoices,...CASE_VOICE_DEFAULTS};st.caseVoiceVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    if(st.pauseTimingVersion!==1){if(!Number.isFinite(Number(st.pauseSec))||Number(st.pauseSec)<=1.6)st.pauseSec=2.5;st.pauseTimingVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     return st;
   }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
@@ -1328,7 +1361,7 @@ function openSettings(){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('set-proxy',st.proxyUrl||''); set('set-class',st.classCode||''); set('set-teacher',st.teacherToken||'');
   set('set-drive',st.driveUrl||'');
-  document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
+  document.getElementById('set-pause').value=st.pauseSec||2.5; document.getElementById('pause-val').textContent=(st.pauseSec||2.5)+' 秒';
   document.getElementById('set-bargein').checked=false;
   document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
   set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-oamodel',st.oaModel||''); set('set-oareport',st.oaReport||''); set('set-oakey',st.oaKey||''); document.getElementById('set-ai').value=st.aiProvider||'openai'; set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
@@ -1341,7 +1374,7 @@ function openSettings(){
 }
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
-  const st={chatEconomyVersion:1,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
+  const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:1,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2.5,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
@@ -1572,7 +1605,7 @@ function saveBlob(filename,blob){
 }
 
 // ===== CAMERA RECORDING =====
-let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null, recComposite=false;
+let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null, recComposite=false, cameraGeneration=0;
 function captureNurseFrame(){
   try{
     const v=document.getElementById('cam-video'); if(!camStream||!v||v.readyState<2||!v.videoWidth) return null;
@@ -1584,9 +1617,12 @@ function captureNurseFrame(){
 }
 async function startCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camUnavailable('此環境不支援鏡頭'); return; }
+  const generation=++cameraGeneration;
   try{
     // iOS Safari：鏡頭若同時佔用麥克風，語音辨識會卡住 → iPhone/iPad 只錄畫面（會談內容仍有逐字稿）
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:IS_IOS?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:IS_IOS?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    if(generation!==cameraGeneration){acquired.getTracks().forEach(t=>t.stop());return;}
+    camStream=acquired;
   }catch(e){
     camUnavailable(e.name==='NotAllowedError'?'鏡頭權限被拒絕，請在瀏覽器網址列允許鏡頭後重新整理':'無法開啟鏡頭：'+(e.message||e.name)); return;
   }
@@ -1621,6 +1657,7 @@ function camUnavailable(msg){
 }
 function updateRecIndicator(){ const el=document.getElementById('rec-indicator'); if(el) el.classList.toggle('hidden',!(recorder&&recorder.state==='recording')); }
 function stopCamera(){
+  cameraGeneration++;
   try{ if(recorder&&recorder.state!=='inactive') recorder.stop(); }catch(e){}
   try{ camStream&&camStream.getTracks().forEach(t=>t.stop()); }catch(e){}
   camStream=null;
@@ -1629,6 +1666,23 @@ function stopCamera(){
   document.getElementById('cam-label').textContent='護生鏡頭';
   updateRecIndicator();
 }
+function stopConversationMedia(){
+  listenWanted=false; pauseListening();
+  convGen++;
+  if(curReply){curReply.done=true;curReply.speaker.cancel();curReply=null;}
+  SentenceSpeaker.current&&SentenceSpeaker.current.cancel();
+  if(window.__thinkTimer){clearInterval(window.__thinkTimer);window.__thinkTimer=null;}
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  // Keep elapsed speaking time; time spent on other steps must not count.
+  if(state.convStart)state.convStart=Date.now()-state.convDuration*1000;
+  isSpeaking=false;
+  window.speechSynthesis&&window.speechSynthesis.cancel();
+  stopAudio();stopMouth();stopBlink();stopCamera();stopSimli();
+  const mic=document.getElementById('mic-btn');
+  if(mic){mic.classList.remove('on','recording','waiting');mic.textContent='🎤';}
+}
+window.addEventListener('pagehide',()=>{stopConversationMedia();closeCheck();});
+
 function renderRecordingPlayback(){
   const card=document.getElementById('rec-card'); if(!card) return;
   if(!recBlob||!recStart){ card.classList.add('hidden'); return; }
@@ -1654,15 +1708,11 @@ async function initConvPhase(){
   const c=getCase(); if(!c) return;
   // Case mini card
   document.getElementById('conv-case-mini').innerHTML=`
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-size:1.5rem">${c.icon}</span>
-      <div><div style="font-weight:700">${c.name}</div><div class="dept-badge ${c.deptClass}" style="margin:0">${c.deptLabel}</div></div>
-    </div>
-    <div style="font-size:.8rem;color:var(--text2)">${c.dx}</div>
-    <div style="margin-top:8px;font-size:.78rem">
-      <strong>護理問題：</strong>${c.nursing.join('、')}
-    </div>
-    ${c.scene?`<div style="margin-top:8px;font-size:.8rem;line-height:1.6;padding:8px 10px;background:var(--surface2);border-radius:6px"><strong>會談情境：</strong>${c.scene}</div>`:''}
+    <header class="conv-chart-heading"><span>${c.icon}</span><div><h3>${escHtml(c.name)}</h3><p>${c.age}歲 · ${escHtml(c.gender)} · ${escHtml(c.deptLabel)} · 病床 ${escHtml(c.bed||'—')}</p></div></header>
+    <section class="conv-chart-section"><h4>診斷與住院狀況</h4><p>${escHtml(c.dx)}</p></section>
+    ${c.scene?`<section class="conv-chart-section conv-chart-scene"><h4>目前會談情境</h4><p>${escHtml(c.scene)}</p></section>`:''}
+    <section class="conv-chart-section"><h4>照護重點</h4><ul>${c.nursing.map(n=>'<li>'+escHtml(n)+'</li>').join('')}</ul></section>
+    <details class="conv-chart-section"><summary>查看用藥醫囑</summary><ul class="conv-chart-medications">${window.CASE_CHARTS[c.id].meds.map(m=>'<li><strong>'+escHtml(m.order.drug)+'</strong><p>'+escHtml([m.order.dose,m.order.route,m.order.freq].join(' · '))+'</p><p>'+escHtml(m.order.note||'')+'</p></li>').join('')}</ul></details>
   `;
   document.getElementById('conv-goals-display').textContent=state.goals;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
@@ -1731,7 +1781,7 @@ function setupRecognition(){
     if((isSpeaking&&!bargeInOn())||isEcho(shown)){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
-    // 停頓超過設定秒數（預設 1.6 秒）才視為說完；中途換氣、想詞不會被送出
+    // 停頓超過設定秒數（預設 2.5 秒）才視為說完；中途換氣、想詞不會被送出
     const pause=pauseMs();
     if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
     else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),Math.max(400,Math.round(pause*0.6))); }
@@ -1767,7 +1817,7 @@ function resumeListening(){
 }
 function bargeInOn(){ return false; }
 let lastPatientText='', lastSpeakEnd=0;
-function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:1.6)*1000); }
+function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:2.5)*1000); }
 // 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
 function _overlap(t,body){ body=(body||'').replace(/[\s，。！？、…「」]/g,''); const x=(t||'').replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return 0; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1); }
 function isEcho(t){
@@ -1795,7 +1845,7 @@ function interruptPatient(){
 
 function toggleMic(){
   unlockAudio();
-  if(!(recorder&&recorder.state==='recording')){ (async()=>{ if(!camStream) await startCamera(); startRecording(); })(); }
+  if(!(recorder&&recorder.state==='recording')){ (async()=>{ if(!camStream) await startCamera(); if(state.phase==='conv')startRecording();else stopCamera(); })(); }
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
   if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
@@ -1828,7 +1878,7 @@ function startTimer(){
 }
 
 async function handleNurseSpeech(text){
-  if(!text||isSpeaking||(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) return;
+  if(state.phase!=='conv'||!text||isSpeaking||(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) return;
   const ts=Date.now();
   addBubble('nurse',text,ts);
   playGesture('g-nod');
@@ -1935,9 +1985,9 @@ function buildPatientSystem(c){
 模擬病歷：${JSON.stringify(patientChartForChat(c))}
 病歷是背景，不代表你能背出藥名或數字；不得改寫既定病史、用藥、過敏、檢驗及住院經過。未記載的細節說不清楚，不自行新增。hidden為隱藏顧慮。
 對話規則：
-1. 先直接回答護生最新的話，再補充一個相關重點。每輪通常1–3句，口語簡短，留接話空間；不說教、不主動給正確照護計畫，不每輪反問，不反覆使用嗯、喔或省略號。
-2. 開場客氣，前2–3輪不主動傾倒擔憂。封閉問句給簡短事實；開放提問、同理或反映感受時，才逐層透露顧慮。被說教、輕率保證或一次問太多時，仍有禮但收回心事。依個性、疼痛或疲憊自然調整，不為製造戲劇新增急症。
-3. 記住前面的話；重複問題可客氣提醒。對方說錯姓名、年齡、性別、疾病、治療或先前內容，要立即自然更正，不能順著錯誤說。沒有介紹時可以問一次身分。不懂的專業問題可反問，不冒充醫療人員。
+1. 病人保持低主動性，讓護生帶領會談。只回答最新問題，預設一句短句或片語就停；封閉問句回答是、否或一個相關事實即可，不自動補充重點。開放提問才用1–2句多說一點；護生追問、同理或邀請繼續時，才再透露一小層。不要每輪反問、另開話題、主動列問題、要求護生教導或提出照護計畫；短暫沉默是正常，不必填滿。語氣自然，不反覆使用嗯、喔或省略號。
+2. 開場簡短客氣，不主動傾倒擔憂。隱藏顧慮不是每輪要說的台詞；只有談到相關主題、被適當追問且建立信任後才逐漸透露。被說教、輕率保證或一次問太多時，仍有禮但收回心事。依個性、疼痛或疲憊調整語氣，不增加話題；較愛聊天者最多多補一句與問題直接相關的日常細節。急迫不適才可主動求助，不為製造戲劇新增急症。此處低主動性規則優先於個案背景中「主動問」「話多」等描述。
+3. 護生的文字來自即時語音辨識，可能有同音、近音、姓名、醫護用語、標點或斷句錯誤。先依前後文、病歷與會談目的理解最合理的意思；可合理理解時直接回應，不糾正發音、用字或姓名的近音字，不把辨識錯字當成護生的知識錯誤，也不說「你說錯了」「我不是那個字」。例如「護生／護士」「傷口／商口」「血糖／血湯」等近音，依情境理解即可。真的有兩種意思、會影響病情或照護安全時，只用病人語氣簡短確認一次，不自行猜測藥名、劑量或治療。護生明確指認另一位病人、錯誤疾病或與既定事實矛盾，且無法用近音或斷句解釋時，才自然澄清。記住前面的話；重複問題可客氣提醒。沒有介紹時可以問一次身分。不懂的專業問題可反問，不冒充醫療人員。
 4. 偶爾可停頓、迴避敏感話題或表示疲累，符合情境即可，不強制次數，不固定搖晃。括號動作少用，不推斷護生未提供的非語言表現。
 輸出第一行固定：【表情：X｜動作：Y】後接病人的話。X選平靜、難過、焦慮、疼痛、不悅、疲憊、微笑；Y選無、點頭、低頭、別過頭、手按胸口、嘆氣、搖頭、擦眼淚、揮手。只輸出標籤與病人說話，使用繁體中文。`;
 }
@@ -2278,10 +2328,7 @@ function endConv(force){
     return;
   }
   document.getElementById('end-confirm').classList.add('hidden');
-  listenWanted=false; if(recognition) try{recognition.stop()}catch(e){}
-  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
-  if(window.speechSynthesis) window.speechSynthesis.cancel();
-  stopAudio(); stopMouth(); stopBlink(); stopCamera(); stopSimli();
+  stopConversationMedia();
   gttsCache.clear(); prepareEmotionalVoices();
   startBackgroundAnalysis();
   addBubble('system','✅ 會談結束。請進行行為過程記錄。',Date.now());
@@ -2315,7 +2362,17 @@ function removeRow(i){
   saveState();
   if(state.phase==='record') renderRecordTable(); else renderAnalysisPhase();
 }
-const delBtn=i=>`<td class="row-num"><button type="button" class="btn btn-sm" style="background:transparent;color:var(--text2);padding:4px" title="刪除此列" onclick="removeRow(${i})">✕</button></td>`;
+function insertRowAt(index){
+  syncRecordFromDOM();
+  if(state.phase==='analysis')syncReflections();
+  const position=Math.max(0,Math.min(state.processRecord.length,index));
+  state.processRecord.splice(position,0,blankRow());
+  saveState();
+  if(state.phase==='record')renderRecordTable();else renderAnalysisPhase();
+  const body=document.getElementById(state.phase==='record'?'record-tbody':'analysis-tbody');
+  body.querySelector('tr[data-row="'+position+'"] textarea')?.focus();
+}
+const delBtn=i=>`<td class="row-num record-row-tools"><button type="button" class="btn btn-sm" title="在第${i+1}筆前插入互動" onclick="insertRowAt(${i})">↑ 前面補一筆</button><button type="button" class="btn btn-sm" title="在第${i+1}筆後插入互動" onclick="insertRowAt(${i+1})">↓ 後面補一筆</button><button type="button" class="btn btn-sm" style="background:transparent;color:var(--text2);padding:4px" title="刪除此列" aria-label="刪除第${i+1}筆互動" onclick="removeRow(${i})">✕</button></td>`;
 
 function renderRecordTable(){
   buildProcessRecord();
@@ -2343,7 +2400,6 @@ function updateRecord(idx,field,val){
 
 // ===== PHASE 5: ANALYSIS =====
 function renderAnalysisPhase(){
-  syncRecordFromDOM();
   buildProcessRecord();
   document.getElementById('step-analysis').classList.add('done');
   const tbody=document.getElementById('analysis-tbody');
@@ -2360,19 +2416,20 @@ function renderAnalysisPhase(){
       ${delBtn(i)}
     </tr>
   `).join('');
-  ['r1','r2','r3','r4'].forEach(k=>{
+  ['r1','r2','r3','r4','r5'].forEach(k=>{
     const el=document.getElementById('reflect'+k.substring(1));
-    if(el&&state.reflections[k]) el.value=state.reflections[k];
+    if(el) el.value=state.reflections[k]||'';
   });
 }
 function syncRecordFromDOM(){
-  document.querySelectorAll('#record-tbody tr[data-row], #analysis-tbody tr[data-row]').forEach(tr=>{
+  document.querySelectorAll('#phase-record:not(.hidden) #record-tbody tr[data-row], #phase-analysis:not(.hidden) #analysis-tbody tr[data-row]').forEach(tr=>{
     const i=+tr.dataset.row; if(!state.processRecord[i]) return;
     tr.querySelectorAll('textarea[data-f]').forEach(ta=>{ state.processRecord[i][ta.dataset.f]=ta.value; });
   });
 }
 function syncReflections(){
-  ['1','2','3','4'].forEach(n=>{
+  if(state.phase!=='analysis')return;
+  ['1','2','3','4','5'].forEach(n=>{
     const el=document.getElementById('reflect'+n);
     if(el) state.reflections['r'+n]=el.value;
   });
@@ -2476,10 +2533,11 @@ function buildStudentReportHTML(){
       <div style="margin-top:20px">
         <h4 style="margin-bottom:12px">整體反思</h4>
         ${[
-          ['1. 此次會談最成功的部分',state.reflections.r1],
-          ['2. 可改善之處',state.reflections.r2],
-          ['3. 病人情緒/需求評估',state.reflections.r3],
-          ['4. 新體會與學習',state.reflections.r4],
+          ['1. 會談目的的達成情況',state.reflections.r1],
+          ['2. 技巧運用優點',state.reflections.r2],
+          ['3. 技巧運用缺點及困難',state.reflections.r3],
+          ['4. 本次發現的護理健康問題',state.reflections.r4],
+          ['5. 心得反思（包括下次會如何調整）',state.reflections.r5],
         ].map(([q,a])=>`
           <div style="margin-bottom:14px">
             <div style="font-weight:500;color:var(--text2);margin-bottom:4px">${q}</div>
@@ -2533,7 +2591,7 @@ ${studentText||'（學生未填寫）'}
 
 【學生整體反思（學生自述，不代表逐字稿已證實）】
 ${JSON.stringify(state.reflections||{})}
-題目對照：r1＝成功之處及原因；r2＝可改善之處與重來的調整；r3＝病人情緒需求與未達目標；r4＝新體會與學習。
+題目對照：r1＝會談目的的達成情況；r2＝技巧運用優點；r3＝技巧運用缺點及困難；r4＝本次發現的護理健康問題；r5＝心得反思（包括下次會如何調整）。
 整體評估需另列「學生反思回饋」，對照其實際填答與逐字稿，指出有依據的覺察、仍待驗證的推論與一項可執行的下一步；不可替學生編造內心想法。
 
 【證據與教學原則（優先於其他格式要求）】
@@ -2898,9 +2956,9 @@ function toast(msg,ms){
 const SAVE_KEY='bpr-practice-v1';
 function saveState(){
   try{
-    const {phase,caseId,studentName,studentId,goals,plannedTech,convDuration,processRecord,reflections,submitted,sid}=state;
+    const {phase,furthestPhase,caseId,studentName,studentId,goals,plannedTech,convDuration,processRecord,reflections,submitted,sid}=state;
     const conversation=state.conversation.map(m=>{const {frames,...rest}=m; return rest;});
-    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,caseId,studentName,studentId,goals,plannedTech,conversation,convDuration,processRecord,reflections,aiRecord:state.aiRecord,aiRecordInputKey:state.aiRecordInputKey,savedAt:Date.now()}));
+    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,furthestPhase,caseId,studentName,studentId,goals,plannedTech,conversation,convDuration,processRecord,reflections,reflectionVersion:2,aiRecord:state.aiRecord,aiRecordInputKey:state.aiRecordInputKey,savedAt:Date.now()}));
   }catch(e){}
 }
 function loadState(){
@@ -2910,6 +2968,8 @@ function resumeSaved(){
   const s=loadState(); if(!s||!s.caseId) return;
   Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',studentId:s.studentId||'',submitted:s.submitted||null,sid:s.sid||null,goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
   state.aiRecord=s.aiRecord||null; state.aiRecordInputKey=s.aiRecordInputKey||null;
+  if(s.reflectionVersion!==2&&s.reflections){const old=s.reflections;state.reflections={r1:'',r2:old.r1||'',r3:old.r2||'',r4:old.r3||'',r5:old.r4||''};state.aiRecord=null;state.aiRecordInputKey=null;}
+  state.furthestPhase=Math.max(Number(s.furthestPhase)||0,PHASES.indexOf(s.phase),state.conversation.length?3:1,state.aiRecord?5:0);
   ['goals','conv','record','analysis','export'].forEach(p=>document.getElementById('step-'+p).classList.add('done'));
   renderCases();
   if(state.conversation.length){ renderPhase('record'); toast('已恢復上次的會談記錄'); }
