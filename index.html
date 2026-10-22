@@ -765,7 +765,7 @@ input[type=text]:focus{border-color:var(--primary)}
       <hr class="divider" style="margin:0">
       <div style="font-weight:700;font-size:.9rem">③ 會談</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.2" value="1.6" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">1.6 秒</span></div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein"> 允許護生插話（病人說話時可直接開口；手機外放易誤判，建議戴耳機再開）</label>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
 
       <hr class="divider" style="margin:0">
       <div style="font-weight:700;font-size:.9rem">④ 發給學生的設定連結 / QR Code</div>
@@ -1310,7 +1310,7 @@ function openSettings(){
   set('set-proxy',st.proxyUrl||''); set('set-class',st.classCode||''); set('set-teacher',st.teacherToken||'');
   set('set-drive',st.driveUrl||'');
   document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
-  document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
+  document.getElementById('set-bargein').checked=false;
   document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
   set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-oamodel',st.oaModel||''); set('set-oareport',st.oaReport||''); set('set-oakey',st.oaKey||''); document.getElementById('set-ai').value=st.aiProvider||'openai'; set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
   set('set-az-key',st.azKey||''); set('set-az-region',st.azRegion||''); set('set-av-m',st.avM||''); set('set-av-f',st.avF||'');
@@ -1550,7 +1550,7 @@ async function startCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ camUnavailable('此環境不支援鏡頭'); return; }
   try{
     // iOS Safari：鏡頭若同時佔用麥克風，語音辨識會卡住 → iPhone/iPad 只錄畫面（會談內容仍有逐字稿）
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:!IS_IOS});
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:IS_IOS?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   }catch(e){
     camUnavailable(e.name==='NotAllowedError'?'鏡頭權限被拒絕，請在瀏覽器網址列允許鏡頭後重新整理':'無法開啟鏡頭：'+(e.message||e.name)); return;
   }
@@ -1653,6 +1653,9 @@ async function initConvPhase(){
 
 // 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
 let listenWanted=false, pendingFinal='', finalTimer=null;
+let resetRecognitionPending=()=>{}, listeningResumeTimer=null;
+const ECHO_TAIL_MS=1000;
+function speechInputBlocked(){ return isSpeaking||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
 function createRecognizer(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return SR?new SR():null; }
 function sttName(){ return '瀏覽器內建辨識'; }
 function setupRecognition(){
@@ -1663,16 +1666,19 @@ function setupRecognition(){
   recognition.interimResults=true;
   recognition.onstart=()=>{
     isRecording=true;
+    if(!listenWanted||state.phase!=='conv'||speechInputBlocked()){ pauseListening(); return; }
     document.getElementById('mic-btn').classList.add('recording');
     setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
-  const commit=(t)=>{ t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return;
+  resetRecognitionPending=()=>{ pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); document.getElementById('interim-text').textContent=''; };
+  const commit=(t)=>{ if(!listenWanted||state.phase!=='conv'||speechInputBlocked()){ resetRecognitionPending(); return; } t=(t||'').trim(); if(!t) return; if(Date.now()-committedAt<2500&&(t===committedText||committedText.startsWith(t)||t.startsWith(committedText))) return;
     if(isEcho(t)){ console.warn('忽略回音：',t); return; }
     if(isSpeaking){ if(!bargeInOn()||t.length<2) return; interruptPatient(); }
     committedAt=Date.now(); committedText=t; pendingFinal=''; lastInterim=''; clearTimeout(interimTimer); clearTimeout(finalTimer); handleNurseSpeech(t); try{ recognition.stop(); }catch(e){} };
   recognition.onresult=(e)=>{
+    if(!listenWanted||state.phase!=='conv'||speechInputBlocked()){ resetRecognitionPending(); return; }
     let interim=''; let final='';
     for(let i=0;i<e.results.length;i++){
       if(e.results[i].isFinal) final+=e.results[i][0].transcript;
@@ -1698,13 +1704,25 @@ function setupRecognition(){
     document.getElementById('mic-btn').classList.remove('recording');
     document.getElementById('interim-text').textContent='';
     // 瀏覽器會自行結束 continuous 聆聽；若仍要聆聽且病人沒在說話，就自動重啟
-    if(listenWanted&&state.phase==='conv'&&(bargeInOn()||!isSpeaking)){ setTimeout(()=>{ if(listenWanted&&!isRecording&&state.phase==='conv'&&(bargeInOn()||!isSpeaking)) try{recognition.start();}catch(e){} },250); }
+    if(listenWanted&&state.phase==='conv') listeningResumeTimer=setTimeout(resumeListening,250);
     else if(!isSpeaking) setStatus(listenWanted?'（已暫停聆聽）':'按下麥克風開始聆聽');
   };
 }
-function pauseListening(){ if(recognition&&isRecording){ try{recognition.stop();}catch(e){} } }
-function resumeListening(){ if(listenWanted&&recognition&&!isRecording&&(bargeInOn()||!isSpeaking)&&state.phase==='conv'){ try{recognition.start();}catch(e){} } }
-function bargeInOn(){ const st=getSettings(); return IS_MOBILE?st.bargeIn===true:st.bargeIn!==false; }
+function pauseListening(){
+  clearTimeout(listeningResumeTimer); resetRecognitionPending();
+  // Discard pending results rather than flushing speaker audio as a final transcript.
+  if(recognition){ try{recognition.abort();}catch(e){} }
+}
+function resumeListening(){
+  clearTimeout(listeningResumeTimer);
+  if(!listenWanted||!recognition||isRecording||state.phase!=='conv') return;
+  if(speechInputBlocked()){
+    if(!isSpeaking&&!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) listeningResumeTimer=setTimeout(resumeListening,Math.max(50,ECHO_TAIL_MS-(Date.now()-lastSpeakEnd)));
+    return;
+  }
+  try{recognition.start();}catch(e){}
+}
+function bargeInOn(){ return false; }
 let lastPatientText='', lastSpeakEnd=0;
 function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:1.6)*1000); }
 // 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
@@ -1740,7 +1758,7 @@ function toggleMic(){
   if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
   listenWanted=true; document.getElementById('mic-btn').classList.add('on'); document.getElementById('mic-btn').textContent='⏸';
   if(isSpeaking){ setStatus('病人說完後會自動開始聆聽'); return; }
-  try{recognition.start();}catch(e){recognition.stop();setTimeout(()=>recognition.start(),300)}
+  resumeListening();
 }
 
 function startTimer(){
