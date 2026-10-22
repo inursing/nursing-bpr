@@ -1386,9 +1386,9 @@ async function testProxy(){
     if(!r.ok){ msg.textContent='❌ '+(j.error||('HTTP '+r.status)); return; }
     azTok=null;
     const oa=(st.aiProvider||'openai')==='openai';
-    const g=oa?await fetch(st.proxyUrl+'/openai/chat/completions?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({model:st.oaModel||OPENAI_CHAT_MODELS[0],messages:[{role:'user',content:'回覆「好」一個字'}],max_completion_tokens:50})})
+    const g=oa?await fetch(st.proxyUrl+'/openai/chat/completions?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify(toOpenAI([{role:'user',content:'回覆「好」一個字'}],null,50,st.oaModel||OPENAI_CHAT_MODELS[0],'test',false))})
                :await fetch(st.proxyUrl+'/gemini/'+(st.gModel||GEMINI_CHAT_MODELS[0])+':generateContent?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({contents:[{parts:[{text:'回覆「好」一個字'}]}]})});
-    const gj=await g.json().catch(()=>({}));
+    const gj=await g.json().catch(()=>({})); if(oa&&g.ok) recordOpenaiUsage(gj,'test');
     msg.textContent=g.ok?'✅ 代理正常（'+(oa?'OpenAI':'Gemini')+' 與 Azure 語音都可用，區域 '+j.region+'）':'⚠ Azure 可用，但 '+(oa?'OpenAI':'Gemini')+' 失敗：'+(gj.error?.message||gj.error||g.status);
   }catch(e){ msg.textContent='❌ 無法連線：'+e.message; }
 }
@@ -1401,7 +1401,7 @@ function recordOpenaiUsage(j,kind){
   if(!j.usage) return;
   const u=j.usage, rows=readOpenaiUsage();
   if(j.id&&rows.some(r=>r.id===j.id)) return;
-  rows.push({id:j.id||'',at:Date.now(),kind:kind==='report'?'分析報告':'會談／連線測試',model:j.model||'',input:u.prompt_tokens||0,cached:u.prompt_tokens_details?.cached_tokens||0,output:u.completion_tokens||0,reasoning:u.completion_tokens_details?.reasoning_tokens||0});
+  rows.push({id:j.id||'',at:Date.now(),kind:kind==='report'?'分析報告':kind==='test'?'連線測試':'會談',model:j.model||'',input:u.prompt_tokens||0,cached:u.prompt_tokens_details?.cached_tokens||0,output:u.completion_tokens||0,reasoning:u.completion_tokens_details?.reasoning_tokens||0});
   try{localStorage.setItem(OPENAI_USAGE_KEY,JSON.stringify(rows.slice(-100)))}catch(e){}
   renderOpenaiUsage();
 }
