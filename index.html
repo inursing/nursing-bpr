@@ -1999,9 +1999,10 @@ function renderCaseVoiceSettings(){
   }).join('');
   getPatientSpeechConfig().then(cfg=>cfg.cases.forEach(id=>{
     const select=document.getElementById('case-voice-'+id),rate=document.getElementById('case-rate-'+id),status=document.getElementById('case-voice-status-'+id);
-    if(select){select.disabled=true;select.innerHTML='<option>ElevenLabs · 已確認的病人聲音</option>';}
+    if(select){select.disabled=true;select.innerHTML='<option>ElevenLabs · 個案專屬聲音</option>';}
     if(rate)rate.disabled=true;
-    if(status)status.textContent='教師測試：'+(id===1?'65歲男聲':'78歲女聲')+'；其他裝置維持 Azure';
+    const patient=CASES.find(c=>c.id===id);
+    if(status&&patient)status.textContent='教師測試：'+patient.age+'歲'+(patient.gender==='女'?'女聲':'男聲')+'；其他裝置維持 Azure';
   }));
 }
 function readCaseVoiceSettings(){return Object.fromEntries(CASES.map(c=>[c.id,{name:document.getElementById('case-voice-'+c.id)?.disabled?azureVoiceFor(c):(document.getElementById('case-voice-'+c.id)?.value||azureVoiceFor(c)),rate:Math.max(.85,Math.min(1.1,parseFloat(document.getElementById('case-rate-'+c.id)?.value)||1))}]))}
@@ -2037,7 +2038,7 @@ async function getPatientSpeechConfig(){
   patientSpeechConfigKey=key;patientSpeechConfigUntil=Date.now()+60000;
   patientSpeechConfig=(async()=>{try{
     const r=await fetch(st.proxyUrl+'/speech/status',{headers:proxyHeaders(),signal:AbortSignal.timeout(5000)});
-    if(!r.ok)return {cases:[]};const data=await r.json();return {cases:Array.isArray(data.cases)?data.cases.filter(id=>id===1||id===5):[]};
+    if(!r.ok)return {cases:[]};const data=await r.json();return {cases:Array.isArray(data.cases)?data.cases.filter(id=>Number.isInteger(id)&&id>=1&&id<=6):[]};
   }catch{return {cases:[]};}})();
   return patientSpeechConfig;
 }
@@ -2057,7 +2058,7 @@ async function elevenPatientSpeech(text,c){
   try{return await pending;}finally{patientSpeechPending.delete(key);}
 }
 async function patientSpeechName(c){
-  const cfg=await getPatientSpeechConfig();return cfg.cases.includes(c.id)?'ElevenLabs · 已確認的'+(c.id===1?'王先生65歲男聲':'林女士78歲女聲'):'Azure '+azureVoiceFor(c);
+  const cfg=await getPatientSpeechConfig();return cfg.cases.includes(c.id)?'ElevenLabs · '+c.name+' '+c.age+'歲'+(c.gender==='女'?'女聲':'男聲'):'Azure '+azureVoiceFor(c);
 }
 // 回傳 {blob, visemes:[{t,id}]}；有 SDK 時用 SDK 取得音素時間（嘴型精準），否則 REST
 // 常駐一條 Azure 連線重複使用（省去每句 0.5–1 秒的握手），呼叫序列化
