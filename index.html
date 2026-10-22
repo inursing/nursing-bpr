@@ -502,7 +502,7 @@ input[type=text]:focus{border-color:var(--primary)}
       <div style="max-width:760px;margin:0 auto">
         <div>
           <div class="section-title" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span class="section-icon">🎤</span><h2>語音會談練習</h2></div>
-            <button class="btn btn-outline btn-sm" onclick="const d=document.getElementById('conv-side');d.classList.toggle('hidden');this.textContent=d.classList.contains('hidden')?'查看個案資訊':'收起個案資訊'">查看個案資訊</button></div>
+            <button class="btn btn-outline btn-sm" onclick="openModal(state.caseId,true)">查看個案資訊</button></div>
           <div id="timer-bar" style="margin-bottom:12px">
             <div>
               <div class="timer-label">會談時間</div>
@@ -1079,10 +1079,13 @@ function selectCase(id){
   // Mark step 1 done after selection
   document.getElementById('step-goals').classList.add('done');
 }
-function openModal(id){
+function openModal(id,readOnly=false){
   const c=CASES.find(x=>x.id===id);
   document.getElementById('modal-body').innerHTML=buildMedicalRecord(c);
-  document.getElementById('modal-select-btn').onclick=()=>{
+  const selectButton=document.getElementById('modal-select-btn');
+  selectButton.textContent=readOnly?'關閉個案資訊':'選擇此個案 →';
+  selectButton.onclick=()=>{
+    if(readOnly){document.getElementById('case-modal').classList.add('hidden');return;}
     selectCase(id);
     document.getElementById('case-modal').classList.add('hidden');
     goStep('goals');
@@ -2538,7 +2541,7 @@ function startBackgroundAnalysis(){
   aiJob=null; aiJobText=''; aiJobDone=false; aiJobError=null; state.aiRecord=null; state.aiRecordInputKey=null;
 }
 function reportInputKey(){
-  return JSON.stringify([state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),state.processRecord,state.reflections]);
+  return JSON.stringify(['screen-gaze-v1',state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),state.processRecord,state.reflections]);
 }
 let aiRecordKey=null;
 function updateAiStatusChips(msg){ document.querySelectorAll('.ai-status').forEach(el=>{ el.textContent=msg; }); }
@@ -2581,6 +2584,8 @@ ${JSON.stringify(state.reflections||{})}
 - 先閱讀整段會談，再逐句對照前一句病人的表達、護生回應與後續病人反應；不要只依關鍵字套技巧。混合反應可以同時有優點與風險。
 - 只引用原文；缺漏或語音辨識不清寫「資料不足，需確認」。病人未回應不代表拒絕或技巧無效；簡短回應不代表缺乏信任。
 - 病人非語言一律寫「未觀察：模擬對話」，不可依診斷或語氣編造表情、動作。護生無對應畫面寫「未觀察」；學生自述行為只能標「學生自述」，不可當成鏡頭事實。
+- 本平台是螢幕會談：虛擬病人在螢幕上，攝影機不等於病人的位置。護生注視螢幕、視線略低或偏向病人視窗，均屬合理互動方式；不得因未直視鏡頭，就判定缺乏眼神接觸、不專心、逃避或缺乏同理心，也不得建議學生持續盯著攝影機。
+- 查看個案資訊、閱讀病歷或短暫看向操作區是本平台正常操作，不能單憑偏頭、低頭或視線移動判定分心。若畫面無法確認注視目標或只有瞬間截圖，明確寫「無法判斷」，不據此扣分；表情、姿勢或動作建議必須結合對應對話與清楚可見的行為證據，區分觀察與推測。
 - 單張截圖僅能描述該瞬間可見的姿勢或動作，不能證明眼神接觸、持續專注、同理心、沉默時間、觸摸或打斷；畫面模糊就寫「畫面不清」。
 - 學生自我分析要分別檢查：技巧標示是否有原文支持、是否辨識病人需求、能否說明回應的可能影響、是否提出可行的替代語句。空白寫「未填」，不要推論能力不足。
 - 回饋連結「具體原句 → 判斷理由 → 病人實際反應／尚待確認 → 下一步」。可能的影響要用「可能」，不要宣稱因果。
@@ -2643,7 +2648,7 @@ ${JSON.stringify(state.reflections||{})}
     parts.push({text:`\n[護生第${k}句「${m.text.slice(0,30)}」說話時的鏡頭畫面]`});
     for(const img of fr){ if(nImg>=20) break; parts.push({image:img}); nImg++; }
   }
-  if(nImg){ parts.push({text:'以上是部分護生說話時的瞬間截圖。僅描述對應句次中清晰可見的事實；不推斷眼神接觸、情緒、人格或整段會談的非語言表現。未附圖的句子寫「未觀察」。'}); }
+  if(nImg){ parts.push({text:'這是螢幕會談，護生看的是螢幕中的病人，無須直視鏡頭。未看鏡頭、查看病歷或視線移動不能當成不專心的證據；注視目標不清時寫「無法判斷」。以上是部分護生說話時的瞬間截圖。僅描述對應句次中清晰可見的事實；不推斷眼神接觸、情緒、人格或整段會談的非語言表現。未附圖的句子寫「未觀察」。'}); }
   const input=nImg?[{role:'user',parts}]:prompt;
   const onDelta=(full)=>{ onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
   const complete=t=>(t.match(/<td\b/gi)||[]).length>=Math.max(1,pairs.length)*7&&/<\/table>/.test(t)&&/整體評估/.test(t)&&/學習評量/.test(t)&&t.length>400;
