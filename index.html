@@ -440,7 +440,7 @@ input[type=text]:focus{border-color:var(--primary)}
     <div class="logo">🏥</div>
     <div>
       <h1>行為過程紀錄練習平台</h1>
-      <div class="sub">NURSING LAB · 每一次傾聽，都是照護的開始</div>
+      <div class="sub">iNursing Lab · 練習會談，從反思中成長</div>
     </div>
     <button class="btn btn-sm" style="background:rgba(255,255,255,.18);color:#fff" onclick="openSettings()">⚙ 設定</button>
   </div>
@@ -1267,11 +1267,20 @@ function loadAvatarFor(c){
 
 // ===== SETTINGS / API =====
 const SET_KEY='bpr-settings-v2';
+const CASE_VOICE_DEFAULTS={
+  1:{name:'zh-TW-YunJheNeural',rate:0.95},
+  2:{name:'zh-TW-HsiaoYuNeural',rate:1},
+  3:{name:'zh-TW-YunJheNeural',rate:0.95},
+  4:{name:'zh-TW-HsiaoChenNeural',rate:1},
+  5:{name:'zh-TW-HsiaoYuNeural',rate:0.95},
+  6:{name:'zh-TW-YunJheNeural',rate:1}
+};
 function getSettings(){
   try{const st=JSON.parse(localStorage.getItem(SET_KEY)||'{}');
     if(st.chatEconomyVersion!==1){st.oaModel='gpt-6-luna';st.chatEconomyVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    if(st.caseVoiceVersion!==1){st.caseVoices={...st.caseVoices,...CASE_VOICE_DEFAULTS};st.caseVoiceVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     return st;
-  }catch(e){return {oaModel:'gpt-6-luna'}}
+  }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
 function makeSetupLink(){
   saveSettings(); openSettings();
@@ -1986,7 +1995,7 @@ function renderCaseVoiceSettings(){
   document.getElementById('case-voice-settings').innerHTML='<h4>逐位病人聲音與試聽</h4><p class="chart-note">聲線依性別篩選。現有台灣華語聲線未標示可精確對應的年齡；請試聽後判斷年齡感，語速調整不等於年長者聲線。</p>'+CASES.map(c=>{
     const names=c.gender==='女'?['zh-TW-HsiaoChenNeural','zh-TW-HsiaoYuNeural']:['zh-TW-YunJheNeural'];
     const current=profiles[c.id]?.name||azureVoiceFor(c);
-    return '<div class="case-voice-row"><label for="case-voice-'+c.id+'">'+c.name+' · '+c.age+'歲 · '+c.gender+'</label><select id="case-voice-'+c.id+'">'+names.map(name=>'<option '+(name===current?'selected ':'')+'value="'+name+'">'+name+'</option>').join('')+'</select><label for="case-rate-'+c.id+'">語速</label><input id="case-rate-'+c.id+'" type="number" min="0.85" max="1.1" step="0.05" value="'+(profiles[c.id]?.rate||1)+'"><button class="btn btn-outline btn-sm" type="button" onclick="testCaseVoice('+c.id+')">試聽</button><span id="case-voice-status-'+c.id+'" class="chart-note">年齡感尚待試聽確認</span></div>';
+    return '<div class="case-voice-row"><label for="case-voice-'+c.id+'">'+c.name+' · '+c.age+'歲 · '+c.gender+'</label><select id="case-voice-'+c.id+'">'+names.map(name=>'<option '+(name===current?'selected ':'')+'value="'+name+'">'+name+'</option>').join('')+'</select><label for="case-rate-'+c.id+'">語速</label><input id="case-rate-'+c.id+'" type="number" min="0.85" max="1.1" step="0.05" value="'+(profiles[c.id]?.rate||1)+'"><button class="btn btn-outline btn-sm" type="button" onclick="testCaseVoice('+c.id+')">試聽</button><span id="case-voice-status-'+c.id+'" class="chart-note">Azure 台灣華語 · 已配置'+(c.gender==='女'?'女聲':'男聲')+'；年齡感請試聽確認</span></div>';
   }).join('');
   getPatientSpeechConfig().then(cfg=>cfg.cases.forEach(id=>{
     const select=document.getElementById('case-voice-'+id),rate=document.getElementById('case-rate-'+id),status=document.getElementById('case-voice-status-'+id);
