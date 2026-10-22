@@ -698,7 +698,7 @@ input[type=text]:focus{border-color:var(--primary)}
         </div>
         <div class="card" id="submit-card">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-            <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">會把學生版 PDF、AI 版 PDF、逐字稿與會談影片上傳到老師的雲端硬碟。</div></div>
+            <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">會把學生版 PDF、AI 版 PDF 與會談影片上傳到老師的雲端硬碟；資料夾與檔名包含學號、姓名、個案與繳交時間。</div></div>
             <button class="btn btn-primary" id="submit-btn" onclick="submitToTeacher()">📤 繳交練習</button>
           </div>
           <div id="submit-status" style="margin-top:10px;font-size:.85rem;line-height:1.7"></div>
@@ -2654,17 +2654,18 @@ async function submitToTeacher(){
   btn.disabled=true; const lines=[]; const show=()=>{ box.innerHTML=lines.join('<br>'); };
   const log=(t)=>{ lines.push(t); show(); }; const upd=(t)=>{ lines[lines.length-1]=t; show(); };
   const now=new Date(); const date=now.toLocaleDateString('sv-SE'); const hm=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
-  const folder=[state.studentId||'無學號',state.studentName,hm,c.name].join('_');
+  const cleanPart=v=>String(v||'').trim().replace(/[\\/:*?"<>|\x00-\x1f]/g,'-').replace(/\s+/g,' ').slice(0,20);
+  const stamp=date.replace(/-/g,'')+'_'+hm+String(now.getSeconds()).padStart(2,'0');
+  const filePrefix=[cleanPart(state.studentId)||'無學號',cleanPart(state.studentName),cleanPart(c.name),stamp].join('_');
+  const folder=filePrefix;
   const files=[];
   try{
     log('⏳ 產生學生版 PDF…');
     syncReflections&&syncReflections(); syncRecordFromDOM&&syncRecordFromDOM();
-    const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`學生版行為過程記錄_${state.studentName}.pdf`,type:'application/pdf',blob:sBlob}); upd('✅ 學生版 PDF');
-    if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`AI版行為過程記錄_${state.studentName}.pdf`,type:'application/pdf',blob:aBlob}); upd('✅ AI 版 PDF'); }
+    const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`${filePrefix}_學生版行為過程記錄.pdf`,type:'application/pdf',blob:sBlob}); upd('✅ 學生版 PDF');
+    if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`${filePrefix}_AI版行為過程記錄.pdf`,type:'application/pdf',blob:aBlob}); upd('✅ AI 版 PDF'); }
     else log('⚠ AI 版記錄尚未產生，這次不含 AI 版（可稍後再繳交一次）');
-    const transcript={studentName:state.studentName,studentId:state.studentId||'',case:{id:c.id,name:c.name,dept:c.deptLabel,dx:c.dx},goals:state.goals,date:now.toISOString(),durationSec:state.convDuration||0,conversation:state.conversation.map(m=>({role:m.role,text:m.text,ts:m.ts,expr:m.expr||null,interrupted:!!m.interrupted})),processRecord:state.processRecord,reflections:state.reflections||null};
-    files.push({name:'逐字稿與記錄.json',type:'application/json',blob:new Blob([JSON.stringify(transcript,null,1)],{type:'application/json'})});
-    if(recBlob&&recBlob.size){ const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm'; if(recBlob.size<=CHUNK) files.push({name:`會談影片_${state.studentName}.${ext}`,type:recBlob.type||'video/webm',blob:recBlob}); else { const n=Math.ceil(recBlob.size/CHUNK); for(let i=0;i<n;i++) files.push({name:`會談影片_${state.studentName}_第${i+1}段共${n}段.${ext}.part`,type:'application/octet-stream',blob:recBlob.slice(i*CHUNK,(i+1)*CHUNK)}); log('ℹ 影片較大，分成 '+n+' 段上傳（老師端可合併）'); } }
+    if(recBlob&&recBlob.size){ const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm'; if(recBlob.size<=CHUNK) files.push({name:`${filePrefix}_會談影片.${ext}`,type:recBlob.type||'video/webm',blob:recBlob}); else { const n=Math.ceil(recBlob.size/CHUNK); for(let i=0;i<n;i++) files.push({name:`${filePrefix}_會談影片_第${i+1}段共${n}段.${ext}.part`,type:'application/octet-stream',blob:recBlob.slice(i*CHUNK,(i+1)*CHUNK)}); log('ℹ 影片較大，分成 '+n+' 段上傳（老師端可合併）'); } }
     else log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
     let folderUrl='';
     for(const f of files){
