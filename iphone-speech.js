@@ -1,14 +1,14 @@
 /* Azure microphone recognition for iPhone home-screen mode. No API keys are embedded. */
 (()=>{
   class IPhoneSpeechRecognizer{
-    constructor({settings,token,sdk,media}){this.settings=settings;this.token=token;this.sdk=sdk;this.media=media;this.lang='zh-TW';this.continuous=true;this._run=null;}
+    constructor({settings,token,sdk,media,context}){this.context=context;this.settings=settings;this.token=token;this.sdk=sdk;this.media=media;this.lang='zh-TW';this.continuous=true;this._run=null;}
     start(){
       if(this._run)return;
-      const run={stream:null,recognizer:null,audio:null,ended:false,finals:[],timer:null,cleanup:null};this._run=run;
+      const run={stream:null,recognizer:null,audio:null,ended:false,finals:[],timer:null,cleanup:null,context:null,source:null,processor:null,gain:null,push:null};this._run=run;
       run.timer=setTimeout(()=>this._fail(run,{name:'NetworkError'}),20000);
       // Request the microphone directly from the student's click, before any network await.
       let requested;
-      try{requested=this.media.getUserMedia({video:false,audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}catch(e){this._fail(run,e);return;}
+      try{run.context=this.context();if(!run.context)throw new Error('AudioContext unavailable');if(run.context.state!=='running')run.context.resume().catch(e=>this._fail(run,e));requested=this.media.getUserMedia({video:false,audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}catch(e){this._fail(run,e);return;}
       this._start(run,requested);
     }
     async _start(run,requested){
@@ -21,8 +21,28 @@
         if(this._run!==run){this._release(run);return;}
         const cfg=tok?sdk.SpeechConfig.fromAuthorizationToken(tok.token,tok.region):sdk.SpeechConfig.fromSubscription(st.azKey,st.azRegion);
         cfg.speechRecognitionLanguage=this.lang;
-        if(cfg.setProperty&&sdk.PropertyId?.Speech_SegmentationSilenceTimeoutMs)cfg.setProperty(sdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,'2500');
-        run.audio=sdk.AudioConfig.fromStreamInput(run.stream);
+        if(cfg.setProperty&&sdk.PropertyId?.Speech_SegmentationSilenceTimeoutMs)cfg.setProperty(sdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,'500');
+        // Reuse the context unlocked by the click; the SDK must not create a new iOS context after a token fetch.
+        run.push=sdk.AudioInputStream.createPushStream(sdk.AudioStreamFormat.getWaveFormatPCM(16000,16,1));
+        run.audio=sdk.AudioConfig.fromStreamInput(run.push);
+        run.source=run.context.createMediaStreamSource(run.stream);
+        run.processor=run.context.createScriptProcessor(4096,1,1);
+        run.gain=run.context.createGain();run.gain.gain.value=0;
+        const stride=run.context.sampleRate/16000;let needed=stride,weighted=0;
+        run.processor.onaudioprocess=e=>{
+          if(this._run!==run)return;
+          const input=e.inputBuffer.getChannelData(0),samples=[];
+          for(const raw of input){
+            const v=Math.max(-1,Math.min(1,raw));let remaining=1;
+            while(remaining>1e-8){const take=Math.min(remaining,needed);weighted+=v*take;remaining-=take;needed-=take;
+              if(needed<1e-8){samples.push(weighted/stride);weighted=0;needed=stride;}
+            }
+          }
+          const pcm=new ArrayBuffer(samples.length*2),view=new DataView(pcm);
+          samples.forEach((v,i)=>view.setInt16(i*2,Math.round(v<0?v*32768:v*32767),true));
+          try{run.push.write(pcm);}catch(e){this._fail(run,{name:'NetworkError'});}
+        };
+        run.source.connect(run.processor);run.processor.connect(run.gain);run.gain.connect(run.context.destination);
         const r=run.recognizer=new sdk.SpeechRecognizer(cfg,run.audio);
         const idle=()=>{clearTimeout(run.timer);run.timer=setTimeout(()=>this._fail(run,{name:'IdleError'}),30000);};
         const emit=(text,final)=>{
@@ -43,6 +63,9 @@
     }
     _release(run){
       clearTimeout(run.timer);try{run.cleanup?.();}catch{}run.cleanup=null;
+      if(run.processor)run.processor.onaudioprocess=null;
+      for(const node of [run.source,run.processor,run.gain]){try{node?.disconnect();}catch{}}
+      run.source=run.processor=run.gain=null;try{run.push?.close();}catch{}run.push=null;
       run.stream?.getTracks().forEach(t=>t.stop());
       const r=run.recognizer;run.recognizer=null;
       if(r){r.recognizing=r.recognized=r.canceled=r.sessionStopped=()=>{};try{r.close();}catch{}}

@@ -1741,7 +1741,7 @@ function useIPhoneCloudSpeech(){return IS_IOS&&IS_STANDALONE&&azureReady();}
 function createRecognizer(){
   if(useIPhoneCloudSpeech()){
     if(!window.SpeechSDK||!window.IPhoneSpeechRecognizer||!navigator.mediaDevices?.getUserMedia)return null;
-    return new IPhoneSpeechRecognizer({settings:getSettings,token:getAzToken,sdk:SpeechSDK,media:navigator.mediaDevices});
+    return new IPhoneSpeechRecognizer({settings:getSettings,token:getAzToken,sdk:SpeechSDK,media:navigator.mediaDevices,context:()=>{ensureAudioCtx();return audioCtx;}});
   }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;return SR?new SR():null;
 }
@@ -3011,7 +3011,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
-<script src="./iphone-speech.js?v=1"></script>
+<script src="./iphone-speech.js?v=2"></script>
 <script src="./patient-view.js"></script>
 <script src="./interaction-recorder.js"></script>
 <script src="./simli-sdk.js"></script>
