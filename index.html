@@ -743,9 +743,21 @@ input[type=text]:focus{border-color:var(--primary)}
   <div class="modal">
     <button class="modal-close" onclick="document.getElementById('settings-modal').classList.add('hidden')">✕</button>
     <h2>平台設定</h2>
-    <div style="display:grid;gap:14px">
-
-      <div style="font-weight:700;font-size:.9rem">① 課程代理（AI 與病人語音的金鑰放在老師的 Cloudflare Worker，學生看不到）</div>
+    <div class="settings-sections" style="display:grid;gap:12px">
+      <details id="own-key-settings" open>
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">學生課後練習</summary>
+        <div style="display:grid;gap:12px;margin-top:10px">
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課後可使用自己的 Gemini 金鑰練習，金鑰儲存在此裝置。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用我自己的金鑰（勾選後不走老師的課程代理）</label>
+          <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
+          <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
+        </div>
+      </details>
+      <details id="conversation-settings"><summary>會談與停頓</summary><div class="settings-section-body">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2.5" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2.5 秒</span></div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled hidden> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
+</div></details>
+      <details id="course-settings"><summary>課程連線設定</summary><div class="settings-section-body">
       <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
       <div><label>AI 供應商（病人對話與 AI 報告）</label>
         <select id="set-ai" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
@@ -757,7 +769,9 @@ input[type=text]:focus{border-color:var(--primary)}
         <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
       </div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
-      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具：練習次數（只在教師自己的裝置填）</summary>
+
+</div></details>
+      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具：練習次數</summary>
         <div style="display:grid;gap:8px;margin-top:8px">
           <div style="font-size:.78rem;color:var(--text2);line-height:1.6">每位學生可用課堂金鑰的練習次數由 Worker 的 <code>MAX_SESSIONS</code> 決定（目前 3 次，以學號計）。填入教師密語後，這台裝置不受限制，並可查看／重設學生次數；密語不會放進連結或 QR。</div>
           <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="與 Worker 的 TEACHER_TOKEN 相同"></div>
@@ -765,19 +779,11 @@ input[type=text]:focus{border-color:var(--primary)}
           <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
         </div>
       </details>
-
-      <hr class="divider" style="margin:0">
-      <div style="font-weight:700;font-size:.9rem">② 學生繳交（存到老師的 Google Drive）</div>
+      <details id="submission-settings"><summary>作業收件設定</summary><div class="settings-section-body">
       <div><label>收件網址（Apps Script 網頁應用程式）</label><input type="text" id="set-drive" placeholder="https://script.google.com/macros/s/…/exec"></div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
-
-      <hr class="divider" style="margin:0">
-      <div style="font-weight:700;font-size:.9rem">③ 會談</div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2.5" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2.5 秒</span></div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
-
-      <hr class="divider" style="margin:0">
-      <div style="font-weight:700;font-size:.9rem">④ 發給學生的設定連結 / QR Code</div>
+</div></details>
+      <details id="sharing-settings"><summary>分享課程連結與 QR Code</summary><div class="settings-section-body">
       <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 含代理網址、課程代碼、收件網址與會談設定，<b>不含任何金鑰</b>。</div>
       <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">尚未設定代理：連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。</div>
       <label class="check-item hidden" style="margin:0" id="link-incl-wrap"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（學生可看到）</label>
@@ -790,19 +796,9 @@ input[type=text]:focus{border-color:var(--primary)}
           <button class="btn btn-outline btn-sm" type="button" onclick="downloadQr()">⬇ 下載 QR 圖片</button>
         </div>
       </div>
-
-      <hr class="divider" style="margin:0">
-      <details id="own-key-settings">
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">⑤ 學生課後練習：使用自己的金鑰</summary>
-        <div style="display:grid;gap:12px;margin-top:10px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課堂外練習可申請免費的 Gemini 金鑰（不需信用卡）。金鑰只存在自己的裝置。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
-          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用我自己的金鑰（勾選後不走老師的課程代理）</label>
-          <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
-          <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
-        </div>
-      </details>
+</div></details>
       <details id="adv-settings">
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑥ 進階（一般不需要）</summary>
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">進階設定</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div><label>OpenAI 模型（會談）</label><input type="text" id="set-oamodel" placeholder="gpt-6-luna"></div>
@@ -1356,6 +1352,7 @@ function applySetupFromHash(){
   }catch(e){ console.warn('setup link',e); }
 }
 function openSettings(){
+  document.querySelectorAll("#settings-modal details").forEach(d=>d.open=d.id==='own-key-settings');
   renderOpenaiUsage();
   const st=getSettings();
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
@@ -1413,7 +1410,7 @@ function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById
   const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
   const os=document.getElementById('ownkey-state'); os.innerHTML=own?(gk?'<span style="color:#1a7f37">✅ 使用自己的金鑰（AI 病人與 AI 記錄走你的 Gemini 額度；語音'+(on?'仍由老師代理提供':'用瀏覽器內建聲音')+'）</span>':'<span style="color:var(--danger)">請貼上你的 Gemini 金鑰，或取消勾選</span>'):'';
   if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
-  document.getElementById('own-key-settings').open=own||(!on&&!!gk);
+  // Disclosure state is controlled by the student; opening settings shows practice first.
   document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
 async function testDrive(){
   saveSettings(); openSettings(); const msg=document.getElementById('drive-msg');
