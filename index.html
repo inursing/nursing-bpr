@@ -366,7 +366,7 @@ input[type=text]:focus{border-color:var(--primary)}
 #rec-video{width:100%;max-height:420px;background:#000;border-radius:8px}
 @media(max-width:720px){#review-stage{grid-template-columns:1fr}#check-grid{grid-template-columns:1fr}}
 #stage.solo{grid-template-columns:1fr;max-width:640px;margin-left:auto;margin-right:auto}
-#stage.solo #cam-wrap{display:none}
+#phase-conv #cam-wrap{display:none}
 #rec-indicator{position:absolute;top:8px;right:10px;z-index:2;font-size:.72rem;color:#fff;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:12px}
 .rv-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;border-radius:10px;padding:2px}
 .rv-row.active{outline:2px solid var(--primary);background:var(--primary-light)}
@@ -515,7 +515,7 @@ input[type=text]:focus{border-color:var(--primary)}
               <div class="progress-bar"><div class="progress-fill" id="timer-fill" style="width:0%"></div></div>
             </div>
           </div>
-          <div id="stage">
+          <div id="stage" class="solo">
             <div class="stage-box" id="avatar-wrap">
               <div class="stage-label" id="avatar-label">病人</div>
               <div id="rec-indicator" class="hidden"><span class="rec-dot"></span>錄影中</div>

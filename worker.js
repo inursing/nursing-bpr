@@ -58,7 +58,11 @@ export default {
           signal: AbortSignal.timeout(12000),
         });
         const result = await r.json().catch(() => ({}));
-        if (!r.ok || !result.session_token) return json({ error: 'Simli 無法建立測試連線，請檢查服務額度或人物設定', status: r.status }, 502);
+        if (!r.ok || !result.session_token) {
+          const detail = JSON.stringify(result).toLowerCase();
+          const reason = /credit|balance|minute|payment|subscription/.test(detail) ? '服務額度或方案' : /face|avatar/.test(detail) ? '人物設定或存取權限' : /api.key|unauthorized|authentication|invalid.key/.test(detail) ? '服務金鑰驗證' : /validation|field|required/.test(detail) ? '請求格式' : '服務拒絕請求';
+          return json({ error: `Simli 無法建立測試連線（HTTP ${r.status}：${reason}）`, status: r.status }, 502);
+        }
         return new Response(JSON.stringify({ session_token: result.session_token, maxSessionLength: 180 }), { headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
       } catch { return json({ error: 'Simli 連線逾時，未自動重試' }, 502); }
     }
