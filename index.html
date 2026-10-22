@@ -1023,6 +1023,7 @@ function renderPhase(p){
   if(p==='analysis') renderAnalysisPhase();
   if(p==='export') renderExportPhase();
   if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); if(p!=='conv') stopSimli(); }
+  window.LivePatient&&LivePatient.refresh();
   window.scrollTo(0,0);
 }
 
@@ -1232,11 +1233,14 @@ let currentUtterance=null;
 // ===== AVATAR (3D bridge; implementation in the module script at the bottom) =====
 const EXPR_MAP={'難過':'sad','哀傷':'sad','悲傷':'sad','焦慮':'anxious','擔心':'anxious','緊張':'anxious','害怕':'anxious','疼痛':'pain','痛':'pain','不悅':'angry','生氣':'angry','煩躁':'angry','防衛':'angry','疲憊':'tired','疲倦':'tired','累':'tired','微笑':'smile','放鬆':'smile','高興':'smile','平靜':'neutral','中性':'neutral'};
 const GEST_MAP={'點頭':'nod','低頭':'down','別過頭':'away','看向別處':'away','移開視線':'away','手按胸口':'chest','按住傷口':'chest','摸胸口':'chest','嘆氣':'sigh','深呼吸':'sigh','揮手':'wave','搖頭':'shake','遮臉':'cover','擦眼淚':'cover','無':''};
-// ===== 真人影像引擎已移除（Simli / LiveAvatar），僅保留 3D 病人 =====
-function vidEngine(){ return null; }
-function simliOn(){ return false; } function laOn(){ return false; }
-async function simliSpeak(){ }
-function stopSimli(){ }
+// Live video is opt-in for the one-patient teacher pilot.
+function vidEngine(){ return window.LivePatient?.active?window.LivePatient:null; }
+function simliOn(){ return !!vidEngine(); } function laOn(){ return false; }
+async function simliSpeak(blob){
+  if(!vidEngine()) return playBlob(blob);
+  try{await LivePatient.speak(blob);}catch(e){await LivePatient.stop('Live 語音無法播放，已結束連線；未自動重播。');toast('Live 語音中斷，可查看逐字稿。',5000);}
+}
+function stopSimli(){ if(window.LivePatient) void LivePatient.stop(); }
 function setExpression(e){ window.Avatar3D&&Avatar3D.setExpression(e||'neutral'); }
 function playGesture(g){ window.Avatar3D&&g&&Avatar3D.gesture(g); }
 function startMouth(){ window.Avatar3D&&Avatar3D.startMouth(); }
@@ -1678,7 +1682,7 @@ async function initConvPhase(){
 let listenWanted=false, pendingFinal='', finalTimer=null;
 let resetRecognitionPending=()=>{}, listeningResumeTimer=null;
 const ECHO_TAIL_MS=1000;
-function speechInputBlocked(){ return isSpeaking||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
+function speechInputBlocked(){ return isSpeaking||!!window.LivePatient?.busy||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
 function createRecognizer(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; return SR?new SR():null; }
 function sttName(){ return '瀏覽器內建辨識'; }
 function setupRecognition(){
@@ -2861,5 +2865,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script src="./patient-view.js"></script>
+<script src="./simli-sdk.js"></script>
+<script src="./live-patient.js"></script>
 </body>
 </html>

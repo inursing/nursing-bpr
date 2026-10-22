@@ -38,6 +38,30 @@ export default {
     if (env.CLASS_CODE && req.headers.get('X-Class-Code') !== env.CLASS_CODE) return json({ error: '課程代碼錯誤' }, 401);
 
     const isTeacher = !!env.TEACHER_TOKEN && req.headers.get('X-Teacher-Token') === env.TEACHER_TOKEN;
+    // One-patient teacher pilot. Only temporary tokens reach the browser.
+    if (url.pathname === '/simli/status' || url.pathname === '/simli/session') {
+      if (!isTeacher) return json({ error: 'Live 測試僅限已設定教師密語的裝置' }, 403);
+      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 1, maxSessionLength: 180 });
+      if (url.pathname !== '/simli/session' || req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+      if (!env.SIMLI_KEY) return json({ error: '尚未設定 SIMLI_KEY，未啟動付費連線' }, 503);
+      let b; try { b = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
+      if (b.caseId !== 1) return json({ error: '目前只開放王先生的 Live 測試' }, 400);
+      if (env.QUOTA) {
+        const previous = Number(await env.QUOTA.get('simli:pilot:last')) || 0;
+        if (Date.now() - previous < 10000) return json({ error: '請稍候再啟動 Live 測試' }, 429);
+        await env.QUOTA.put('simli:pilot:last', String(Date.now()), { expirationTtl: 60 });
+      }
+      try {
+        const r = await fetch('https://api.simli.ai/compose/token', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-simli-api-key': env.SIMLI_KEY },
+          body: JSON.stringify({ faceId: '9fcd5739-bf66-49a5-b525-d02d7f0bc2fc', apiVersion: 'v2', handleSilence: true, maxSessionLength: 180, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
+          signal: AbortSignal.timeout(12000),
+        });
+        const result = await r.json().catch(() => ({}));
+        if (!r.ok || !result.session_token) return json({ error: 'Simli 無法建立測試連線，請檢查服務額度或人物設定', status: r.status }, 502);
+        return new Response(JSON.stringify({ session_token: result.session_token, maxSessionLength: 180 }), { headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      } catch { return json({ error: 'Simli 連線逾時，未自動重試' }, 502); }
+    }
     const maxSessions = parseInt(env.MAX_SESSIONS || '0', 10) || 0;
     const quotaOn = maxSessions > 0 && !!env.QUOTA;
 
