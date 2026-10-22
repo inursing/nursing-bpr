@@ -641,7 +641,7 @@ input[type=text]:focus{border-color:var(--primary)}
     <!-- PHASE 7: REVIEW -->
     <div id="phase-review" class="hidden">
       <div class="section-title"><span class="section-icon">🎬</span><h2>回顧會談過程</h2></div>
-      <div class="info-box info-primary" style="margin-bottom:16px">回顧整段會談：左邊播放病人語音並顯示動態情境插畫，右邊是您的錄影。插畫動畫為重建效果，不是當時非語言行為的錄影。下方逐字稿可點選跳轉。</div>
+      <div class="info-box info-primary" style="margin-bottom:16px">有互動錄影時，播放當時的病人畫面、護生鏡頭與錄下的聲音；未啟用 Live 時病人為情境插畫。下方逐字稿可點選跳轉。</div>
       <div class="card" style="margin-bottom:16px">
         <div id="review-stage" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="stage-box" id="review-avatar-wrap" style="background:radial-gradient(120% 90% at 50% 20%,#eef3f8 0%,#cfdbe8 70%,#b9c9d9 100%)">
@@ -1563,7 +1563,7 @@ function saveBlob(filename,blob){
 }
 
 // ===== CAMERA RECORDING =====
-let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null;
+let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null, recComposite=false;
 function captureNurseFrame(){
   try{
     const v=document.getElementById('cam-video'); if(!camStream||!v||v.readyState<2||!v.videoWidth) return null;
@@ -1590,13 +1590,20 @@ function startRecording(){
   if(!camStream||(recorder&&recorder.state==='recording')) return;
   try{
     const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
-    recorder=new MediaRecorder(camStream,Object.assign(mime?{mimeType:mime}:{},{videoBitsPerSecond:260000,audioBitsPerSecond:24000}));
+    ensureAudioCtx();
+    if(!audioCtx||!window.InteractionRecorder) throw new Error('互動錄影元件無法啟動');
+    const capture=InteractionRecorder.create({camera:camStream,context:audioCtx,patientAudio:analyser,
+      info:()=>[state.studentId,state.studentName,getCase()?.name,'會談互動錄影'].filter(Boolean).join(' · '),
+      conversation:()=>state.conversation});
+    try{recorder=new MediaRecorder(capture.stream,Object.assign(mime?{mimeType:mime}:{},{videoBitsPerSecond:600000,audioBitsPerSecond:48000}));}
+    catch(e){capture.stop();throw e;}
+    recComposite=true;
     recChunks=[]; recBlob=null;
     recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
-    recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); };
+    recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); capture.stop(); };
     recorder.start(1000); recStart=Date.now(); updateRecIndicator();
     document.getElementById('cam-label').innerHTML='<span class="rec-dot"></span>錄影中';
-  }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; }
+  }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; toast('互動錄影無法啟動：'+(e.message||e.name)); }
 }
 function camUnavailable(msg){
   const off=document.getElementById('cam-off');
@@ -1631,7 +1638,7 @@ function seekRec(sec){ const v=document.getElementById('rec-video'); v.currentTi
 async function downloadRecording(){
   if(!recBlob){toast('沒有錄影');return}
   const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm';
-  saveBlob(`護生會談錄影_${state.studentName}.${ext}`,recBlob);
+  saveBlob(`會談互動錄影_${state.studentId||'無學號'}_${state.studentName}.${ext}`,recBlob);
 }
 
 async function initConvPhase(){
@@ -2662,8 +2669,8 @@ async function submitToTeacher(){
   try{
     log('⏳ 產生學生版 PDF…');
     syncReflections&&syncReflections(); syncRecordFromDOM&&syncRecordFromDOM();
-    const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`${filePrefix}_學生版行為過程記錄.pdf`,type:'application/pdf',blob:sBlob}); upd('✅ 學生版 PDF');
-    if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`${filePrefix}_AI版行為過程記錄.pdf`,type:'application/pdf',blob:aBlob}); upd('✅ AI 版 PDF'); }
+    const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`${filePrefix}_學生版行為過程記錄.pdf`,type:'application/pdf',blob:sBlob}); upd('📄 學生版 PDF 已產生（待上傳）');
+    if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`${filePrefix}_AI版行為過程記錄.pdf`,type:'application/pdf',blob:aBlob}); upd('📄 AI 版 PDF 已產生（待上傳）'); }
     else log('⚠ AI 版記錄尚未產生，這次不含 AI 版（可稍後再繳交一次）');
     if(recBlob&&recBlob.size){
       if(recBlob.size>50*1024*1024) throw new Error('影片超過50MB，請先下載保存，再壓縮後另行繳交；本次尚未完成繳交');
@@ -2690,7 +2697,7 @@ async function submitToTeacher(){
         const data=await blobToBase64(f.blob);
         r=await drivePost({classCode:st.classCode||'',date,folder,file:{name:f.name,type:f.type,data}});
       }
-      folderUrl=r.folder||folderUrl; upd(`✅ ${f.name}（${mb} MB）`);
+      folderUrl=r.folder||folderUrl; upd(`✅ 已上傳：${escHtml(f.name)}（${mb} MB）`);
     }
     state.submitted={at:now.toISOString(),folder}; saveState();
     log(`<b style="color:#1a7f37">🎉 繳交完成！</b> 已存到老師的雲端：${date} / ${escHtml(folder)}`);
@@ -2735,6 +2742,13 @@ function renderReviewPhase(){
   // video
   const v=document.getElementById('review-video'), nt=document.getElementById('review-nurse-text');
   v.onended=null; v.ontimeupdate=null;
+  const composite=hasVideo&&recComposite;
+  document.getElementById('review-stage').style.gridTemplateColumns=composite?'1fr':'1fr 1fr';
+  document.getElementById('review-avatar-wrap').style.display=composite?'none':'';
+  document.getElementById('review-nurse-wrap').style.aspectRatio=composite?'3 / 2':'4 / 3';
+  document.querySelector('#review-nurse-wrap .stage-label').textContent=composite?'會談互動錄影':'護生';
+  v.style.transform=composite?'none':'scaleX(-1)'; v.style.objectFit='contain';
+  const tts=document.getElementById('review-tts');tts.disabled=composite;if(composite)tts.checked=false;
   if(hasVideo){
     v.classList.remove('hidden'); nt.classList.add('hidden');
     if(v.dataset.blobUrl) URL.revokeObjectURL(v.dataset.blobUrl);
@@ -2804,7 +2818,7 @@ function replayTick(sec){
     highlightRow(e.i); showSubtitle(e);
     if(e.role==='patient'){
       setExpression(e.expr||'neutral'); if(e.gest) playGesture(e.gest);
-      if(document.getElementById('review-tts').checked) speakPatientLine(e);
+      if(!(replay.hasVideo&&recComposite)&&document.getElementById('review-tts').checked) speakPatientLine(e);
     } else { playGesture(GEST_MAP['點頭']||'nod'); }
   }
 }
@@ -2884,6 +2898,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script src="./patient-view.js"></script>
+<script src="./interaction-recorder.js"></script>
 <script src="./simli-sdk.js"></script>
 <script src="./live-patient.js"></script>
 </body>
