@@ -524,7 +524,7 @@ input[type=text]:focus{border-color:var(--primary)}
             <div class="stage-box" id="cam-wrap">
               <div class="stage-label" id="cam-label">護生鏡頭</div>
               <video id="cam-video" autoplay muted playsinline class="hidden"></video>
-              <div id="cam-off">鏡頭尚未開啟<br><button class="btn btn-outline btn-sm" style="margin-top:8px;color:#fff;border-color:#fff" onclick="startCamera()">開啟鏡頭並錄影</button></div>
+              <div id="cam-off">鏡頭尚未開啟<br><button class="btn btn-outline btn-sm" style="margin-top:8px;color:#fff;border-color:#fff" onclick="startConversationRecording()">開啟鏡頭並錄影</button></div>
             </div>
           </div>
           <div id="conv-area" style="min-height:140px;max-height:220px"></div>
@@ -723,11 +723,10 @@ input[type=text]:focus{border-color:var(--primary)}
   <div class="modal" style="max-width:720px">
     <h2>會談前檢查</h2>
     <div id="check-scene" class="info-box info-primary" style="margin-bottom:12px;font-size:.85rem"></div>
-    <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">請確認鏡頭能看到您的臉與上半身、麥克風有收到聲音，再開始會談。會談進行中畫面只會顯示病人，鏡頭會在背景持續錄影。</div>
+    <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">可先測試語音辨識與病人聲音。進入會談後，按下麥克風才會開啟攝影機並開始錄影；離開會談步驟即停止。</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="check-grid">
-      <div class="stage-box" style="background:#111"><div class="stage-label">鏡頭預覽</div><video id="check-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1)"></video><div id="check-cam-msg" style="position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:.85rem;text-align:center;padding:16px">正在開啟鏡頭…</div></div>
+      <div class="info-box info-primary" style="margin:0;line-height:1.8">攝影機尚未啟動<br>準備好後進入會談，按下麥克風開始。錄影時請讓鏡頭能看到您的臉與上半身。</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風音量</div><div class="progress-bar" style="height:12px"><div class="progress-fill" id="check-mic-fill" style="width:0%"></div></div><div id="check-mic-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px">請說幾句話，看音量條有沒有跳動。</div></div>
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 按下後說「我是護生」</button><div id="check-sr-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
       </div>
@@ -1173,28 +1172,7 @@ async function openCheck(){
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
   document.getElementById('check-sr-msg').textContent=''; document.getElementById('check-voice-msg').textContent='';
   runCheckDiag();
-  // camera (shared stream, reused for recording)
-  const msg=document.getElementById('check-cam-msg');
-  if(!camStream){ await startCamera(); }
-  if(camStream){ const v=document.getElementById('check-video'); v.srcObject=camStream; msg.classList.add('hidden'); }
-  else { msg.textContent='鏡頭無法開啟：請在網址列允許鏡頭與麥克風後重新整理。沒有鏡頭也可以會談，但不會有錄影與表情分析。'; }
-  // mic level meter
-  try{
-    if(camStream&&camStream.getAudioTracks().length){
-      checkMicCtx=new (window.AudioContext||window.webkitAudioContext)();
-      const src=checkMicCtx.createMediaStreamSource(camStream); const an=checkMicCtx.createAnalyser(); an.fftSize=512; src.connect(an);
-      const data=new Uint8Array(an.fftSize); let peak=0;
-      const tick=()=>{ an.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const x=(data[i]-128)/128; sum+=x*x;} const lvl=Math.min(1,Math.sqrt(sum/data.length)*4); peak=Math.max(peak*0.97,lvl);
-        document.getElementById('check-mic-fill').style.width=Math.round(lvl*100)+'%';
-        document.getElementById('check-mic-msg').textContent=peak>0.08?'✅ 有收到聲音':'請說幾句話，看音量條有沒有跳動。'; checkMicRAF=requestAnimationFrame(tick); };
-      tick();
-    } else if(IS_IOS){
-      // iPhone：鏡頭不含聲音；檢查時另外暫借麥克風做音量表，關閉檢查視窗時釋放
-      try{ checkMicStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); checkMicCtx=new (window.AudioContext||window.webkitAudioContext)(); const src=checkMicCtx.createMediaStreamSource(checkMicStream); const an=checkMicCtx.createAnalyser(); an.fftSize=512; src.connect(an); const data=new Uint8Array(an.fftSize); let peak=0;
-        const tick=()=>{ an.getByteTimeDomainData(data); let sum=0; for(let i=0;i<data.length;i++){const x=(data[i]-128)/128; sum+=x*x;} const lvl=Math.min(1,Math.sqrt(sum/data.length)*4); peak=Math.max(peak*0.97,lvl); document.getElementById('check-mic-fill').style.width=Math.round(lvl*100)+'%'; document.getElementById('check-mic-msg').textContent=peak>0.08?'✅ 有收到聲音':'請說幾句話，看音量條有沒有跳動。'; checkMicRAF=requestAnimationFrame(tick); }; tick();
-      }catch(e){ document.getElementById('check-mic-msg').textContent='未取得麥克風：'+(e.name==='NotAllowedError'?'請允許麥克風權限':(e.message||e.name)); }
-    } else document.getElementById('check-mic-msg').textContent='未取得麥克風。';
-  }catch(e){}
+  // Do not acquire camera or microphone until the student explicitly starts.
 }
 async function runCheckDiag(){
   const el=document.getElementById('check-diag'); const st=getSettings(); const rows=[];
@@ -1213,6 +1191,8 @@ async function runCheckDiag(){
   }
 }
 function closeCheck(){
+  if(checkSpeech._r){try{checkSpeech._r.abort();}catch(e){}checkSpeech._r=null;}
+  stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();
   document.getElementById('check-modal').classList.add('hidden');
   if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null}
   if(checkMicCtx){try{checkMicCtx.close()}catch(e){} checkMicCtx=null}
@@ -1727,9 +1707,9 @@ async function initConvPhase(){
   warmAzure();
   setTimeout(()=>setExpression(c.id===4?'sad':c.id===3?'tired':c.id===5?'pain':'anxious'),1500);
   document.getElementById('stage').classList.add('solo');
-  (async()=>{ if(!camStream) await startCamera(); })();
+  // Camera starts only from the microphone or explicit recording button.
   updateRecIndicator();
-  document.getElementById('cam-label').textContent=IS_IOS?'鏡頭（按麥克風後錄影，僅畫面）':'鏡頭（按麥克風後開始錄影）';
+  document.getElementById('cam-label').textContent='尚未錄影（按麥克風開始）';
   // Setup speech recognition
   setupRecognition();
   // Load sample
@@ -1840,9 +1820,14 @@ function interruptPatient(){
   document.getElementById('end-conv-btn').disabled=false; saveState();
 }
 
+async function startConversationRecording(){
+  if(state.phase!=='conv'||(recorder&&recorder.state==='recording'))return;
+  if(!camStream)await startCamera();
+  if(state.phase==='conv')startRecording();else stopCamera();
+}
 function toggleMic(){
   unlockAudio();
-  if(!(recorder&&recorder.state==='recording')){ (async()=>{ if(!camStream) await startCamera(); if(state.phase==='conv')startRecording();else stopCamera(); })(); }
+  startConversationRecording();
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
   if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
@@ -3005,6 +2990,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./patient-view.js"></script>
 <script src="./interaction-recorder.js"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js"></script>
+<!-- Live pilot entry temporarily removed. -->
 </body>
 </html>
