@@ -733,6 +733,11 @@ input[type=text]:focus{border-color:var(--primary)}
 
       <div style="font-weight:700;font-size:.9rem">① 課程代理（AI 與病人語音的金鑰放在老師的 Cloudflare Worker，學生看不到）</div>
       <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
+      <div><label>AI 供應商（病人對話與 AI 報告）</label>
+        <select id="set-ai" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+          <option value="openai">OpenAI GPT（付費，穩定；Worker 需設 OPENAI_KEY）</option>
+          <option value="gemini">Google Gemini（免費額度有限；Worker 需設 GEMINI_KEY）</option>
+        </select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label>代理網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
         <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
@@ -785,6 +790,11 @@ input[type=text]:focus{border-color:var(--primary)}
       <details id="adv-settings">
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem;color:var(--text2)">⑥ 進階（一般不需要）</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label>OpenAI 模型（會談）</label><input type="text" id="set-oamodel" placeholder="gpt-5-mini"></div>
+            <div><label>OpenAI 模型（AI 報告）</label><input type="text" id="set-oareport" placeholder="gpt-5"></div>
+          </div>
+          <div><label>OpenAI 金鑰（不經代理時）</label><input type="text" id="set-oakey" placeholder="sk-…"></div>
           <div><label>Gemini 模型</label><input type="text" id="set-gmodel" placeholder="gemini-3.1-flash-lite"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div><label>男性病人聲音</label><input type="text" id="set-az-vm" placeholder="zh-TW-YunJheNeural"></div>
@@ -1271,6 +1281,7 @@ function makeSetupLink(){
   if(proxyOn()){ cfg.proxyUrl=st.proxyUrl; cfg.classCode=st.classCode; cfg.gKey=''; cfg.azKey=''; cfg.azRegion=''; }
   if(st.driveUrl) cfg.driveUrl=st.driveUrl;
   if(st.pauseSec) cfg.pauseSec=st.pauseSec;
+  cfg.aiProvider=st.aiProvider||'openai'; if(st.oaModel) cfg.oaModel=st.oaModel; if(st.oaReport) cfg.oaReport=st.oaReport;
   else { cfg.azKey=st.azKey; cfg.azRegion=st.azRegion; if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey; }
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   const url=location.origin+location.pathname+'#setup='+b64;
@@ -1312,7 +1323,7 @@ function openSettings(){
   document.getElementById('set-pause').value=st.pauseSec||1.6; document.getElementById('pause-val').textContent=(st.pauseSec||1.6)+' 秒';
   document.getElementById('set-bargein').checked=IS_MOBILE?st.bargeIn===true:st.bargeIn!==false;
   document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
-  set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
+  set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-oamodel',st.oaModel||''); set('set-oareport',st.oaReport||''); set('set-oakey',st.oaKey||''); document.getElementById('set-ai').value=st.aiProvider||'openai'; set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
   set('set-az-key',st.azKey||''); set('set-az-region',st.azRegion||''); set('set-av-m',st.avM||''); set('set-av-f',st.avF||'');
   document.getElementById('set-hands').checked=!!st.hands;
   document.getElementById('set-proxy').oninput=updateLinkHints; document.getElementById('set-gkey').oninput=updateLinkHints;
@@ -1321,7 +1332,7 @@ function openSettings(){
 }
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
-  const st={provider:'gemini',gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
+  const st={provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||1.6,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
@@ -1332,7 +1343,8 @@ function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false;
 function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||''}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
 // 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
 async function ensureSession(){
-  if(!proxyOn()||state.sid) return true;
+  const viaProxy=proxyOn()||(useOpenAI()&&proxyConfigured()&&!getSettings().oaKey);
+  if(!viaProxy||state.sid) return true;
   const st=getSettings();
   const r=await fetch(st.proxyUrl+'/session/start',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({studentId:state.studentId||'',name:state.studentName||''})});
   const j=await r.json().catch(()=>({}));
@@ -1376,12 +1388,66 @@ async function testProxy(){
     if(r.status===401){ msg.textContent='❌ 課程代碼錯誤'; return; }
     if(!r.ok){ msg.textContent='❌ '+(j.error||('HTTP '+r.status)); return; }
     azTok=null;
-    const g=await fetch(st.proxyUrl+'/gemini/'+(st.gModel||GEMINI_CHAT_MODELS[0])+':generateContent?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({contents:[{parts:[{text:'回覆「好」一個字'}]}]})});
+    const oa=(st.aiProvider||'openai')==='openai';
+    const g=oa?await fetch(st.proxyUrl+'/openai/chat/completions?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({model:st.oaModel||OPENAI_CHAT_MODELS[0],messages:[{role:'user',content:'回覆「好」一個字'}],max_completion_tokens:50})})
+               :await fetch(st.proxyUrl+'/gemini/'+(st.gModel||GEMINI_CHAT_MODELS[0])+':generateContent?test=1',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({contents:[{parts:[{text:'回覆「好」一個字'}]}]})});
     const gj=await g.json().catch(()=>({}));
-    msg.textContent=g.ok?'✅ 代理正常（Gemini 與 Azure 語音都可用，區域 '+j.region+'）':'⚠ Azure 可用，但 Gemini 失敗：'+(gj.error?.message||gj.error||g.status);
+    msg.textContent=g.ok?'✅ 代理正常（'+(oa?'OpenAI':'Gemini')+' 與 Azure 語音都可用，區域 '+j.region+'）':'⚠ Azure 可用，但 '+(oa?'OpenAI':'Gemini')+' 失敗：'+(gj.error?.message||gj.error||g.status);
   }catch(e){ msg.textContent='❌ 無法連線：'+e.message; }
 }
-function aiReady(){ const st=getSettings(); if(proxyOn()) return true; return (st.provider||'gemini')==='gemini'?!!st.gKey:!!st.apiKey; }
+// 使用 OpenAI？（老師選 OpenAI 且學生沒勾「用自己的金鑰」）
+function useOpenAI(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return (st.aiProvider||'openai')==='openai'&&(proxyConfigured()||!!st.oaKey); }
+function aiReady(){ const st=getSettings(); if(useOpenAI()) return true; if(proxyOn()) return true; return !!st.gKey; }
+const OPENAI_CHAT_MODELS=['gpt-5-mini','gpt-4.1-mini','gpt-4o-mini'];
+const OPENAI_REPORT_MODELS=['gpt-5','gpt-5-mini','gpt-4.1'];
+let openaiModelOverride=null;
+function openaiModels(kind){ const st=getSettings(); const base=kind==='report'?OPENAI_REPORT_MODELS:OPENAI_CHAT_MODELS; const m=kind==='report'?(st.oaReport||base[0]):(openaiModelOverride||st.oaModel||base[0]); return [m,...base.filter(x=>x!==m)]; }
+function toOpenAI(messages,system,maxTokens,model,kind,stream){
+  const msgs=[]; if(system) msgs.push({role:'system',content:system});
+  for(const m of messages){ msgs.push(m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image_url',image_url:{url:p.image,detail:'low'}}:{type:'text',text:p.text||''})}:{role:m.role,content:m.content}); }
+  const body={model,messages:msgs,stream:!!stream};
+  if(/^gpt-5|^o\d/.test(model)){ body.max_completion_tokens=maxTokens||1024; body.reasoning_effort=kind==='report'?'low':'minimal'; }
+  else { body.max_tokens=maxTokens||1024; body.temperature=0.9; }
+  return body;
+}
+async function openaiFetch(messages,opts,stream){
+  const st=getSettings(); const kind=opts.kind; let lastErr=null; const timeoutMs=kind==='report'?150000:15000;
+  for(const model of openaiModels(kind)){
+    const ac=new AbortController(); const timer=setTimeout(()=>ac.abort(),timeoutMs);
+    const url=proxyConfigured()&&!st.oaKey?`${st.proxyUrl}/openai/chat/completions`:'https://api.openai.com/v1/chat/completions';
+    const headers=proxyConfigured()&&!st.oaKey?proxyHeaders({'content-type':'application/json'}):{'content-type':'application/json','Authorization':'Bearer '+st.oaKey};
+    let res;
+    try{ res=await fetch(url,{method:'POST',signal:ac.signal,headers,body:JSON.stringify(toOpenAI(messages,opts.system,opts.maxTokens,model,kind,stream))}); }
+    catch(e){ clearTimeout(timer); lastErr=new Error('OpenAI 逾時（'+model+'）'); continue; }
+    if(res.ok){ if(kind!=='report'&&model!==(st.oaModel||OPENAI_CHAT_MODELS[0])){ openaiModelOverride=model; console.warn('OpenAI 改用模型',model); } res.__timer=timer; return res; }
+    clearTimeout(timer);
+    let t=''; try{ const j=await res.json(); t=j.error?.message||j.error||''; }catch(e){}
+    lastErr=new Error('OpenAI 錯誤 '+res.status+' '+t);
+    if(res.status===401||res.status===403) break;          // 金鑰問題不用換模型
+    if(res.status===429&&/quota|billing|insufficient/i.test(t)) break;   // 沒餘額
+  }
+  throw lastErr||new Error('OpenAI 無法連線');
+}
+async function openaiSample(input,opts={}){
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await openaiFetch(messages,opts,false); const j=await res.json(); clearTimeout(res.__timer);
+  return {text:j.choices?.[0]?.message?.content||''};
+}
+async function openaiSampleStream(input,opts={}){
+  const messages=typeof input==='string'?[{role:'user',content:input}]:input;
+  const res=await openaiFetch(messages,opts,true); clearTimeout(res.__timer);
+  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop();
+    for(const line of lines){
+      if(!line.startsWith('data:')) continue; const d=line.slice(5).trim(); if(d==='[DONE]') continue;
+      try{ const j=JSON.parse(d); const t=j.choices?.[0]?.delta?.content||''; if(t){ full+=t; opts.onDelta&&opts.onDelta(full,t); } }catch(e){}
+    }
+  }
+  return {text:full};
+}
 // 訊息格式：{role, content:string} 或 {role, parts:[{text}|{image:dataURL}]}
 function msgParts(m){ return m.parts||[{text:m.content}]; }
 function toGemini(messages,system,maxTokens){
@@ -1436,6 +1502,7 @@ async function geminiSampleStream(input,opts={}){
 }
 async function apiSample(input,opts={}){
   const st=getSettings();
+  if(useOpenAI()){ if(proxyOn()||proxyConfigured()) await ensureSession(); return openaiSample(input,opts); }
   if(proxyOn()||(st.provider||'gemini')==='gemini'){ if(!proxyOn()&&!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰（右上角 ⚙ 設定）'),{code:'no_key'}); return geminiSample(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰（右上角 ⚙ 設定）'),{code:'no_key'});
   const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
@@ -1450,6 +1517,7 @@ async function apiSample(input,opts={}){
 }
 async function apiSampleStream(input,opts={}){
   const st=getSettings();
+  if(useOpenAI()){ if(proxyConfigured()&&!st.oaKey) await ensureSession(); return openaiSampleStream(input,opts); }
   if(proxyOn()||(st.provider||'gemini')==='gemini'){ if(!proxyOn()&&!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰'),{code:'no_key'}); return geminiSampleStream(input,opts); }
   if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰'),{code:'no_key'});
   const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
@@ -1760,7 +1828,7 @@ async function handleNurseSpeech(text){
   }catch(e){
     console.error(e);
     if(e&&e.code==='quota'){ toast(e.message,8000); bubble.textContent='（'+e.message+'）'; liveEl.querySelector('.bubble-ts').textContent=''; reply.done=true; curReply=null; isSpeaking=false; if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; } document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤'; setStatus('⚠ '+e.message); state.conversation.pop(); convHistory.pop(); return; }
-    { const m=String(e.message||''); toast(/quota|429/i.test(m)?'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費':/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
+    { const m=String(e.message||''); toast(/quota|429/i.test(m)?(useOpenAI()?'OpenAI 額度不足或請求過多，請老師確認儲值':'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費'):/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
     response=fallbackPatientResponse(c,text);
   }
   if(gen!==convGen||reply.done) return;   // 已被護生打斷

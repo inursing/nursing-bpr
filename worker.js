@@ -4,6 +4,7 @@
 //
 // 需要設定的 Variables and Secrets（Settings → Variables and Secrets → Add）：
 //   GEMINI_KEY    = 你的 Gemini API 金鑰（Secret）
+//   OPENAI_KEY    = 你的 OpenAI API 金鑰（Secret；平台設定選「OpenAI GPT」時使用）
 //   AZURE_KEY     = 你的 Azure 語音金鑰（Secret）
 //   AZURE_REGION  = 例如 eastasia（Text 即可）
 //   CLASS_CODE    = 自訂課程代碼，例如 n2026fall（Secret；每學期可以換）
@@ -82,7 +83,7 @@ export default {
     // Gemini 呼叫需有有效的練習 sid（教師或未啟用次數限制時免檢查）
     // 設定頁的「測試代理連線」：?test=1 且請求很小，免登記
     const isTinyTest = url.searchParams.get('test') === '1' && parseInt(req.headers.get('content-length') || '9999', 10) < 400;
-    const needSid = quotaOn && !isTeacher && !isTinyTest && url.pathname.startsWith('/gemini/');
+    const needSid = quotaOn && !isTeacher && !isTinyTest && (url.pathname.startsWith('/gemini/') || url.pathname.startsWith('/openai/'));
     if (needSid) {
       const sid = req.headers.get('X-Session') || '';
       if (!sid || !(await env.QUOTA.get('sid:' + sid))) return json({ error: '練習尚未登記或已逾時，請重新開始會談' }, 403);
@@ -97,6 +98,19 @@ export default {
       const r = await fetch(target, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_KEY },
+        body: req.body,
+      });
+      const h = new Headers(r.headers);
+      for (const [k, v] of Object.entries(cors)) h.set(k, v);
+      return new Response(r.body, { status: r.status, headers: h });
+    }
+
+    // ---- OpenAI：POST /openai/chat/completions（支援 stream）----
+    if (url.pathname === '/openai/chat/completions' && req.method === 'POST') {
+      if (!env.OPENAI_KEY) return json({ error: 'OPENAI_KEY 未設定（Cloudflare → Worker → Settings → Variables and Secrets）' }, 500);
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.OPENAI_KEY },
         body: req.body,
       });
       const h = new Headers(r.headers);
