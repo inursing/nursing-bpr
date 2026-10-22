@@ -39,16 +39,16 @@ export default {
     if (env.CLASS_CODE && req.headers.get('X-Class-Code') !== env.CLASS_CODE) return json({ error: '課程代碼錯誤' }, 401);
 
     const isTeacher = !!env.TEACHER_TOKEN && req.headers.get('X-Teacher-Token') === env.TEACHER_TOKEN;
-    const patientVoices = {1:'VWAVJ9V9uViHiR8dUFkU',4:'mCkrEZIMC8rMOAvc8QHl',5:'kIL4Puk4YO3p9mVQPW76'};
+    const patientVoices = {1:'VWAVJ9V9uViHiR8dUFkU',2:'sKba8tFwZaKT6HwHl1Bs',3:'svqYpJQkGmNxRHGMp0Cl',4:'mCkrEZIMC8rMOAvc8QHl',5:'kIL4Puk4YO3p9mVQPW76',6:'LkiA69wdTE4y8ckVrM1z'};
     if (url.pathname === '/speech/status' && req.method === 'GET') {
-      return json({provider:'elevenlabs',cases:isTeacher&&env.ELEVENLABS_KEY?[1,4,5]:[],model:'eleven_v4_turbo'});
+      return json({provider:'elevenlabs',cases:isTeacher&&env.ELEVENLABS_KEY?[1,2,3,4,5,6]:[],model:'eleven_v4_turbo'});
     }
     if (url.pathname === '/speech/synthesize') {
       if (req.method !== 'POST') return json({error:'method not allowed'},405);
       if (!isTeacher) return json({error:'新聲音目前僅供教師測試'},403);
       if (!env.ELEVENLABS_KEY) return json({error:'ElevenLabs 語音金鑰尚未設定'},503);
       let b;try{b=await req.json();}catch{return json({error:'invalid JSON'},400);}
-      if (![1,4,5].includes(b.caseId) || typeof b.text!=='string' || !b.text.trim() || b.text.length>600) return json({error:'不支援的病人或語音文字長度'},400);
+      if (![1,2,3,4,5,6].includes(b.caseId) || typeof b.text!=='string' || !b.text.trim() || b.text.length>600) return json({error:'不支援的病人或語音文字長度'},400);
       try {
         // v4 Turbo uses Text to Dialogue WebSocket; keep its credential server-side.
         const r=await fetch('https://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=eleven_v4_turbo&output_format=mp3_44100_128',{
