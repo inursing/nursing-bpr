@@ -17,6 +17,7 @@ function doPost(e) {
   try {
     const d = JSON.parse(e.postData.contents);
     if (CLASS_CODE && d.classCode !== CLASS_CODE) return out({ ok: false, error: '課程代碼錯誤' });
+    if (d.action === 'video-chunk' || d.action === 'video-finish') return receiveVideo(d);
     if (!d.folder || !d.file) return out({ ok: false, error: '資料不完整' });
 
     const root = getOrCreate(DriveApp.getRootFolder(), ROOT_FOLDER_NAME);
@@ -34,6 +35,51 @@ function doPost(e) {
   } catch (err) {
     return out({ ok: false, error: String(err && err.message || err) });
   }
+}
+
+// Decode small pieces independently, then assemble the original bytes into one playable file.
+function receiveVideo(d) {
+  const f=d.file||{}, total=Number(d.total), size=Number(f.size);
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(d.uploadId||'') || !Number.isInteger(total) || total<1 || total>200 || !Number.isInteger(size) || size<1 || size>50*1024*1024 || !d.folder || !f.name) throw new Error('影片上傳資料不完整或超過50MB');
+  const lock=LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const props=PropertiesService.getScriptProperties(), key='video:'+d.uploadId;
+    let m=JSON.parse(props.getProperty(key)||'null');
+    if (!m) {
+      if (d.action!=='video-chunk' || d.index!==0) throw new Error('影片上傳尚未開始，請重新繳交');
+      const root=getOrCreate(DriveApp.getRootFolder(),ROOT_FOLDER_NAME);
+      const day=getOrCreate(root,sanitize(d.date));
+      const sub=getOrCreate(day,sanitize(d.folder));
+      const temp=sub.createFolder('_影片上傳中_'+d.uploadId);
+      m={temp:temp.getId(),target:sub.getId(),name:sanitize(f.name),type:f.type||'video/webm',total,size};
+      props.setProperty(key,JSON.stringify(m));
+    }
+    if (m.total!==total || m.size!==size || m.name!==sanitize(f.name)) throw new Error('影片上傳資料不一致');
+    const sub=DriveApp.getFolderById(m.target);
+    if (m.done) return out({ok:true,folder:sub.getUrl(),size:m.size});
+    const temp=DriveApp.getFolderById(m.temp);
+    if (d.action==='video-chunk') {
+      if (!Number.isInteger(d.index) || d.index<0 || d.index>=total || typeof f.data!=='string' || f.data.length>360000) throw new Error('影片分段格式錯誤');
+      const bytes=Utilities.base64Decode(f.data);
+      const expected=Math.min(256*1024,size-d.index*256*1024);
+      if (bytes.length!==expected) throw new Error('影片分段大小不完整');
+      const name=String(d.index), old=temp.getFilesByName(name);
+      if (!old.hasNext()) temp.createFile(Utilities.newBlob(bytes,'application/octet-stream',name));
+      return out({ok:true,index:d.index});
+    }
+    const bytes=[];
+    for (let i=0;i<total;i++) {
+      const it=temp.getFilesByName(String(i));
+      if (!it.hasNext()) throw new Error('影片尚未傳完：缺少第'+(i+1)+'段');
+      const part=it.next().getBlob().getBytes();
+      for (let j=0;j<part.length;j++) bytes.push(part[j]);
+    }
+    if (bytes.length!==size) throw new Error('影片大小不完整，未標記繳交完成');
+    const result=sub.createFile(Utilities.newBlob(bytes,m.type,m.name));
+    m.done=result.getId(); props.setProperty(key,JSON.stringify(m));
+    temp.setTrashed(true);
+    return out({ok:true,folder:sub.getUrl(),file:result.getName(),size});
+  } finally { lock.releaseLock(); }
 }
 
 function getOrCreate(parent, name) {

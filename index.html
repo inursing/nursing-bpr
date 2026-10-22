@@ -2650,12 +2650,12 @@ async function submitToTeacher(){
   if(!driveUrl()){ box.innerHTML='<span style="color:var(--danger)">老師尚未設定收件雲端（設定連結／QR 內會包含），請向老師確認。</span>'; return; }
   const c=getCase(); if(!c){ toast('沒有會談資料'); return; }
   if(!state.studentName){ toast('請先填寫姓名'); return; }
-  const CHUNK=30*1024*1024; // Apps Script 單次請求上限約 50MB（含 base64 膨脹），分段保守取 30MB
+  const CHUNK=256*1024; // 影片每段256KB，收件端驗證大小後合併成完整影片
   btn.disabled=true; const lines=[]; const show=()=>{ box.innerHTML=lines.join('<br>'); };
   const log=(t)=>{ lines.push(t); show(); }; const upd=(t)=>{ lines[lines.length-1]=t; show(); };
   const now=new Date(); const date=now.toLocaleDateString('sv-SE'); const hm=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const cleanPart=v=>String(v||'').trim().replace(/[\\/:*?"<>|\x00-\x1f]/g,'-').replace(/\s+/g,' ').slice(0,20);
-  const stamp=date.replace(/-/g,'')+'_'+hm+String(now.getSeconds()).padStart(2,'0');
+  const stamp=date.slice(5).replace(/-/g,'')+'_'+hm;
   const filePrefix=[cleanPart(state.studentId)||'無學號',cleanPart(state.studentName),cleanPart(c.name),stamp].join('_');
   const folder=filePrefix;
   const files=[];
@@ -2665,13 +2665,31 @@ async function submitToTeacher(){
     const sBlob=await makePdf('',document.getElementById('student-report-preview').innerHTML,'',true); files.push({name:`${filePrefix}_學生版行為過程記錄.pdf`,type:'application/pdf',blob:sBlob}); upd('✅ 學生版 PDF');
     if(state.aiRecord){ log('⏳ 產生 AI 版 PDF…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makePdf('行為過程記錄（AI 版）',body,'',true); files.push({name:`${filePrefix}_AI版行為過程記錄.pdf`,type:'application/pdf',blob:aBlob}); upd('✅ AI 版 PDF'); }
     else log('⚠ AI 版記錄尚未產生，這次不含 AI 版（可稍後再繳交一次）');
-    if(recBlob&&recBlob.size){ const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm'; if(recBlob.size<=CHUNK) files.push({name:`${filePrefix}_會談影片.${ext}`,type:recBlob.type||'video/webm',blob:recBlob}); else { const n=Math.ceil(recBlob.size/CHUNK); for(let i=0;i<n;i++) files.push({name:`${filePrefix}_會談影片_第${i+1}段共${n}段.${ext}.part`,type:'application/octet-stream',blob:recBlob.slice(i*CHUNK,(i+1)*CHUNK)}); log('ℹ 影片較大，分成 '+n+' 段上傳（老師端可合併）'); } }
-    else log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
+    if(recBlob&&recBlob.size){
+      if(recBlob.size>50*1024*1024) throw new Error('影片超過50MB，請先下載保存，再壓縮後另行繳交；本次尚未完成繳交');
+      const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm';
+      files.push({name:`${filePrefix}_會談影片.${ext}`,type:recBlob.type||'video/webm',blob:recBlob,video:true});
+    } else log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
     let folderUrl='';
     for(const f of files){
       const mb=(f.blob.size/1048576).toFixed(1); log(`⏳ 上傳 ${f.name}（${mb} MB）…`);
-      const data=await blobToBase64(f.blob);
-      const r=await drivePost({classCode:st.classCode||'',date,folder,file:{name:f.name,type:f.type,data}});
+      let r;
+      if(f.video){
+        const uploadId=crypto.randomUUID(), total=Math.ceil(f.blob.size/CHUNK);
+        const base={classCode:st.classCode||'',date,folder,uploadId,total};
+        const meta={name:f.name,type:f.type,size:f.blob.size};
+        for(let i=0;i<total;i++){
+          upd(`⏳ 上傳 ${escHtml(f.name)}（${i+1}/${total} 段）…`);
+          const data=await blobToBase64(f.blob.slice(i*CHUNK,(i+1)*CHUNK));
+          await drivePost({...base,action:'video-chunk',index:i,file:{...meta,data}});
+        }
+        upd('⏳ 影片已傳送，正在合併並確認完整性…');
+        r=await drivePost({...base,action:'video-finish',file:meta});
+        if(r.size!==f.blob.size) throw new Error('影片收件大小不符，尚未確認繳交完成');
+      }else{
+        const data=await blobToBase64(f.blob);
+        r=await drivePost({classCode:st.classCode||'',date,folder,file:{name:f.name,type:f.type,data}});
+      }
       folderUrl=r.folder||folderUrl; upd(`✅ ${f.name}（${mb} MB）`);
     }
     state.submitted={at:now.toISOString(),folder}; saveState();
