@@ -783,9 +783,8 @@ input[type=text]:focus{border-color:var(--primary)}
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
 </div></details>
       <details id="sharing-settings"><summary>分享課程連結與 QR Code</summary><div class="settings-section-body">
-      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">連結與 QR 含代理網址、課程代碼、收件網址與會談設定，<b>不含任何金鑰</b>。</div>
-      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">尚未設定代理：連結會把 Azure 金鑰帶給學生（學生可從連結中看到）。</div>
-      <label class="check-item hidden" style="margin:0" id="link-incl-wrap"><input type="checkbox" id="link-incl-gemini"> 連結內含 Gemini 金鑰（學生可看到）</label>
+      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">請分享下方完整課程連結或 QR。一般網站網址不包含您的設定。課程連結<b>不含 API 金鑰與教師密語</b>。</div>
+      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">請先完成「課程連線設定」。本平台不提供分享個人 API 金鑰的連結。</div>
       <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
       <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
       <div id="setup-qr-box" class="hidden" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -1301,18 +1300,25 @@ function getSettings(){
     return st;
   }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
+function courseSetupConfig(st){
+  let proxy;try{proxy=new URL(st.proxyUrl);}catch(e){throw new Error('請先完成「課程連線設定」，才能分享給學生。');}
+  if(proxy.protocol!=='https:'||proxy.username||proxy.password)throw new Error('課程代理必須使用 HTTPS 網址。');
+  // Explicit allowlist: API keys and teacher credentials never belong in student links.
+  const cfg={setupVersion:1,proxyUrl:proxy.href.replace(/\/$/,''),classCode:st.classCode||'',ownKey:false,aiProvider:st.aiProvider||'openai'};
+  for(const k of ['azVM','azVF','avM','avF','gModel','oaModel','oaReport','driveUrl','pauseSec'])if(st[k]!==undefined&&st[k]!=='')cfg[k]=st[k];
+  cfg.hands=!!st.hands;
+  if(st.caseVoices){cfg.caseVoices={};for(const id of [1,2,3,4,5,6]){const v=st.caseVoices[id];if(v)cfg.caseVoices[id]={name:String(v.name||''),rate:Math.max(.85,Math.min(1.1,Number(v.rate)||1))};}}
+  return cfg;
+}
+function setupHash(cfg){return '#setup='+btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));}
 function makeSetupLink(){
-  saveSettings(); openSettings();
-  const st=getSettings(); const cfg={azVM:st.azVM,azVF:st.azVF,avM:st.avM,avF:st.avF,provider:'gemini',gModel:st.gModel,hands:!!st.hands};
-  if(proxyOn()){ cfg.proxyUrl=st.proxyUrl; cfg.classCode=st.classCode; cfg.gKey=''; cfg.azKey=''; cfg.azRegion=''; }
-  if(st.driveUrl) cfg.driveUrl=st.driveUrl;
-  if(st.pauseSec) cfg.pauseSec=st.pauseSec;
-  cfg.aiProvider=st.aiProvider||'openai'; if(st.oaModel) cfg.oaModel=st.oaModel; if(st.oaReport) cfg.oaReport=st.oaReport;
-  else { cfg.azKey=st.azKey; cfg.azRegion=st.azRegion; if(document.getElementById('link-incl-gemini').checked) cfg.gKey=st.gKey; }
-  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
-  const url=location.origin+location.pathname+'#setup='+b64;
-  const out=document.getElementById('setup-link-out'); out.value=url;
-  navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{document.getElementById('setup-link-msg').textContent='已複製到剪貼簿';}).catch(()=>{document.getElementById('setup-link-msg').textContent='請手動複製下方連結';});
+  saveSettings();openSettings();document.getElementById('sharing-settings').open=true;
+  const out=document.getElementById('setup-link-out'),msg=document.getElementById('setup-link-msg');
+  let cfg;try{cfg=courseSetupConfig(getSettings());}catch(e){out.value='';_qrUrl='';document.getElementById('setup-qr-box').classList.add('hidden');msg.textContent=e.message;toast(e.message);return;}
+  const url=location.origin+location.pathname+setupHash(cfg);
+  out.value=url;history.replaceState(null,'',location.pathname+location.search+setupHash(cfg));
+  msg.textContent='課程連結已產生，不含 API 金鑰與教師密語。';
+  navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{msg.textContent='已複製課程連結（不含 API 金鑰）';}).catch(()=>{msg.textContent='請複製下方完整課程連結';});
   renderSetupQr(url);
 }
 let _qrUrl='';
@@ -1331,15 +1337,23 @@ function downloadQr(){
 }
 window.addEventListener('DOMContentLoaded',()=>{ try{ if(IS_IOS&&IS_STANDALONE&&!azureReady()) document.getElementById('ios-standalone-warn').classList.remove('hidden'); }catch(e){} });
 function applySetupFromHash(){
+  if(!location.hash.startsWith('#setup='))return;
   try{
-    const m=location.hash.match(/^#setup=([A-Za-z0-9+/=]+)/); if(!m) return;
-    const cfg=JSON.parse(decodeURIComponent(escape(atob(m[1]))));
-    const st=getSettings(); for(const k in cfg){ if(cfg[k]!==undefined&&cfg[k]!==''&&cfg[k]!==null) st[k]=cfg[k]; }
-    if(cfg.proxyUrl){ st.proxyUrl=cfg.proxyUrl; st.classCode=cfg.classCode||''; st.gKey=''; st.azKey=''; st.azRegion=''; }
+    const encoded=decodeURIComponent(location.hash.slice(7)).replace(/ /g,'+');
+    const cfg=JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if(!cfg||typeof cfg!=='object'||Array.isArray(cfg))throw new Error('課程設定格式不正確');
+    const safe=courseSetupConfig(cfg),st=getSettings();
+    // A student's earlier personal-key mode must not override the teacher's course AI.
+    if(st.proxyUrl!==safe.proxyUrl)st.teacherToken='';
+    Object.assign(st,safe,{ownKey:false,gKey:'',oaKey:'',azKey:'',azRegion:''});
     localStorage.setItem(SET_KEY,JSON.stringify(st));
+    // Keep only the safe course configuration so forwarding the address still works.
+    history.replaceState(null,'',location.pathname+location.search+setupHash(safe));
+    setTimeout(()=>toast('已套用課程 AI 與語音設定；學生不需要老師的 API 金鑰。'),300);
+  }catch(e){
     history.replaceState(null,'',location.pathname+location.search);
-    setTimeout(()=>toast(cfg.proxyUrl?'已套用教師提供的設定（透過課程代理，AI 與語音皆可用）':cfg.gKey?'已套用教師提供的設定（含 AI 與語音）':'已套用教師提供的語音設定；請到 ⚙ 設定 貼上您自己的 Gemini 金鑰'),300);
-  }catch(e){ console.warn('setup link',e); }
+    setTimeout(()=>toast('無法套用課程設定，請老師重新產生課程連結；請勿轉傳含個人金鑰的舊連結。',7000),300);
+  }
 }
 function openSettings(){
   document.querySelectorAll("#settings-modal details").forEach(d=>d.open=d.id==='own-key-settings');
@@ -1396,12 +1410,12 @@ async function teacherQuota(action,studentId,count){
   }catch(e){ out.textContent='❌ '+e.message; }
 }
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
-  const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定代理。沒有代理時需到「⑤／⑥」直接填金鑰。</span>';
+  const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定課程代理。教師分享前請先完成課程連線設定。</span>';
   const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
   const os=document.getElementById('ownkey-state'); os.innerHTML=own?(gk?'<span style="color:#1a7f37">✅ 使用自己的金鑰（AI 病人與 AI 記錄走你的 Gemini 額度；語音'+(on?'仍由老師代理提供':'用瀏覽器內建聲音')+'）</span>':'<span style="color:var(--danger)">請貼上你的 Gemini 金鑰，或取消勾選</span>'):'';
   if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
   // Disclosure state is controlled by the student; opening settings shows practice first.
-  document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); document.getElementById('link-incl-wrap').classList.toggle('hidden',on); }
+  document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); }
 async function testDrive(){
   saveSettings(); openSettings(); const msg=document.getElementById('drive-msg');
   if(!driveUrl()){ msg.textContent='請先貼上 script.google.com 開頭的網址'; return; }
