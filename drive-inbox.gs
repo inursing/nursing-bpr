@@ -41,7 +41,16 @@ function doPost(e) {
 function receiveVideo(d) {
   const f=d.file||{}, total=Number(d.total), size=Number(f.size);
   if (!/^[a-zA-Z0-9-]{16,64}$/.test(d.uploadId||'') || !Number.isInteger(total) || total<1 || total>200 || !Number.isInteger(size) || size<1 || size>50*1024*1024 || !d.folder || !f.name) throw new Error('影片上傳資料不完整或超過50MB');
-  const lock=LockService.getScriptLock(); lock.waitLock(20000);
+  // Hold the shared mutex only for a short lease update, never during Drive I/O.
+  // Different uploads can then write chunks concurrently.
+  const leaseKey='video-lease:'+d.uploadId, leaseId=String(Date.now())+':'+Math.random();
+  const leaseProps=PropertiesService.getScriptProperties();
+  const lock=LockService.getScriptLock();lock.waitLock(20000);
+  try {
+    const active=JSON.parse(leaseProps.getProperty(leaseKey)||'null');
+    if(active&&active.until>Date.now())throw new Error('同一份影片仍在處理，請稍後重試');
+    leaseProps.setProperty(leaseKey,JSON.stringify({id:leaseId,until:Date.now()+420000}));
+  } finally {lock.releaseLock();}
   try {
     const props=PropertiesService.getScriptProperties(), key='video:'+d.uploadId;
     let m=JSON.parse(props.getProperty(key)||'null');
@@ -79,7 +88,10 @@ function receiveVideo(d) {
     m.done=result.getId(); props.setProperty(key,JSON.stringify(m));
     temp.setTrashed(true);
     return out({ok:true,folder:sub.getUrl(),file:result.getName(),size});
-  } finally { lock.releaseLock(); }
+  } finally {
+    const active=JSON.parse(leaseProps.getProperty(leaseKey)||'null');
+    if(active&&active.id===leaseId)leaseProps.deleteProperty(leaseKey);
+  }
 }
 
 function getOrCreate(parent, name) {
