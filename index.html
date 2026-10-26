@@ -1868,7 +1868,7 @@ function setupRecognition(){
     // 停頓超過設定秒數（預設 2 秒）才視為說完；中途換氣、想詞不會被送出
     const pause=pauseMs();
     if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
-    else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
+    // Repeated identical final events must not postpone the same utterance indefinitely.
   };
   recognition.onerror=(e)=>{
     recognitionError=e.error!=='aborted'&&e.error!=='no-speech';
@@ -1881,6 +1881,8 @@ function setupRecognition(){
   recognition.onend=()=>{
     isRecording=false;
     document.getElementById('mic-btn').classList.remove('recording');
+    // Keep an unsent utterance until its pause timer fires before restarting.
+    if(lastInterim&&listenWanted&&state.phase==='conv'&&!speechInputBlocked()) return;
     document.getElementById('interim-text').textContent='';
     // 瀏覽器會自行結束 continuous 聆聽；若仍要聆聽且病人沒在說話，就自動重啟
     if(listenWanted&&state.phase==='conv') listeningResumeTimer=setTimeout(resumeListening,250);
