@@ -1,4 +1,4 @@
-/* Teacher preview: case 6 uses Simli preset Daniel with the existing patient audio. */
+/* Course Live: case 6 uses Simli preset Daniel with the existing patient audio. */
 (() => {
   let client=null, generation=0, connected=false, busy=false, ending=false, connectJob=null;
   let idleTimer=null, limitTimer=null, finishSpeech=null, lastActivity=0, utteranceStarted=false;
@@ -10,13 +10,13 @@
   const controls=document.createElement('div');
   controls.className='info-box live-patient-controls';
   controls.style.cssText='margin:8px 0;display:none';
-  controls.innerHTML='<button type="button" id="live-patient-start" hidden>開始真人影像</button> <button type="button" class="btn btn-outline btn-sm" id="live-patient-stop" hidden>結束 Live</button><div id="live-patient-status" style="font-size:.8rem;margin-top:6px" role="status">按麥克風開始會談時啟動吳先生真人影像（教師預覽，最多3分鐘）。</div>';
+  controls.innerHTML='<button type="button" id="live-patient-start" hidden>開始真人影像</button> <button type="button" class="btn btn-outline btn-sm" id="live-patient-stop" hidden>結束 Live</button><div id="live-patient-status" style="font-size:.8rem;margin-top:6px" role="status">按麥克風開始會談時啟動吳先生真人影像（每次最多12分鐘）。</div>';
   document.getElementById('stage').before(controls);
   const start=controls.querySelector('#live-patient-start'), stop=controls.querySelector('#live-patient-stop'), status=controls.querySelector('#live-patient-status');
   const video=panel.querySelector('video'), audio=panel.querySelector('audio');
   const message=t=>{status.textContent=t;};
   function refresh(){
-    const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&getSettings().teacherToken?'flex':'none';
+    const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&proxyOn()?'flex':'none';
     start.disabled=!!client; stop.hidden=!client;
     const unmute=controls.querySelector('#live-patient-unmute');if(unmute)unmute.disabled=!connected;
   }
@@ -30,7 +30,7 @@
     panel.style.display='none'; audio.pause(); video.pause();
     audio.srcObject=null;video.srcObject=null;
     if(old){try{await old.stop();}catch{}try{await old.audioContext?.close();}catch{}}
-    ending=false;message(reason||(hadSession?'Live 已結束，恢復靜態人物。':'按麥克風開始會談時啟動吳先生真人影像（教師預覽，最多3分鐘）。'));refresh();
+    ending=false;message(reason||(hadSession?'Live 已結束，恢復靜態人物。':'按麥克風開始會談時啟動吳先生真人影像（每次最多12分鐘）。'));refresh();
   }
   function connect(){
     if(connectJob)return connectJob;
@@ -40,10 +40,12 @@
     if(client||state.phase!=='conv'||getCase()?.id!==6) return;
     if(isSpeaking||(SentenceSpeaker.current&&SentenceSpeaker.current.playing)){message('請等病人說完，再啟動 Live。');return;}
     const st=getSettings();
-    if(!proxyConfigured()||!st.teacherToken){message('此為教師測試：請先在設定填入既有教師密語。');return;}
+    if(!proxyOn()){message('請先套用老師提供的課程連結，再開始真人會談。');return;}
     if(!window.SimliSDK){message('Live 元件載入失敗，請重新整理。');return;}
     const id=++generation;start.disabled=true;message('正在建立 Live 連線，最多等待20秒…');
     try{
+      await ensureSession();
+      if(id!==generation||state.phase!=='conv')return;
       const r=await fetch(st.proxyUrl+'/simli/session',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:6}),signal:AbortSignal.timeout(15000)});
       const config=await r.json();
       if(!r.ok) throw new Error(config.error||'Live 連線失敗');
@@ -61,7 +63,7 @@
       try{await Promise.race([c.start(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Live 連線逾時，未自動重試')),20000)})]);}finally{clearTimeout(timer);panel.style.opacity='1';}
       if(id!==generation){try{await c.stop();}catch{}return;}
       if(!connected) throw new Error('尚未收到 Live 影像');
-      limitTimer=setTimeout(()=>void disconnect('三分鐘教師預覽已結束；未自動續接。'),180000);
+      limitTimer=setTimeout(()=>void disconnect('本次12分鐘真人會談已結束；未自動續接。'),720000);
       idleTimer=setInterval(()=>{if(!busy&&Date.now()-lastActivity>30000) void disconnect('已閒置30秒，Live 已自動斷線以節省分鐘。');},1000);
     }catch(e){if(id===generation) await disconnect(String(e.message||'Live 啟動失敗')+'；未自動重試。');}
     finally{refresh();}

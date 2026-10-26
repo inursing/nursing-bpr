@@ -1454,7 +1454,12 @@ function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(s
 function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return proxyConfigured(); }
 function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||''}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
 // 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
-async function ensureSession(){
+let sessionJob=null;
+function ensureSession(){
+  if(sessionJob)return sessionJob;
+  const job=registerPracticeSession().finally(()=>{if(sessionJob===job)sessionJob=null;});sessionJob=job;return job;
+}
+async function registerPracticeSession(){
   const viaProxy=proxyOn()||(useOpenAI()&&proxyConfigured()&&!getSettings().oaKey);
   if(!viaProxy||state.sid) return true;
   const st=getSettings();
@@ -1931,7 +1936,7 @@ async function startConversationRecording(){
 }
 function toggleMic(){
   unlockAudio();
-  if(!listenWanted&&window.LivePatient&&getCase()?.id===6&&getSettings().teacherToken)void LivePatient.connect();
+  if(!listenWanted&&window.LivePatient&&getCase()?.id===6&&proxyOn())void LivePatient.connect();
   startConversationRecording();
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
@@ -2405,7 +2410,7 @@ function sendTextInput(){
   const t=inp.value.trim();
   if(!t||isSpeaking) return;
   inp.value='';
-  if(window.LivePatient&&getCase()?.id===6&&getSettings().teacherToken)void LivePatient.connect();
+  if(window.LivePatient&&getCase()?.id===6&&proxyOn())void LivePatient.connect();
   startTimer();
   handleNurseSpeech(t);
 }
@@ -2995,6 +3000,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./interaction-recorder.js?v=origin-safe-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=word-summary-2"></script>
+<script src="./live-patient.js?v=course-live-1"></script>
 </body>
 </html>
