@@ -1268,7 +1268,7 @@ function checkSpeech(){
   stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();unlockAudio();
   const r=createRecognizer();
   if(!r){m.textContent='此瀏覽器尚無法使用語音辨識，請改用 Chrome（Android）或 Safari（iPhone）。';return;}
-  const run={r,timer:null};checkSpeech._run=run;checkSpeech._r=r;
+  const run={r,timer:null,text:'',finalText:''};checkSpeech._run=run;checkSpeech._r=r;
   const current=()=>checkSpeech._run===run;
   const finish=(text,success=false)=>{if(!current())return;stopCheckSpeech();m.textContent=text;b.textContent=success?'↻ 重新測試':'🎤 再試一次';};
   const waitForText=()=>{clearTimeout(run.timer);run.timer=setTimeout(()=>finish('沒有收到辨識文字。請確認耳機麥克風與網路，再按「再試一次」。'),12000);};
@@ -1276,9 +1276,20 @@ function checkSpeech(){
   b.textContent='⏹ 停止測試';m.textContent='請在瀏覽器提示中允許麥克風；同意後會自動接著測試，不用再按。';
   r.oncapture=()=>{if(!current())return;m.textContent='麥克風已開啟，正在連接辨識服務，請稍候…';waitForText();};
   r.onstart=()=>{if(!current())return;m.textContent='🎤 正在聆聽，現在請說「我是護生」';waitForText();};
-  r.onresult=e=>{if(!current())return;const text=Array.from(e.results).map(x=>x[0].transcript).join('').trim();if(text)finish('✅ 麥克風與辨識正常！聽到：「'+text+'」。可以開始會談。',true);};
+  r.onresult=e=>{
+    if(!current())return;
+    run.text=Array.from(e.results).map(x=>x[0].transcript).join('').trim();
+    run.finalText=Array.from(e.results).filter(x=>x.isFinal).map(x=>x[0].transcript).join('').trim();
+    if(run.text)m.textContent='🎤 辨識中：「'+run.text+'」；請說完整句，說完稍停。';
+    const length=run.finalText.replace(/[\s，。！？、,.!?]/g,'').length;
+    if(length>=4)finish('✅ 已收到完整辨識結果：「'+run.finalText+'」。請確認是否接近你說的內容；若不符可重新測試。',true);
+  };
   r.onerror=e=>{if(!current()||e.error==='aborted')return;const hints={'not-allowed':'麥克風未獲允許，請到瀏覽器網站權限開啟麥克風。','audio-capture':'無法取得麥克風，請確認耳機已接好並關閉其他錄音程式。','network':'無法連到語音辨識服務，請檢查網路後再試。','no-speech':'沒有聽到說話聲，請靠近耳機麥克風再試。'};finish(hints[e.error]||'語音辨識未連線成功，請確認網路後再試。');};
-  r.onend=()=>{if(current())finish('測試已結束，沒有收到辨識文字。請靠近麥克風再試一次。');};
+  r.onend=()=>{
+    if(!current())return;
+    if(run.text)finish('只收到'+(run.finalText?'部分':'暫時')+'文字：「'+run.text+'」。尚未確認完整句，請重新測試，說完「我是護生」後稍停。');
+    else finish('測試已結束，沒有收到辨識文字。請靠近麥克風再試一次。');
+  };
   // Permission prompts can remain open; start the timeout only after capture starts.
   try{r.start();}catch(e){finish('無法開啟語音辨識，請確認麥克風權限後再試。');}
 }
