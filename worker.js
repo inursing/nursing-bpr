@@ -73,11 +73,11 @@ export default {
     // One-patient teacher pilot. Only temporary tokens reach the browser.
     if (url.pathname === '/simli/status' || url.pathname === '/simli/session') {
       if (!isTeacher) return json({ error: 'Live 測試僅限已設定教師密語的裝置' }, 403);
-      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 1, maxSessionLength: 180 });
+      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 6, maxSessionLength: 180 });
       if (url.pathname !== '/simli/session' || req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
       if (!env.SIMLI_KEY) return json({ error: '尚未設定 SIMLI_KEY，未啟動付費連線' }, 503);
       let b; try { b = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
-      if (b.caseId !== 1) return json({ error: '目前只開放王先生的 Live 測試' }, 400);
+      if (b.caseId !== 6) return json({ error: '目前只開放吳先生的 Live 會談測試' }, 400);
       if (env.QUOTA) {
         const previous = Number(await env.QUOTA.get('simli:pilot:last')) || 0;
         if (Date.now() - previous < 10000) return json({ error: '請稍候再啟動 Live 測試' }, 429);
@@ -86,7 +86,7 @@ export default {
       try {
         const r = await fetch('https://api.simli.ai/compose/token', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-simli-api-key': env.SIMLI_KEY },
-          body: JSON.stringify({ faceId: '9fcd5739-bf66-49a5-b525-d02d7f0bc2fc', apiVersion: 'v2', handleSilence: true, maxSessionLength: 180, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
+          body: JSON.stringify({ faceId: '03ce3ee8-db97-4150-a333-8f643d48fee9', apiVersion: 'v2', handleSilence: true, maxSessionLength: 180, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
           signal: AbortSignal.timeout(12000),
         });
         const result = await r.json().catch(() => ({}));
@@ -191,3 +191,4 @@ export default {
     return json({ error: 'not found' }, 404);
   },
 };
+
