@@ -725,7 +725,12 @@ input[type=text]:focus{border-color:var(--primary)}
     <div id="check-scene" class="info-box info-primary" style="margin-bottom:12px;font-size:.85rem"></div>
     <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">可先測試語音辨識與病人聲音。進入會談後，按下麥克風才會開啟攝影機並開始錄影；離開會談步驟即停止。</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="check-grid">
-      <div class="info-box info-primary" style="margin:0;line-height:1.8">攝影機尚未啟動<br>準備好後進入會談，按下麥克風開始。錄影時請讓鏡頭能看到您的臉與上半身。</div>
+      <div class="card" style="margin:0;padding:12px">
+        <div style="font-weight:700;margin-bottom:8px">攝影機與取景</div>
+        <video id="check-video" autoplay muted playsinline hidden style="width:100%;aspect-ratio:4/3;object-fit:cover;transform:scaleX(-1);border-radius:12px;background:#171b30"></video>
+        <button class="btn btn-outline btn-sm" id="check-camera-btn" onclick="toggleCheckCamera()">📷 測試攝影機</button>
+        <div id="check-camera-msg" role="status" style="font-size:.8rem;margin-top:8px;line-height:1.7">按下後顯示自己的預覽，請確認臉與上半身都在鏡頭內。此處只預覽，不錄影。</div>
+      </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風與語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 按下後說「我是護生」</button><div id="check-sr-service" style="font-size:.78rem;color:var(--text2);margin-top:8px"></div><div id="check-sr-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
@@ -1169,6 +1174,27 @@ function startConv(){
   openCheck();
 }
 let checkMicCtx=null, checkMicRAF=null, checkMicStream=null;
+let checkCameraStream=null, checkCameraGeneration=0, checkCameraPending=false;
+function stopCheckCamera(){
+  checkCameraGeneration++;checkCameraPending=false;
+  if(checkCameraStream)checkCameraStream.getTracks().forEach(t=>t.stop());
+  checkCameraStream=null;
+  const v=document.getElementById('check-video');if(v){v.pause();v.srcObject=null;v.hidden=true;}
+  const b=document.getElementById('check-camera-btn');if(b){b.disabled=false;b.textContent='📷 測試攝影機';}
+}
+async function toggleCheckCamera(){
+  if(checkCameraStream||checkCameraPending){stopCheckCamera();document.getElementById('check-camera-msg').textContent='攝影機已停止；正式會談按下麥克風後開始錄影。';return;}
+  const id=++checkCameraGeneration,b=document.getElementById('check-camera-btn'),m=document.getElementById('check-camera-msg');
+  checkCameraPending=true;b.disabled=true;m.textContent='正在開啟攝影機，請允許瀏覽器使用鏡頭…';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
+    if(id!==checkCameraGeneration||document.getElementById('check-modal').classList.contains('hidden')){stream.getTracks().forEach(t=>t.stop());return;}
+    checkCameraStream=stream;const v=document.getElementById('check-video');v.srcObject=stream;v.hidden=false;await v.play();
+    if(id!==checkCameraGeneration)return;
+    b.textContent='停止攝影機測試';m.textContent='請確認臉與上半身都在畫面內。現在只預覽，不錄影；關閉檢查時會停止鏡頭。';
+  }catch(e){if(id===checkCameraGeneration){stopCheckCamera();m.textContent=e.name==='NotAllowedError'?'攝影機權限未允許，請在瀏覽器的網站權限中允許攝影機後再試。':'無法開啟攝影機，請確認鏡頭已連接且沒有被其他程式占用。';}}
+  finally{if(id===checkCameraGeneration){checkCameraPending=false;b.disabled=false;}}
+}
 async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
@@ -1195,6 +1221,7 @@ async function runCheckDiag(){
   }
 }
 function closeCheck(){
+  stopCheckCamera();
   if(checkSpeech._r){try{checkSpeech._r.abort();}catch(e){}checkSpeech._r=null;}
   stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();
   document.getElementById('check-modal').classList.add('hidden');
