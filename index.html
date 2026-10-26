@@ -1048,7 +1048,7 @@ function renderCases(){
   const grid=document.getElementById('case-grid');
   grid.innerHTML=CASES.map(c=>`
     <div class="card case-card ${state.caseId===c.id?'selected':''}" onclick="selectCase(${c.id})">
-      <div class="case-portrait"><img src="${portraitUrl(c)}" alt="${c.age}歲${c.gender}性模擬病人插畫" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
+      <div class="case-portrait"><img src="${portraitUrl(c)}" alt="${c.age}歲${c.gender}性模擬病人${c.id===6?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
       <div class="dept-badge ${c.deptClass}">${c.icon} ${c.deptLabel}</div>
       <div class="case-name">${c.name}　${c.age}歲 ${c.gender}</div>
       <div class="case-meta">病床 ${c.bed}</div>
@@ -1276,10 +1276,10 @@ function parsePatientReply(raw){
   return {expr,gest,text};
 }
 const CASE_PORTRAITS={1:'wang',2:'li',3:'chen',4:'zhang',5:'lin',6:'wu'};
-function portraitUrl(c){ return './portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
+function portraitUrl(c){ return c.id===6?'https://app.simli.com/_next/image?url=%2Fcharacters%2Ftrinity2%2F03ce3ee8-db97-4150-a333-8f643d48fee9.jpg&w=3840&q=75':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
 function loadAvatarFor(c){
   document.getElementById('avatar-loading').classList.add('hidden');
-  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender});
+  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:c.id===6});
 }
 
 // ===== SETTINGS / API =====
@@ -3030,7 +3030,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script src="./iphone-speech.js?v=2"></script>
-<script src="./patient-view.js"></script>
+<script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./interaction-recorder.js"></script>
 <script src="./simli-sdk.js"></script>
 <script src="./live-patient.js?v=wu-preset-1"></script>
