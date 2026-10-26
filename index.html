@@ -745,7 +745,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         <div id="check-camera-msg" role="status" style="font-size:.8rem;margin-top:8px;line-height:1.7">按下後顯示自己的預覽，請確認臉與上半身都在鏡頭內。此處只預覽，不錄影。</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風與語音辨識測試</div><label for="check-speech-mode">辨識方式</label><select id="check-speech-mode" onchange="changeSpeechInput(this.value)" style="width:100%;margin-bottom:10px"><option value="browser">手機／瀏覽器內建（不使用 Azure 額度）</option><option value="azure">Azure 雲端辨識（使用 Azure 額度）</option></select><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 開始麥克風測試</button><div id="check-sr-service" style="font-size:.78rem;color:var(--text2);margin-top:8px"></div><div id="check-sr-msg" role="status" aria-live="polite" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
+        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風與語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 開始麥克風測試</button><div id="check-sr-service" style="font-size:.78rem;color:var(--text2);margin-top:8px"></div><div id="check-sr-msg" role="status" aria-live="polite" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
       </div>
     </div>
@@ -1693,7 +1693,7 @@ async function startCamera(){
   const generation=++cameraGeneration;
   try{
     // iOS Safari：鏡頭若同時佔用麥克風，語音辨識會卡住 → iPhone/iPad 只錄畫面（會談內容仍有逐字稿）
-    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:(IS_IOS||useIPhoneCloudSpeech())?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:IS_IOS?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(generation!==cameraGeneration){acquired.getTracks().forEach(t=>t.stop());return;}
     camStream=acquired;
   }catch(e){
@@ -1824,31 +1824,19 @@ let listenWanted=false, pendingFinal='', finalTimer=null;
 let resetRecognitionPending=()=>{}, listeningResumeTimer=null, recognitionWatchdogTimer=null;
 const ECHO_TAIL_MS=1000;
 function speechInputBlocked(){ return isSpeaking||!!window.LivePatient?.busy||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
-function preferredSpeechInput(){try{return localStorage.getItem('nursing-bpr-speech-mode')||(IS_IOS&&IS_STANDALONE?'azure':'browser');}catch{return IS_IOS&&IS_STANDALONE?'azure':'browser';}}
-function useIPhoneCloudSpeech(){return preferredSpeechInput()==='azure'&&azureReady();}
 function updateSpeechChoice(){
-  const mode=preferredSpeechInput(),select=document.getElementById('check-speech-mode');if(select)select.value=mode;
-  document.getElementById('check-sr-service').textContent=mode==='azure'?(azureReady()?'使用 Azure 辨識額度；免費方案一次僅支援 1 人。':'尚未設定 Azure，請先使用手機／瀏覽器內建辨識。'):'使用手機／瀏覽器的辨識服務，不使用 Azure 額度。請先不開鏡頭，單獨測試麥克風。';
-}
-function changeSpeechInput(mode){
-  stopCheckSpeech();pauseListening();recognition=null;
-  try{localStorage.setItem('nursing-bpr-speech-mode',mode==='azure'?'azure':'browser');}catch{}
-  updateSpeechChoice();document.getElementById('check-sr-msg').textContent='已切換。按一次「開始麥克風測試」，再說「我是護生」。';
+  document.getElementById('check-sr-service').textContent='使用手機／瀏覽器內建辨識。請先不開鏡頭，單獨測試麥克風。';
 }
 function createRecognizer(){
-  if(useIPhoneCloudSpeech()){
-    if(!window.SpeechSDK||!window.IPhoneSpeechRecognizer||!navigator.mediaDevices?.getUserMedia)return null;
-    return new IPhoneSpeechRecognizer({settings:getSettings,token:getAzToken,sdk:SpeechSDK,media:navigator.mediaDevices,context:()=>{ensureAudioCtx();return audioCtx;}});
-  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;return SR?new SR():null;
 }
-function sttName(){return useIPhoneCloudSpeech()?'Azure 語音辨識':'瀏覽器內建辨識';}
+function sttName(){return '手機／瀏覽器內建辨識';}
 function setupRecognition(){
   let recognitionError=false;
   recognition=createRecognizer();
-  if(!recognition){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ 主畫面語音辨識尚未就緒，請確認課程連線及網路，或暫用 Safari':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
+  if(!recognition){setStatus(IS_IOS&&IS_STANDALONE?'⚠️ 此主畫面 App 無法使用內建辨識，請改用 Safari 開啟，或在文字輸入框使用手機鍵盤語音輸入':'⚠️ 您的瀏覽器不支援語音識別，請改用 Chrome 或 Safari');return}
   recognition.lang='zh-TW';
-  recognition.continuous=useIPhoneCloudSpeech()||!(typeof navigator!=='undefined'&&/Android/i.test(navigator.userAgent));
+  recognition.continuous=!(typeof navigator!=='undefined'&&/Android/i.test(navigator.userAgent));
   recognition.interimResults=true;
   recognition.onstart=()=>{
     recognitionError=false;
