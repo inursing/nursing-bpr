@@ -689,6 +689,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
       </div>
       <div class="card">
         <h3 style="margin-bottom:10px">📝 會談逐字稿</h3>
+        <div id="review-clips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div id="review-meta" style="font-size:.82rem;color:var(--text2);margin-bottom:12px"></div>
         <div id="review-transcript" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
@@ -1093,6 +1094,7 @@ function selectCase(id){
   state.caseId=id;
   state.furthestPhase=1;
   state.conversation=[];
+  recordingEpoch++;recSegments=[];recBlob=null;recStart=null;
   state.processRecord=[];
   state.aiRecord=null;
   state.aiRecordInputKey=null;
@@ -1663,6 +1665,9 @@ function saveBlob(filename,blob){
 
 // ===== CAMERA RECORDING =====
 let camStream=null, recorder=null, recChunks=[], recBlob=null, recStart=null, recComposite=false, cameraGeneration=0;
+let recSegments=[],recordingEpoch=0;
+function recordingClips(){return recSegments.length?recSegments:(recBlob?[{blob:recBlob,start:recStart}]:[]); }
+function chooseRecordingClip(index){const clip=recordingClips()[index];if(!clip)return;recBlob=clip.blob;recStart=clip.start;renderReviewPhase();}
 function captureNurseFrame(){
   try{
     const v=document.getElementById('cam-video'); if(!camStream||!v||v.readyState<2||!v.videoWidth) return null;
@@ -1700,10 +1705,11 @@ function startRecording(){
     try{recorder=new MediaRecorder(capture.stream,Object.assign(mime?{mimeType:mime}:{},{videoBitsPerSecond:600000,audioBitsPerSecond:48000}));}
     catch(e){capture.stop();throw e;}
     recComposite=true;
-    recChunks=[]; recBlob=null;
-    recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
-    recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); capture.stop(); };
-    recorder.start(1000); recStart=Date.now(); updateRecIndicator();
+    const currentRecorder=recorder,chunks=[],epoch=recordingEpoch,startedAt=Date.now();
+    recChunks=chunks;
+    currentRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    currentRecorder.onstop=()=>{const blob=new Blob(chunks,{type:currentRecorder.mimeType||'video/webm'});if(epoch===recordingEpoch&&blob.size){recSegments.push({blob,start:startedAt});recBlob=blob;recStart=startedAt;}capture.stop();};
+    recorder.start(1000); recStart=startedAt; updateRecIndicator();
     document.getElementById('cam-label').innerHTML='<span class="rec-dot"></span>錄影中';
   }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; toast('本次未能開始錄影，會談仍可繼續：'+(e.message||e.name)); }
 }
@@ -1759,7 +1765,7 @@ function seekRec(sec){ const v=document.getElementById('rec-video'); v.currentTi
 async function downloadRecording(){
   if(!recBlob){toast('沒有錄影');return}
   const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm';
-  saveBlob(`會談互動錄影_${state.studentId||'無學號'}_${state.studentName}.${ext}`,recBlob);
+  saveBlob(`會談互動錄影_${state.studentId||'無學號'}_${state.studentName}${recordingClips().length>1?'_第'+(recordingClips().findIndex(c=>c.blob===recBlob)+1)+'段':''}.${ext}`,recBlob);
 }
 
 async function initConvPhase(){
@@ -2749,11 +2755,15 @@ async function submitToTeacher(){
     const sBlob=await makeWord('行為過程紀錄',buildStudentReportHTML(),'',true); files.push({name:`${filePrefix}_學生版行為過程記錄.docx`,type:WordExport.MIME,blob:sBlob}); upd('📄 學生版 Word 已產生（待上傳）');
     if(state.aiRecord&&state.aiRecordInputKey===reportInputKey()){ log('⏳ 產生 AI 版 Word…'); const body=`<div style="font-size:10pt;margin-bottom:8px">學生：${escHtml(state.studentName)}　病人：${c.name}（${c.deptLabel}）　日期：${now.toLocaleDateString('zh-TW')}</div>`+document.getElementById('ai-report-preview').innerHTML; const aBlob=await makeWord('AI版行為過程紀錄',body,'',true); files.push({name:`${filePrefix}_AI版行為過程記錄.docx`,type:WordExport.MIME,blob:aBlob}); upd('📄 AI 版 Word 已產生（待上傳）'); }
     else log('⚠ AI 版記錄尚未產生，這次不含 AI 版（可稍後再繳交一次）');
-    if(recBlob&&recBlob.size){
-      if(recBlob.size>50*1024*1024) throw new Error('影片超過50MB，請先下載保存，再壓縮後另行繳交；本次尚未完成繳交');
-      const ext=(recBlob.type||'').includes('mp4')?'mp4':'webm';
-      files.push({name:`${filePrefix}_會談影片.${ext}`,type:recBlob.type||'video/webm',blob:recBlob,video:true});
-    } else log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
+    for(const [index,clip] of recordingClips().entries()){
+      const blob=clip.blob;if(!blob?.size)continue;
+      if(blob.size>50*1024*1024)throw new Error('影片超過50MB，請先下載保存，再壓縮後另行繳交；本次尚未完成繳交');
+      const ext=(blob.type||'').includes('mp4')?'mp4':'webm';
+      const suffix=recordingClips().length>1?'_第'+(index+1)+'段':'';
+      files.push({name:filePrefix+'_會談影片'+suffix+'.'+ext,type:blob.type||'video/webm',blob,video:true});
+
+    }
+    if(!recordingClips().length)log('⚠ 沒有錄影檔（可能未開啟鏡頭），這次不含影片');
     let folderUrl='';
     for(const f of files){
       const mb=(f.blob.size/1048576).toFixed(1); log(`⏳ 上傳 ${f.name}（${mb} MB）…`);
@@ -2799,6 +2809,8 @@ function moveAvatarTo(containerId){
 const replay={events:[],base:0,duration:0,playing:false,timer:null,clockStart:0,clockOffset:0,fired:0,hasVideo:false};
 function fmtSec(sec){sec=Math.max(0,Math.round(sec));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 function renderReviewPhase(){
+  const clips=recordingClips(),clipBox=document.getElementById('review-clips');
+  if(clipBox)clipBox.innerHTML=clips.length>1?'<span>中斷前後影片分段保留：</span>'+clips.map((clip,i)=>'<button type="button" class="btn btn-outline btn-sm" onclick="chooseRecordingClip('+i+')">第'+(i+1)+'段</button>').join(''):'';
   document.getElementById('step-review').classList.add('done');
   prepareEmotionalVoices(); setTimeout(gttsProgress,50);
   replayStop();
