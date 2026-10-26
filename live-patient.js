@@ -8,7 +8,7 @@
   panel.innerHTML='<video id="live-patient-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain"></video><audio id="live-patient-audio" autoplay></audio><span style="position:absolute;top:12px;right:12px;background:#233a31;color:white;padding:4px 10px;border-radius:14px;font-size:12px">LIVE · 吳先生（內建人物）</span>';
   host.append(panel);
   const controls=document.createElement('div');
-  controls.className='info-box';
+  controls.className='info-box live-patient-controls';
   controls.style.cssText='margin:8px 0;display:none';
   controls.innerHTML='<button type="button" id="live-patient-start" hidden>開始真人影像</button> <button type="button" class="btn btn-outline btn-sm" id="live-patient-stop" hidden>結束 Live</button><div id="live-patient-status" style="font-size:.8rem;margin-top:6px" role="status">按麥克風開始會談時啟動吳先生真人影像（教師預覽，最多3分鐘）。</div>';
   document.getElementById('stage').before(controls);
@@ -16,7 +16,7 @@
   const video=panel.querySelector('video'), audio=panel.querySelector('audio');
   const message=t=>{status.textContent=t;};
   function refresh(){
-    const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&getSettings().teacherToken?'block':'none';
+    const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&getSettings().teacherToken?'flex':'none';
     start.disabled=!!client; stop.hidden=!client;
     const unmute=controls.querySelector('#live-patient-unmute');if(unmute)unmute.disabled=!connected;
   }
