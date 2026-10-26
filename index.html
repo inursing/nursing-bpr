@@ -1072,7 +1072,7 @@ function renderCases(){
   const grid=document.getElementById('case-grid');
   grid.innerHTML=CASES.map(c=>`
     <div class="card case-card ${state.caseId===c.id?'selected':''}" onclick="selectCase(${c.id})">
-      <div class="case-portrait"><img src="${portraitUrl(c)}" ${[4,6].includes(c.id)?'style="object-fit:contain;background:#626262"':''} alt="${c.age}歲${c.gender}性模擬病人${[4,6].includes(c.id)?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
+      <div class="case-portrait"><img src="${caseCardPortraitUrl(c)}" alt="${c.age}歲${c.gender}性模擬病人手繪插畫" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
       <div class="dept-badge ${c.deptClass}">${c.icon} ${c.deptLabel}</div>
       <div class="case-name">${c.name}　${c.age}歲 ${c.gender}</div>
       <div class="case-meta">病床 ${c.bed}</div>
@@ -1298,8 +1298,8 @@ async function checkVoice(){
   m.textContent='播放中…';
   const who=`${c.name}（${c.gender}性，${c.age} 歲）`;
   try{ if(azureReady()){ const blob=await azureSynth('你好，我是今天住在這一床的病人。',c,'neutral'); await playBlob(blob); m.innerHTML=`✅ ${await patientSpeechName(c)}　病人：${who}`; }
-       else { const v=pickVoice(c.gender); await browserSpeak('你好，我是今天住在這一床的病人。',c); m.innerHTML=(v&&voiceGender(v)===c.gender?'✅ ':'⚠️ ')+`瀏覽器內建語音「${v?v.name:'無'}」　病人：${who}`+((!v||voiceGender(v)!==c.gender)?'<br><span style="color:var(--danger)">此裝置沒有符合病人性別的內建聲音，將保留文字，不以異性聲音替代。請確認老師的語音代理已設定，或換用電腦／Android。</span>':''); } }
-  catch(e){ m.innerHTML='⚠️ Azure 語音失敗：'+escHtml(e.message||'')+'<br>會改用瀏覽器內建語音，僅使用符合病人性別的聲音。請檢查網路或向老師確認代理設定。'; }
+       else { m.textContent='尚未連上課程的病人聲音設定，請確認課程連線後重試。'; } }
+  catch(e){ m.textContent='⚠️ 病人指定聲音未能播放：'+(e.message||'請確認課程連線')+'。請重試，不會改用手機內建聲音。'; }
 }
 
 // ===== PHASE 3: CONVERSATION =====
@@ -1340,6 +1340,7 @@ function parsePatientReply(raw){
   return {expr,gest,text};
 }
 const CASE_PORTRAITS={1:'wang',2:'li',3:'chen',4:'zhang',5:'lin',6:'wu'};
+function caseCardPortraitUrl(c){return c.id===6?'./portraits/wu-daniel-sketch.jpg':c.id===4?'./portraits/zhang-live-sketch.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png';}
 function portraitUrl(c){ return c.id===6?'./portraits/wu-daniel.jpg':c.id===4?'./portraits/zhang-50-live.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
 function loadAvatarFor(c){
   document.getElementById('avatar-loading').classList.add('hidden');
@@ -2148,8 +2149,8 @@ function renderCaseVoiceSettings(){
     if(select){select.disabled=true;select.innerHTML='<option>ElevenLabs · 個案專屬聲音</option>';}
     if(rate)rate.disabled=true;
     const patient=CASES.find(c=>c.id===id);
-    if(status&&patient)status.textContent='教師測試：'+patient.age+'歲'+(patient.gender==='女'?'女聲':'男聲')+'；其他裝置維持 Azure';
-  }));
+    if(status&&patient)status.textContent='個案專屬聲音：'+patient.age+'歲'+(patient.gender==='女'?'女聲':'男聲')+'；手機與電腦使用相同設定';
+  })).catch(()=>{document.querySelectorAll('[id^=case-voice-status-]').forEach(el=>el.textContent='專屬聲音設定未載入，請確認課程連線後重開設定。');});
 }
 function readCaseVoiceSettings(){return Object.fromEntries(CASES.map(c=>[c.id,{name:document.getElementById('case-voice-'+c.id)?.disabled?azureVoiceFor(c):(document.getElementById('case-voice-'+c.id)?.value||azureVoiceFor(c)),rate:Math.max(.85,Math.min(1.1,parseFloat(document.getElementById('case-rate-'+c.id)?.value)||1))}]))}
 async function testCaseVoice(id){
@@ -2184,8 +2185,8 @@ async function getPatientSpeechConfig(){
   patientSpeechConfigKey=key;patientSpeechConfigUntil=Date.now()+60000;
   patientSpeechConfig=(async()=>{try{
     const r=await fetch(st.proxyUrl+'/speech/status',{headers:proxyHeaders(),signal:AbortSignal.timeout(5000)});
-    if(!r.ok)return {cases:[]};const data=await r.json();return {cases:Array.isArray(data.cases)?data.cases.filter(id=>Number.isInteger(id)&&id>=1&&id<=6):[]};
-  }catch{return {cases:[]};}})();
+    if(!r.ok)throw new Error('無法讀取病人指定聲音設定（'+r.status+'）');const data=await r.json();return {cases:Array.isArray(data.cases)?data.cases.filter(id=>Number.isInteger(id)&&id>=1&&id<=6):[]};
+  }catch(e){patientSpeechConfig=null;patientSpeechConfigUntil=0;throw new Error('病人指定聲音設定載入失敗，請確認課程連線後重試。');}})();
   return patientSpeechConfig;
 }
 async function elevenPatientSpeech(text,c){
@@ -2301,14 +2302,15 @@ async function playBlobBuffer(blob,visemes,hint){
 // 逐句語音佇列：邊生成邊唸，並預先抓下一句
 class SentenceSpeaker{
   constructor(){ this.q=[]; this.playing=false; this.finished=false; this.c=getCase(); this.expr=null; SentenceSpeaker.current&&SentenceSpeaker.current.cancel(); SentenceSpeaker.current=this; stopAudio(); window.speechSynthesis&&speechSynthesis.cancel(); }
-  push(t){ t=t.trim(); if(!t) return; const expr=currentExprName(); this.q.push({t,expr,p:azureReady()?azureSynth(t,this.c,expr).catch(()=>null):null}); this.run(); }
+  push(t){ t=t.trim(); if(!t) return; const expr=currentExprName(); this.q.push({t,expr,p:azureReady()?azureSynth(t,this.c,expr).catch(error=>({error})):null}); this.run(); }
   finish(){ this.finished=true; }
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
+      if(blob?.error){toast('病人指定聲音未能載入，請重試；本句保留文字。',6000);continue;}
       if(window.LivePatient)await LivePatient.ready();
       if(this.cancelled)break;
-      if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
+      if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else toast('病人語音尚未設定，本句保留文字，請確認課程連線。',5000); }
     this.playing=false; lastSpeakEnd=Date.now(); if(this.finished&&!this.cancelled&&!isSpeaking) setTimeout(resumeListening,IS_MOBILE?900:300); }
 }
 let _curExpr='neutral';
