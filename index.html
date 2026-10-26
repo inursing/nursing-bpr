@@ -2507,11 +2507,16 @@ async function renderExportPhase(generate=false){
         document.getElementById('ai-report-preview').innerHTML=''; return;
       }
       if(!aiJob || aiRecordKey!==key || aiJobError){
-        aiRecordKey=key; aiJobError=null; state.aiRecord=null;
+        aiRecordKey=key; aiJobError=null; aiJobText=''; state.aiRecord=null;
         const job=generateAiRecord(); aiJob=job;
         job.catch(e=>{ if(aiJob===job) aiJobError=e; });
       }
-      aiText=await aiJob;
+      const waitingSince=Date.now();
+      const waitingTimer=setInterval(()=>{
+        const el=document.getElementById('ai-generating');
+        if(el&&state.phase==='export')el.textContent=aiJobText?'AI 正在分析會談過程…（已產生 '+aiJobText.length+' 字）':'AI 正在閱讀會談與反思…（已等候 '+Math.floor((Date.now()-waitingSince)/1000)+' 秒，請勿重複點選）';
+      },1000);
+      try{aiText=await aiJob;}finally{clearInterval(waitingTimer);}
       if(reportInputKey()!==key) return;
       state.aiRecord=aiText;
       state.aiRecordInputKey=key; saveState();
@@ -2687,12 +2692,12 @@ ${JSON.stringify(state.reflections||{})}
 
 【字數限制——務必遵守】
 - 護生非語言／病人非語言：每格 ≤ 15 字。
-- 教師分析每格四小段、各一行、總共約 80–140 字：「依據 」引用關鍵字與理由／「回應 」病人實際表達及不確定處／「反思 」評述學生本列技巧與自我分析（未能對應則說明）／「可說 」符合當下脈絡的替代語句。恰當的回應可寫「可保留」並建議下一步，不必硬挑錯。
-- 整體評估每一小標約 80–160 字，用 2–3 個短句或條列，不要長段落。
+- 教師分析每格四小段、各一行、總共約 60–90 字：「依據 」引用關鍵字與理由／「回應 」病人實際表達及不確定處／「反思 」評述學生本列技巧與自我分析（未能對應則說明）／「可說 」符合當下脈絡的替代語句。恰當的回應可寫「可保留」並建議下一步，不必硬挑錯。
+- 整體評估每一小標約 50–90 字，用 2–3 個短句或條列，不要長段落。
 
 請直接輸出 HTML（不要 markdown、不要 <html>/<body> 標籤），結構如下：
 1. 一個 <table class="record-table">，欄位依序為：序｜護生語言反應（引用原文）｜護生非語言反應（有對應畫面只寫可見事實，否則「未觀察」）｜病人語言反應（引用原文）｜病人非語言反應（寫「未觀察：模擬對話」）｜使用技巧（每個技巧用 <span class="tech-tag">技巧名</span>，非治療性用 <span class="tech-tag tech-non">非治療性：類型</span>）｜教師分析（四行：依據…<br>回應…<br>反思…<br>可說 「…」）
-2. 一個 <h4>整體評估</h4>，依序包含下列小標（用 <b>），每項約 80–160 字，以具體證據為主：
+2. 一個 <h4>整體評估</h4>，依序包含下列小標（用 <b>），每項約 50–90 字，以具體證據為主：
    - 會談內容相關性：護生的話是否圍繞病人的狀況與會談目的；若有與病人無關的句子，指出是第幾句並說明影響。
    - 技巧運用：不要統計次數。評論「用得恰當的技巧」（舉 1–2 句實例說明為何恰當）、「用得不恰當或時機不對的技巧」（舉例說明）、以及本案最需要卻沒用到的技巧（最多 2 個，說明在哪一句可以用）。
    - 會談結構：開場／中段／結束各一句評語。
@@ -2702,6 +2707,7 @@ ${JSON.stringify(state.reflections||{})}
    - 記憶落差（學生有填才寫）：遺漏或記錯的重點，≤ 2 項。
    - 學習評量（供教師複核）：小表格，「建立關係／傾聽與回應／探索與聚焦／結束與總結」各列證據句次、理由與 1–5 分。共同尺度：1＝有明確反向行為且未修正；2＝有嘗試但錯失主要需求；3＝基本適切但未深入或確認；4＝適切並有確認或追問；5＝適切、依病人回應調整且有共同確認。沒有可評資料寫「證據不足」，不得直接給 1 分。分數是教學參考，不計算總分。最後給一項具體鼓勵。
 
+每句對話都必須分析，不得省略句次。優先保留原句依據、判斷理由、學生反思與可執行建議，避免重複敘述病歷及相同結論。
 全部使用繁體中文、台灣護理用語，稱呼對方為「病人」，不要用「案主」或「個案」。`;
 
   // 每句最多一張，最多20張；只在產出報告時傳送，不隨每輪會談傳送。
@@ -2714,7 +2720,8 @@ ${JSON.stringify(state.reflections||{})}
   }
   if(nImg){ parts.push({text:'這是螢幕會談，護生看的是螢幕中的病人，無須直視鏡頭。未看鏡頭、查看病歷或視線移動不能當成不專心的證據；注視目標不清時寫「無法判斷」。以上是部分護生說話時的瞬間截圖。僅描述對應句次中清晰可見的事實；不推斷眼神接觸、情緒、人格或整段會談的非語言表現。未附圖的句子寫「未觀察」。'}); }
   const input=nImg?[{role:'user',parts}]:prompt;
-  const onDelta=(full)=>{ onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
+  let lastReportPaint=0;
+  const onDelta=(full)=>{ aiJobText=full; const now=Date.now(); if(now-lastReportPaint<300)return; lastReportPaint=now; onProgress&&onProgress(full); const el=document.getElementById('ai-report-preview'); if(el&&state.phase==='export') el.innerHTML=full; const g=document.getElementById('ai-generating'); if(g&&state.phase==='export') g.textContent=`AI 正在分析會談過程…（已產生 ${full.length} 字）`; };
   const complete=t=>(t.match(/<td\b/gi)||[]).length>=Math.max(1,pairs.length)*7&&/<\/table>/.test(t)&&/整體評估/.test(t)&&/學習評量/.test(t)&&t.length>400;
   let text=''; let lastErr=null;
   for(let attempt=0;attempt<1;attempt++){
