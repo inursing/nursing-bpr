@@ -435,6 +435,19 @@ input[type=text]:focus{border-color:var(--primary)}
 <div id="ios-standalone-warn" class="hidden" style="background:#b42318;color:#fff;padding:10px 14px;font-size:.85rem;line-height:1.6;text-align:center">iPhone 主畫面模式需設定課程連線，才能使用 Azure 語音辨識。也可先用 <b>Safari</b> 開啟網址：<br><span style="user-select:all;background:rgba(255,255,255,.18);padding:2px 6px;border-radius:4px">inursing.github.io/nursing-bpr/</span>　<button class="btn btn-sm" style="background:#fff;color:#b42318" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.origin+location.pathname).then(()=>toast('已複製網址，請到 Safari 貼上'))">複製網址</button><br><span style="font-size:.75rem;opacity:.9">請到「設定 → 課程連線設定」確認老師提供的設定。</span></div>
 <link rel="stylesheet" href="./modern.css">
 <style>
+body.review-active #topbar{display:none}
+body.review-active #steps{top:0;padding:4px 8px;margin:0}
+body.review-active #main{padding-top:8px}
+#phase-review{max-width:960px;margin:0 auto}
+#phase-review>.section-title{margin-bottom:6px}
+#phase-review>.info-box{padding:8px 12px;font-size:.8rem;margin-bottom:8px!important}
+#phase-review>.card{padding:14px}
+#review-stage{max-width:900px;margin:0 auto}
+#review-stage .stage-box{aspect-ratio:auto;height:clamp(180px,43dvh,420px)}
+#review-video{object-fit:contain!important}
+#review-subtitle{height:70px;min-height:70px!important;max-height:70px;overflow-y:auto;overflow-anchor:none}
+#review-transcript{height:26dvh;min-height:120px;max-height:280px;overflow-y:auto;overscroll-behavior:contain;overflow-anchor:none}
+@media(max-width:640px){body.review-active #steps{display:none}#review-stage .stage-box{height:clamp(160px,36dvh,320px)}}
 /* Keep the patient and call controls inside the conversation viewport. */
 body.conv-active #topbar{display:none}
 body.conv-active #steps{padding:4px 8px;margin:0;min-height:32px;top:0}
@@ -1046,7 +1059,7 @@ function renderPhase(p){
     state.goals=document.getElementById('goals-input').value.trim();
   }
   state.furthestPhase=Math.max(state.furthestPhase||0,PHASES.indexOf(state.phase),PHASES.indexOf(p));
-  state.phase=p; document.body.classList.toggle('conv-active',p==='conv');
+  state.phase=p; document.body.classList.toggle('conv-active',p==='conv');document.body.classList.toggle('review-active',p==='review');
   PHASES.forEach(ph=>{
     document.getElementById('phase-'+ph)?.classList.add('hidden');
   });
@@ -2898,7 +2911,11 @@ function replayTick(sec){
 }
 function highlightRow(i){
   document.querySelectorAll('#review-transcript .rv-row').forEach(r=>r.classList.toggle('active',+r.dataset.i===i));
-  const el=document.querySelector(`#review-transcript .rv-row[data-i="${i}"]`); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  const box=document.getElementById('review-transcript'),el=box.querySelector(`.rv-row[data-i="${i}"]`);
+  if(el){
+    const outer=box.getBoundingClientRect(),row=el.getBoundingClientRect();
+    if(row.top<outer.top||row.bottom>outer.bottom)box.scrollTo({top:Math.max(0,box.scrollTop+row.top-outer.top-(box.clientHeight-row.height)/2),behavior:'auto'});
+  }
 }
 function showSubtitle(e){
   const box=document.getElementById('review-subtitle'); if(!e){box.textContent='';return}
@@ -2926,7 +2943,7 @@ function saveState(){
   try{
     const {phase,furthestPhase,caseId,studentName,studentId,goals,plannedTech,convDuration,processRecord,reflections,submitted,sid}=state;
     const conversation=state.conversation.map(m=>{const {frames,...rest}=m; return rest;});
-    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,furthestPhase,caseId,studentName,studentId,goals,plannedTech,conversation,convDuration,processRecord,reflections,reflectionVersion:2,aiRecord:state.aiRecord,aiRecordInputKey:state.aiRecordInputKey,savedAt:Date.now()}));
+    localStorage.setItem(SAVE_KEY,JSON.stringify({phase,furthestPhase,caseId,studentName,studentId,goals,plannedTech,conversation,convDuration,processRecord,reflections,reflectionVersion:2,aiRecord:state.aiRecord,aiRecordInputKey:state.aiRecordInputKey,aiAnalysisStarted:state.aiAnalysisStarted||null,savedAt:Date.now()}));
   }catch(e){}
 }
 function loadState(){
@@ -2935,7 +2952,7 @@ function loadState(){
 function resumeSaved(){
   const s=loadState(); if(!s||!s.caseId) return;
   Object.assign(state,{caseId:s.caseId,studentName:s.studentName||'',studentId:s.studentId||'',submitted:s.submitted||null,sid:s.sid||null,goals:s.goals||'',plannedTech:s.plannedTech||[],conversation:s.conversation||[],convDuration:s.convDuration||0,processRecord:s.processRecord||[],reflections:s.reflections||state.reflections});
-  state.aiRecord=s.aiRecord||null; state.aiRecordInputKey=s.aiRecordInputKey||null;
+  state.aiRecord=s.aiRecord||null; state.aiRecordInputKey=s.aiRecordInputKey||null;state.aiAnalysisStarted=s.aiAnalysisStarted||null;
   if(s.reflectionVersion!==2&&s.reflections){const old=s.reflections;state.reflections={r1:'',r2:old.r1||'',r3:old.r2||'',r4:old.r3||'',r5:old.r4||''};state.aiRecord=null;state.aiRecordInputKey=null;}
   state.furthestPhase=Math.max(Number(s.furthestPhase)||0,PHASES.indexOf(s.phase),state.conversation.length?3:1,state.aiRecord?5:0);
   ['goals','conv','record','analysis','export'].forEach(p=>document.getElementById('step-'+p).classList.add('done'));
