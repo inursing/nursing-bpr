@@ -1,4 +1,4 @@
-:root{color-scheme:light;--bg:#fbf7ef;--surface:#fffdf8;--surface2:#f6f0e6;--primary:#282b55;--primary-light:#eeedf5;--primary-dark:#191c3d;--accent:#b84432;--accent-light:#ffede5;--border:#e5dfd4;--text:#282b45;--text2:#696b76;--r:18px;--shadow-sm:0 4px 16px #38342d07;--shadow:0 12px 30px #38342d12;--nurse-bubble:#eeedf5;--patient-bubble:#fff4e8}
+:root{color-scheme:only light;--bg:#fbf7ef;--surface:#fffdf8;--surface2:#f6f0e6;--primary:#282b55;--primary-light:#eeedf5;--primary-dark:#191c3d;--accent:#b84432;--accent-light:#ffede5;--border:#e5dfd4;--text:#282b45;--text2:#696b76;--r:18px;--shadow-sm:0 4px 16px #38342d07;--shadow:0 12px 30px #38342d12;--nurse-bubble:#eeedf5;--patient-bubble:#fff4e8}
 body{background:var(--bg);line-height:1.7}h1,h2,h3,h4{font-family:'Noto Sans TC',system-ui,sans-serif;font-weight:700;letter-spacing:.015em}
 #topbar{background:var(--surface);color:var(--text);border-bottom:1px solid var(--border);box-shadow:none;padding-top:20px;padding-bottom:20px}#topbar h1{color:var(--primary);font-size:1.05rem}#topbar .sub{color:var(--text2);opacity:1;letter-spacing:.025em}.logo{width:46px;height:46px;background:var(--primary-light);border-radius:15px;font-size:1.5rem}#topbar>.btn{background:var(--primary)!important;color:#fff!important;border-radius:12px;margin-left:auto}
 #steps{background:var(--surface);border-bottom:1px solid var(--border);padding-top:12px;padding-bottom:12px;gap:4px}.step{border-radius:10px}.step.active{background:var(--primary);color:#fff;border-color:var(--primary)}.step.active .step-num{background:#f28c73;color:#282b45}.step-num{border-radius:9px}
@@ -8,8 +8,6 @@ body{background:var(--bg);line-height:1.7}h1,h2,h3,h4{font-family:'Noto Sans TC'
 .btn{border-radius:10px;min-height:42px;font-weight:500}.btn-primary{background:var(--primary);color:#fff;box-shadow:0 3px 8px #282b5514}.btn-outline{border-color:var(--border);color:var(--primary)}.btn-outline:hover{background:var(--primary-light)}input,textarea,select{border-radius:10px!important}textarea{line-height:1.8}.info-box{border-radius:12px}.info-primary{background:var(--accent-light);color:var(--text);border-left-color:var(--accent)}.record-table{line-height:1.8}.record-table th{background:var(--primary-light)}:is(button,a,input,select,textarea,[onclick]):focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 #avatar-wrap,#review-avatar-wrap{background:#f5ede0!important}#avatar-3d{height:100%;width:100%}.patient-scene{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;padding:36px 12px 12px;background:radial-gradient(ellipse at 50% 35%,#fffcf5,#f1e6d6)}.patient-art-frame{min-height:0;flex:1;width:100%;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}.patient-art{height:100%;width:100%;object-fit:contain;mix-blend-mode:multiply}.patient-identity{font-size:.85rem;color:#282b55;font-weight:700;letter-spacing:.05em;margin-top:5px}.patient-audio{display:flex;align-items:center;gap:8px;color:#69616a;font-size:.7rem;padding:5px 12px;border-radius:24px;background:#fffaf2;margin-top:5px}.portrait-note{position:absolute;top:10px;right:10px;font-size:.6rem;color:#6b6270}.audio-bars{height:16px;display:flex;gap:3px;align-items:center}.audio-bars i{width:3px;height:4px;border-radius:4px;background:#c5654c}.is-speaking .audio-bars i{animation:voicebar .65s ease-in-out infinite alternate}.is-speaking .audio-bars i:nth-child(2){animation-delay:-.2s}.is-speaking .audio-bars i:nth-child(3){animation-delay:-.4s}.is-speaking .audio-bars i:nth-child(4){animation-delay:-.1s}@keyframes voicebar{to{height:15px}}.portrait-error{color:#9b3528;text-align:center;padding:20px}#avatar-caption{display:none}
 div:has(> #set-av-m),div:has(> #set-av-f),label:has(> #set-hands){display:none}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#191925;--surface:#242433;--surface2:#30303e;--primary:#dad9fc;--primary-light:#36364c;--primary-dark:#efedff;--accent:#f5a38b;--accent-light:#44312f;--border:#42404b;--text:#f0e9e4;--text2:#c1b9b5;--nurse-bubble:#383850;--patient-bubble:#3f3330}:root:not([data-theme="light"]) :is(.btn-primary,#topbar>.btn,.step.active){background:#dad9fc!important;color:#222239!important}}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#191925;--surface:#242433;--surface2:#30303e;--primary:#dad9fc;--primary-light:#36364c;--primary-dark:#efedff;--accent:#f5a38b;--accent-light:#44312f;--border:#42404b;--text:#f0e9e4;--text2:#c1b9b5;--nurse-bubble:#383850;--patient-bubble:#3f3330}:root[data-theme="dark"] :is(.btn-primary,#topbar>.btn,.step.active){background:#dad9fc!important;color:#222239!important}
 @media(max-width:700px){#main{padding-top:18px}.welcome-panel{display:block;padding:28px 24px 24px;min-height:0;margin-bottom:28px}.welcome-panel h2{font-size:1.8rem}.welcome-panel p{max-width:23em}.hero-art{height:180px;width:220px;margin:28px auto 8px}.hero-photo{width:150px;height:175px;right:25px;border-width:6px;border-bottom-width:20px}.hero-orbit{font-size:54px;left:0;top:-8px}.hero-note{font-size:.75rem;bottom:0;left:-10px;padding:10px 14px}.hero-spark{font-size:36px;right:5px;bottom:25px}.welcome-tags{gap:7px}.welcome-tags span{font-size:.63rem}#topbar .sub{font-size:.6rem}#topbar h1{font-size:.9rem}#topbar>.btn{font-size:.7rem}.card{padding:18px}.case-card{padding:0 18px 20px}.case-portrait{margin:0 -18px 18px;height:220px}.step{font-size:.72rem}.patient-scene{padding-top:30px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.case-card:hover,.case-card:hover img{transform:none}}@media print{body{background:white}.welcome-panel{display:none}.card{box-shadow:none}}
 
@@ -60,3 +58,28 @@ div:has(> #set-av-m),div:has(> #set-av-f),label:has(> #set-hands){display:none}
 .settings-section-body{display:grid;gap:12px;margin-top:14px}
 #own-key-settings{background:#f7f5fc;border-color:#c6c3de}
 #settings-modal .row-actions{position:sticky;bottom:0;background:var(--surface);padding:12px 0 0;margin-top:0}
+
+/* Phone writing and device-check layouts share the visible viewport. */
+@media(max-width:760px){
+  #main{min-width:0;max-width:100%;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  #phase-record,#phase-analysis,#phase-record>.card,#phase-analysis>.card{width:100%;min-width:0;max-width:100%;margin-left:auto;margin-right:auto}
+  #record-table,#analysis-table,#record-table tbody,#analysis-table tbody{display:block;width:100%;min-width:0;max-width:100%}
+  #record-table thead,#analysis-table thead{display:none}
+  #record-table tr[data-row]{grid-template-columns:minmax(0,1fr);padding:14px;gap:12px}
+  #record-table tr[data-row] td:nth-child(n){grid-column:1;grid-row:auto;min-width:0;max-width:100%}
+  #analysis-table tr[data-row]{display:block;width:100%;min-width:0;padding:14px;border:1px solid var(--border);border-radius:14px;margin-bottom:16px}
+  #analysis-table td{display:block;width:100%;min-width:0!important;max-width:100%;padding:6px 0!important;border:0}
+  #analysis-table td.row-num:last-child{position:static!important;display:flex;width:100%;flex-wrap:wrap}
+  #phase-record textarea,#phase-analysis textarea{display:block;width:100%;max-width:100%;min-width:0;font-size:16px;min-height:100px;box-sizing:border-box}
+  #phase-analysis>.card{padding:14px;overflow-x:visible!important}
+  #phase-analysis .card:has(#reflect1)>div>div{padding:12px;min-width:0}
+  #phase-record>.row-actions .btn,#phase-analysis .row-actions .btn{width:100%}
+  #check-modal{padding:12px max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-right));height:100%;height:100dvh;align-items:flex-start}
+  #check-modal>.modal{width:100%;min-width:0;max-width:520px!important;margin:auto;padding:16px;box-sizing:border-box;overflow-wrap:anywhere}
+  #check-grid{grid-template-columns:minmax(0,1fr)!important;min-width:0;gap:12px!important}
+  #check-grid>*,#check-grid .card{min-width:0;max-width:100%;margin:0!important;box-sizing:border-box}
+  #check-video{display:block;width:100%;max-width:100%;max-height:32dvh;object-fit:contain}
+  #check-modal .btn{min-height:46px;white-space:normal;max-width:100%}
+  #check-grid .btn,#check-modal .row-actions .btn{width:100%}
+  #check-modal .row-actions{position:sticky;bottom:-16px;background:var(--surface);padding:12px 0 0;gap:8px;z-index:1}
+}

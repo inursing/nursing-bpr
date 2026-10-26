@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1a6fa3">
+<meta name="theme-color" content="#fff9f0">
+<meta name="color-scheme" content="only light">
 <meta name="apple-mobile-web-app-capable" content="no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +14,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
-<style>:root{color-scheme:light dark}body{margin:0;font-family:system-ui,sans-serif;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>:root{color-scheme:only light}body{margin:0;font-family:system-ui,sans-serif;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
 <title>行為過程紀錄練習｜溝通練習室</title>
@@ -42,30 +43,6 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
   --shadow: 0 4px 16px rgba(0,0,0,.1);
   --r: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f172a; --surface: #1e293b; --surface2: #162032;
-    --border: #334155; --text: #f1f5f9; --text2: #94a3b8;
-    --primary: #3b82f6; --primary-light: #1e3a5f; --primary-dark: #60a5fa;
-    --accent: #10b981; --accent-light: #064e3b;
-    --warn: #fbbf24; --warn-light: #451a03;
-    --danger: #f87171; --danger-light: #450a0a;
-    --nurse-bubble: #1e3a5f; --patient-bubble: #263344;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,.3); --shadow: 0 4px 16px rgba(0,0,0,.4);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f172a; --surface: #1e293b; --surface2: #162032;
-  --border: #334155; --text: #f1f5f9; --text2: #94a3b8;
-  --primary: #3b82f6; --primary-light: #1e3a5f; --primary-dark: #60a5fa;
-  --accent: #10b981; --accent-light: #064e3b;
-  --warn: #fbbf24; --warn-light: #451a03;
-  --danger: #f87171; --danger-light: #450a0a;
-  --nurse-bubble: #1e3a5f; --patient-bubble: #263344;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.3); --shadow: 0 4px 16px rgba(0,0,0,.4);
-  color-scheme: dark;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -433,7 +410,7 @@ input[type=text]:focus{border-color:var(--primary)}
 </style>
 
 <div id="ios-standalone-warn" class="hidden" style="background:#b42318;color:#fff;padding:10px 14px;font-size:.85rem;line-height:1.6;text-align:center">iPhone 主畫面模式需設定課程連線，才能使用 Azure 語音辨識。也可先用 <b>Safari</b> 開啟網址：<br><span style="user-select:all;background:rgba(255,255,255,.18);padding:2px 6px;border-radius:4px">inursing.github.io/nursing-bpr/</span>　<button class="btn btn-sm" style="background:#fff;color:#b42318" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.origin+location.pathname).then(()=>toast('已複製網址，請到 Safari 貼上'))">複製網址</button><br><span style="font-size:.75rem;opacity:.9">請到「設定 → 課程連線設定」確認老師提供的設定。</span></div>
-<link rel="stylesheet" href="./modern.css">
+<link rel="stylesheet" href="./modern.css?v=mobile-check-2">
 <style>
 body.review-active #topbar{display:none}
 body.review-active #steps{top:0;padding:4px 8px;margin:0}
@@ -767,7 +744,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         <div id="check-camera-msg" role="status" style="font-size:.8rem;margin-top:8px;line-height:1.7">按下後顯示自己的預覽，請確認臉與上半身都在鏡頭內。此處只預覽，不錄影。</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風與語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 按下後說「我是護生」</button><div id="check-sr-service" style="font-size:.78rem;color:var(--text2);margin-top:8px"></div><div id="check-sr-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
+        <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">麥克風與語音辨識測試</div><button class="btn btn-outline btn-sm" id="check-sr-btn" onclick="checkSpeech()">🎤 開始麥克風測試</button><div id="check-sr-service" style="font-size:.78rem;color:var(--text2);margin-top:8px"></div><div id="check-sr-msg" role="status" aria-live="polite" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
         <div class="card" style="padding:12px"><div style="font-size:.8rem;font-weight:700;margin-bottom:6px">病人語音</div><button class="btn btn-outline btn-sm" onclick="checkVoice()">🔊 試聽病人聲音</button><div id="check-voice-msg" style="font-size:.78rem;color:var(--text2);margin-top:6px;min-height:18px"></div></div>
       </div>
     </div>
@@ -1239,7 +1216,7 @@ async function toggleCheckCamera(){
 async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
-  document.getElementById('check-sr-msg').textContent=''; document.getElementById('check-voice-msg').textContent='';
+  stopCheckSpeech(); document.getElementById('check-sr-msg').textContent='按一次開始，允許麥克風後直接說「我是護生」，不需要再按。'; document.getElementById('check-voice-msg').textContent='';
   document.getElementById('check-sr-service').textContent=useIPhoneCloudSpeech()?'iPhone 主畫面：使用 Azure 語音辨識。按下測試才開啟麥克風，辨識期間使用 Azure 額度。':'按下測試才會開啟麥克風與語音辨識。';
   runCheckDiag();
   // Do not acquire camera or microphone until the student explicitly starts.
@@ -1263,7 +1240,7 @@ async function runCheckDiag(){
 }
 function closeCheck(){
   stopCheckCamera();
-  if(checkSpeech._r){try{checkSpeech._r.abort();}catch(e){}checkSpeech._r=null;}
+  stopCheckSpeech();
   stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();
   document.getElementById('check-modal').classList.add('hidden');
   if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null}
@@ -1278,24 +1255,30 @@ function confirmStartConv(){
   renderPhase('conv');
   initConvPhase();
 }
+function stopCheckSpeech(){
+  const run=checkSpeech._run;checkSpeech._run=null;checkSpeech._r=null;
+  if(run){clearTimeout(run.timer);try{run.r.abort();}catch(e){}}
+  const b=document.getElementById('check-sr-btn');if(b)b.textContent='🎤 開始麥克風測試';
+}
 function checkSpeech(){
-  stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();
-  unlockAudio();
-  const m=document.getElementById('check-sr-msg');
-  if(checkSpeech._r){ try{checkSpeech._r.abort();}catch(e){} }
-  if(checkMicStream){ try{checkMicStream.getTracks().forEach(t=>t.stop());}catch(e){} checkMicStream=null; if(checkMicRAF){cancelAnimationFrame(checkMicRAF);checkMicRAF=null} document.getElementById('check-mic-msg').textContent='（音量表已停止，改由語音辨識使用麥克風）'; }
+  const m=document.getElementById('check-sr-msg'),b=document.getElementById('check-sr-btn');
+  if(checkSpeech._run){stopCheckSpeech();m.textContent='測試已停止。按一次即可重新測試。';return;}
+  stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();unlockAudio();
   const r=createRecognizer();
-  if(!r){ m.innerHTML=IS_IOS&&IS_STANDALONE?'⚠️ 主畫面語音辨識尚未就緒，請確認課程連線及網路，重新整理後再試；也可暫用 Safari。':'⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome（電腦／Android）或 Safari（iPhone）。'; return; }
-  checkSpeech._r=r; r.lang='zh-TW'; r.interimResults=true; r.continuous=false; m.textContent='🎤 聆聽中…請說「我是護生」（'+sttName()+'）';
-  const help=useIPhoneCloudSpeech()?'<br>主畫面模式使用 Azure 語音辨識。請允許麥克風並保持畫面在前景；若仍無法使用，可先用 Safari 開啟同一網址測試。':IS_IOS?'<br>iPhone 排除方法：① 用 Safari 開（不要用桌面圖示）② 設定 → 一般 → 鍵盤 → 開啟「啟用聽寫」③ 設定 → Safari → 麥克風 → 允許 ④ 關閉其他正在使用麥克風的 App。':'<br>排除方法：確認網址列左邊的麥克風權限為「允許」、沒有其他程式占用麥克風；Chrome 需要能連到 Google 語音服務。';
-  let timer; const timeout=()=>{try{r.abort();}catch(e){} m.innerHTML='尚未收到辨識文字，請檢查麥克風權限與網路後再試。'+help;};
-  timer=setTimeout(timeout,20000);
-  r.oncapture=()=>{m.textContent='✅ 麥克風已開啟，正在連接 Azure 語音辨識…';};
-  r.onstart=()=>{clearTimeout(timer);m.textContent='🎤 已連線，請說「我是護生」（'+sttName()+'）';timer=setTimeout(timeout,10000);};
-  r.onresult=e=>{ const t=Array.from(e.results).map(x=>x[0].transcript).join(''); m.textContent=(e.results[e.results.length-1].isFinal?'✅ 辨識到：「':'…「')+t+'」（'+sttName()+'）'; if(e.results[e.results.length-1].isFinal){ clearTimeout(timer); try{ r.stop(); }catch(x){} } };
-  r.onerror=e=>{ clearTimeout(timer); if(e.error==='aborted') return; m.innerHTML='辨識錯誤：'+e.error+(e.message?'（'+escHtml(String(e.message).slice(0,200))+'）':'')+(e.error==='not-allowed'?'（請允許麥克風）':e.error==='audio-capture'?'（麥克風被占用或無法取得）':e.error==='network'?'（連不到語音服務，請檢查網路）':'')+help; };
-  r.onend=()=>{ clearTimeout(timer); if(m.textContent.startsWith('🎤')) m.innerHTML='沒有聽到聲音，請再試一次。'+help; };
-  try{ r.start(); }catch(e){ clearTimeout(timer); m.innerHTML='無法啟動辨識：'+e.message+help; }
+  if(!r){m.textContent='此瀏覽器尚無法使用語音辨識，請改用 Chrome（Android）或 Safari（iPhone）。';return;}
+  const run={r,timer:null};checkSpeech._run=run;checkSpeech._r=r;
+  const current=()=>checkSpeech._run===run;
+  const finish=(text,success=false)=>{if(!current())return;stopCheckSpeech();m.textContent=text;b.textContent=success?'↻ 重新測試':'🎤 再試一次';};
+  const waitForText=()=>{clearTimeout(run.timer);run.timer=setTimeout(()=>finish('沒有收到辨識文字。請確認耳機麥克風與網路，再按「再試一次」。'),12000);};
+  r.lang='zh-TW';r.interimResults=true;r.continuous=false;
+  b.textContent='⏹ 停止測試';m.textContent='請在瀏覽器提示中允許麥克風；同意後會自動接著測試，不用再按。';
+  r.oncapture=()=>{if(!current())return;m.textContent='麥克風已開啟，正在連接辨識服務，請稍候…';waitForText();};
+  r.onstart=()=>{if(!current())return;m.textContent='🎤 正在聆聽，現在請說「我是護生」';waitForText();};
+  r.onresult=e=>{if(!current())return;const text=Array.from(e.results).map(x=>x[0].transcript).join('').trim();if(text)finish('✅ 麥克風與辨識正常！聽到：「'+text+'」。可以開始會談。',true);};
+  r.onerror=e=>{if(!current()||e.error==='aborted')return;const hints={'not-allowed':'麥克風未獲允許，請到瀏覽器網站權限開啟麥克風。','audio-capture':'無法取得麥克風，請確認耳機已接好並關閉其他錄音程式。','network':'無法連到語音辨識服務，請檢查網路後再試。','no-speech':'沒有聽到說話聲，請靠近耳機麥克風再試。'};finish(hints[e.error]||'語音辨識未連線成功，請確認網路後再試。');};
+  r.onend=()=>{if(current())finish('測試已結束，沒有收到辨識文字。請靠近麥克風再試一次。');};
+  // Permission prompts can remain open; start the timeout only after capture starts.
+  try{r.start();}catch(e){finish('無法開啟語音辨識，請確認麥克風權限後再試。');}
 }
 async function checkVoice(){
   const m=document.getElementById('check-voice-msg'); const c=getCase()||CASES[0]; ensureAudioCtx();
@@ -1748,15 +1731,15 @@ function stopConversationMedia(){
   if(window.__thinkTimer){clearInterval(window.__thinkTimer);window.__thinkTimer=null;}
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   // Keep elapsed speaking time; time spent on other steps must not count.
-  if(state.convStart)state.convStart=Date.now()-state.convDuration*1000;
+  state.convStart=null;
   isSpeaking=false;
   window.speechSynthesis&&window.speechSynthesis.cancel();
   stopAudio();stopMouth();stopBlink();stopCamera();stopSimli();
   const mic=document.getElementById('mic-btn');
   if(mic){mic.classList.remove('on','recording','waiting');mic.textContent='🎤';}
 }
-window.addEventListener('pagehide',()=>{stopConversationMedia();closeCheck();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&IS_IOS&&IS_STANDALONE){stopConversationMedia();closeCheck();}});
+window.addEventListener('pagehide',()=>{stopConversationMedia();closeCheck();syncRecordFromDOM();syncReflections();saveState();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stopConversationMedia();closeCheck();syncRecordFromDOM();syncReflections();saveState();if(state.phase==='conv')setStatus('會談已暫停，已停止收音與錄影。按麥克風繼續；離開時間不計入會談。');}});
 
 function renderRecordingPlayback(){
   const card=document.getElementById('rec-card'); if(!card) return;
@@ -1950,7 +1933,7 @@ function toggleMic(){
 
 function startTimer(){
   if(timerInterval) return;
-  if(!state.convStart) state.convStart=Date.now();
+  if(!state.convStart) state.convStart=Date.now()-state.convDuration*1000;
   timerInterval=setInterval(()=>{
     if(!state.convStart){ state.convStart=Date.now(); }
     const secs=Math.floor((Date.now()-state.convStart)/1000);
@@ -2998,10 +2981,10 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
-<script src="./iphone-speech.js?v=2"></script>
+<script src="./iphone-speech.js?v=permission-flow-3"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./interaction-recorder.js?v=origin-safe-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=course-live-1"></script>
+<script src="./live-patient.js?v=connection-status-2"></script>
 </body>
 </html>

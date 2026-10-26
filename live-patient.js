@@ -15,6 +15,11 @@
   const start=controls.querySelector('#live-patient-start'), stop=controls.querySelector('#live-patient-stop'), status=controls.querySelector('#live-patient-status');
   const video=panel.querySelector('video'), audio=panel.querySelector('audio');
   const message=t=>{status.textContent=t;};
+  function connectionFailure(error){
+    const text=String(error?.message||error||'');
+    if(/retry attempts|failed to connect|websocket|timed out|逾時|尚未收到 Live/i.test(text))return 'Live 人物影音未能連線，與麥克風權限無關。請切換 Wi-Fi／行動網路後再試；目前使用靜態人物，仍可進行語音會談。未自動重連。';
+    return 'Live 人物連線失敗。請確認課程連線與服務狀態；目前使用靜態人物，仍可進行語音會談。未自動重連。';
+  }
   function refresh(){
     const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&proxyOn()?'flex':'none';
     start.disabled=!!client; stop.hidden=!client;
@@ -56,7 +61,7 @@
       c.on('start',()=>{if(id!==generation) return;connected=true;panel.style.display='block';video.play().catch(()=>{});audio.play().catch(()=>message('Live 已連線，請點「播放聲音」允許聲音。'));touch();message('Live 已連線。嘴型隨病人語音；30秒無音訊或離開頁面即斷線。');refresh();});
       c.on('speaking',()=>{if(id!==generation)return;utteranceStarted=true;busy=true;touch();pauseListening();});
       c.on('silent',()=>{if(id!==generation||!utteranceStarted)return;utteranceStarted=false;busy=false;touch();if(finishSpeech){const done=finishSpeech;finishSpeech=null;setTimeout(done,600);}});
-      for(const event of ['stop','error','startup_error']) c.on(event,()=>{if(id===generation&&!ending) void disconnect('Live 連線已結束；未自動重連。可查看逐字稿或按麥克風重新開始。');});
+      for(const event of ['stop','error','startup_error']) c.on(event,()=>{if(id===generation&&!ending) void disconnect(connected?'Live 影音已中斷，目前使用靜態人物，仍可繼續語音會談。未自動重連。':connectionFailure('Failed to connect'));});
       // Keep the element renderable while waiting for the first frame callback.
       panel.style.display='block';panel.style.opacity='0';
       let timer;
@@ -65,7 +70,7 @@
       if(!connected) throw new Error('尚未收到 Live 影像');
       limitTimer=setTimeout(()=>void disconnect('本次12分鐘真人會談已結束；未自動續接。'),720000);
       idleTimer=setInterval(()=>{if(!busy&&Date.now()-lastActivity>30000) void disconnect('已閒置30秒，Live 已自動斷線以節省分鐘。');},1000);
-    }catch(e){if(id===generation) await disconnect(String(e.message||'Live 啟動失敗')+'；未自動重試。');}
+    }catch(e){if(id===generation) await disconnect(connectionFailure(e));}
     finally{refresh();}
   }
   async function pcm(blob){

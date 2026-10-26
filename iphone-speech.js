@@ -5,7 +5,6 @@
     start(){
       if(this._run)return;
       const run={stream:null,recognizer:null,audio:null,ended:false,finals:[],timer:null,cleanup:null,context:null,source:null,processor:null,gain:null,push:null};this._run=run;
-      run.timer=setTimeout(()=>this._fail(run,{name:'NetworkError'}),20000);
       // Request the microphone directly from the student's click, before any network await.
       let requested;
       try{run.context=this.context();if(!run.context)throw new Error('AudioContext unavailable');if(run.context.state!=='running')run.context.resume().catch(e=>this._fail(run,e));requested=this.media.getUserMedia({video:false,audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}catch(e){this._fail(run,e);return;}
@@ -15,6 +14,7 @@
       try{
         run.stream=await requested;
         if(this._run!==run){this._release(run);return;}
+        run.timer=setTimeout(()=>this._fail(run,{name:'NetworkError'}),20000);
         run.cleanup=this.oncapture?.(run.stream);
         const st=this.settings();const sdk=this.sdk;
         const tok=st.proxyUrl?await this.token():null;
