@@ -74,11 +74,12 @@ export default {
     if (url.pathname === '/simli/status' || url.pathname === '/simli/session') {
       const liveSid=req.headers.get('X-Session')||'';
       if(!isTeacher&&(!liveSid||!env.QUOTA||!(await env.QUOTA.get('sid:'+liveSid))))return json({error:'請先登記課堂練習，再開始真人會談'},403);
-      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 6, maxSessionLength: 720 });
+      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 6, caseIds: [4,6], maxSessionLength: 720 });
       if (url.pathname !== '/simli/session' || req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
       if (!env.SIMLI_KEY) return json({ error: '尚未設定 SIMLI_KEY，未啟動付費連線' }, 503);
       let b; try { b = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
-      if (b.caseId !== 6) return json({ error: '吳先生真人會談已開放，其餘人物尚在製作' }, 400);
+      const faces={4:'828eaab3-4f7d-44c9-8b13-b67bfe37cb88',6:'03ce3ee8-db97-4150-a333-8f643d48fee9'};
+      if (![4,6].includes(b.caseId)) return json({ error: '此人物尚未完成真人影像製作' }, 400);
       if (env.QUOTA) {
         const liveRateKey='simli:session:'+(liveSid||'teacher');
         const previous = Number(await env.QUOTA.get(liveRateKey)) || 0;
@@ -88,7 +89,7 @@ export default {
       try {
         const r = await fetch('https://api.simli.ai/compose/token', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-simli-api-key': env.SIMLI_KEY },
-          body: JSON.stringify({ faceId: '03ce3ee8-db97-4150-a333-8f643d48fee9', apiVersion: 'v2', handleSilence: true, maxSessionLength: 720, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
+          body: JSON.stringify({ faceId: faces[b.caseId], apiVersion: 'v2', handleSilence: true, maxSessionLength: 720, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
           signal: AbortSignal.timeout(12000),
         });
         const result = await r.json().catch(() => ({}));

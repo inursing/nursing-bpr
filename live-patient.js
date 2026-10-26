@@ -1,4 +1,4 @@
-/* Course Live: case 6 uses Simli preset Daniel with the existing patient audio. */
+/* Course Live: ready cases use their own face with existing patient audio. */
 (() => {
   let client=null, generation=0, connected=false, busy=false, ending=false, connectJob=null;
   let idleTimer=null, limitTimer=null, finishSpeech=null, lastActivity=0, utteranceStarted=false;
@@ -14,6 +14,8 @@
   document.getElementById('stage').before(controls);
   const start=controls.querySelector('#live-patient-start'), stop=controls.querySelector('#live-patient-stop'), status=controls.querySelector('#live-patient-status');
   const video=panel.querySelector('video'), audio=panel.querySelector('audio');
+  const supports=id=>[4,6].includes(id);
+  const readyMessage=()=>`按麥克風開始會談時啟動${getCase()?.name||'病人'}真人影像（每次最多12分鐘）。`;
   const message=t=>{status.textContent=t;};
   function connectionFailure(error){
     const text=String(error?.message||error||'');
@@ -21,7 +23,9 @@
     return 'Live 人物連線失敗。請確認課程連線與服務狀態；目前使用靜態人物，仍可進行語音會談。未自動重連。';
   }
   function refresh(){
-    const c=getCase(); controls.style.display=state.phase==='conv'&&c?.id===6&&proxyOn()?'flex':'none';
+    const c=getCase(); controls.style.display=state.phase==='conv'&&supports(c?.id)&&proxyOn()?'flex':'none';
+    panel.querySelector('span').textContent='LIVE · '+(c?.name||'病人')+(c?.id===6?'（內建人物）':'（自訂人物）');
+    if(!client&&!connectJob&&status.textContent.startsWith('按麥克風'))message(readyMessage());
     start.disabled=!!client; stop.hidden=!client;
     const unmute=controls.querySelector('#live-patient-unmute');if(unmute)unmute.disabled=!connected;
   }
@@ -35,14 +39,14 @@
     panel.style.display='none'; audio.pause(); video.pause();
     audio.srcObject=null;video.srcObject=null;
     if(old){try{await old.stop();}catch{}try{await old.audioContext?.close();}catch{}}
-    ending=false;message(reason||(hadSession?'Live 已結束，恢復靜態人物。':'按麥克風開始會談時啟動吳先生真人影像（每次最多12分鐘）。'));refresh();
+    ending=false;message(reason||(hadSession?'Live 已結束，恢復靜態人物。':readyMessage()));refresh();
   }
   function connect(){
     if(connectJob)return connectJob;
     const job=openConnection().finally(()=>{if(connectJob===job)connectJob=null;});connectJob=job;return job;
   }
   async function openConnection(){
-    if(client||state.phase!=='conv'||getCase()?.id!==6) return;
+    if(client||state.phase!=='conv'||!supports(getCase()?.id)) return;
     if(isSpeaking||(SentenceSpeaker.current&&SentenceSpeaker.current.playing)){message('請等病人說完，再啟動 Live。');return;}
     const st=getSettings();
     if(!proxyOn()){message('請先套用老師提供的課程連結，再開始真人會談。');return;}
@@ -51,7 +55,7 @@
     try{
       await ensureSession();
       if(id!==generation||state.phase!=='conv')return;
-      const r=await fetch(st.proxyUrl+'/simli/session',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:6}),signal:AbortSignal.timeout(15000)});
+      const r=await fetch(st.proxyUrl+'/simli/session',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:getCase().id}),signal:AbortSignal.timeout(15000)});
       const config=await r.json();
       if(!r.ok) throw new Error(config.error||'Live 連線失敗');
       if(id!==generation||state.phase!=='conv') return;
@@ -101,6 +105,6 @@
   start.onclick=()=>void connect();stop.onclick=()=>void disconnect();
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&client)void disconnect('已離開頁面，Live 已斷線以節省分鐘。');});
   window.addEventListener('pagehide',()=>{if(client)void disconnect();});
-  window.LivePatient={refresh,connect,ready:()=>connectJob||Promise.resolve(),stop:disconnect,speak,get active(){return connected},get busy(){return busy},clear(){if(client){try{client.ClearBuffer();}catch{}}if(finishSpeech){finishSpeech();finishSpeech=null;}busy=false;lastSpeakEnd=Date.now();}};
+  window.LivePatient={supports,refresh,connect,ready:()=>connectJob||Promise.resolve(),stop:disconnect,speak,get active(){return connected},get busy(){return busy},clear(){if(client){try{client.ClearBuffer();}catch{}}if(finishSpeech){finishSpeech();finishSpeech=null;}busy=false;lastSpeakEnd=Date.now();}};
   refresh();
 })();

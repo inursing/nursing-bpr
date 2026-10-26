@@ -1072,7 +1072,7 @@ function renderCases(){
   const grid=document.getElementById('case-grid');
   grid.innerHTML=CASES.map(c=>`
     <div class="card case-card ${state.caseId===c.id?'selected':''}" onclick="selectCase(${c.id})">
-      <div class="case-portrait"><img src="${portraitUrl(c)}" ${c.id===6?'style="object-fit:contain;background:#626262"':''} alt="${c.age}歲${c.gender}性模擬病人${c.id===6?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
+      <div class="case-portrait"><img src="${portraitUrl(c)}" ${[4,6].includes(c.id)?'style="object-fit:contain;background:#626262"':''} alt="${c.age}歲${c.gender}性模擬病人${[4,6].includes(c.id)?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
       <div class="dept-badge ${c.deptClass}">${c.icon} ${c.deptLabel}</div>
       <div class="case-name">${c.name}　${c.age}歲 ${c.gender}</div>
       <div class="case-meta">病床 ${c.bed}</div>
@@ -1329,10 +1329,10 @@ function parsePatientReply(raw){
   return {expr,gest,text};
 }
 const CASE_PORTRAITS={1:'wang',2:'li',3:'chen',4:'zhang',5:'lin',6:'wu'};
-function portraitUrl(c){ return c.id===6?'./portraits/wu-daniel.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
+function portraitUrl(c){ return c.id===6?'./portraits/wu-daniel.jpg':c.id===4?'./portraits/zhang-50-live.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
 function loadAvatarFor(c){
   document.getElementById('avatar-loading').classList.add('hidden');
-  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:c.id===6});
+  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:[4,6].includes(c.id)});
 }
 
 // ===== SETTINGS / API =====
@@ -1941,7 +1941,7 @@ async function startConversationRecording(){
 }
 function toggleMic(){
   unlockAudio();
-  if(!listenWanted&&window.LivePatient&&getCase()?.id===6&&proxyOn())void LivePatient.connect();
+  if(!listenWanted&&window.LivePatient&&LivePatient.supports(getCase()?.id)&&proxyOn())void LivePatient.connect();
   startConversationRecording();
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
@@ -2415,7 +2415,7 @@ function sendTextInput(){
   const t=inp.value.trim();
   if(!t||isSpeaking) return;
   inp.value='';
-  if(window.LivePatient&&getCase()?.id===6&&proxyOn())void LivePatient.connect();
+  if(window.LivePatient&&LivePatient.supports(getCase()?.id)&&proxyOn())void LivePatient.connect();
   startTimer();
   handleNurseSpeech(t);
 }
@@ -3011,6 +3011,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./interaction-recorder.js?v=shared-mic-2"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=connection-status-2"></script>
+<script src="./live-patient.js?v=zhang-ready-1"></script>
 </body>
 </html>
