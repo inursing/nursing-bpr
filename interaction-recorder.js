@@ -1,11 +1,18 @@
 /* Record the actual patient feed and nurse camera together; never replay TTS to record it. */
 (() => {
-  function create({camera,context,patientAudio,info,conversation}) {
+  function create({camera,context,patientAudio,info,conversation,microphone=()=>null}) {
     const canvas=document.createElement('canvas');canvas.width=960;canvas.height=640;
     const g=canvas.getContext('2d'), destination=context.createMediaStreamDestination();
     const nurse=document.getElementById('cam-video');
-    let mic=null, remote=null, remoteTrack=null, stopped=false;
-    if(camera.getAudioTracks().length){mic=context.createMediaStreamSource(camera);mic.connect(destination);}
+    let mic=null, micTrack=null, remote=null, remoteTrack=null, stopped=false;
+    function syncMicrophone(){
+      const input=camera.getAudioTracks().length?camera:microphone();
+      const track=input?.getAudioTracks().find(t=>t.readyState!=='ended')||null;
+      if(track===micTrack)return;
+      try{mic?.disconnect();}catch{}mic=null;micTrack=track;
+      if(track){mic=context.createMediaStreamSource(input);mic.connect(destination);}
+    }
+    syncMicrophone();
     if(patientAudio)patientAudio.connect(destination);
     const fit=(el,x,y,w,h,mirror=false)=>{
       const sw=el.videoWidth||el.naturalWidth,sh=el.videoHeight||el.naturalHeight;
@@ -23,6 +30,7 @@
     };
     function draw(){
       if(stopped)return;
+      syncMicrophone();
       const live=document.getElementById('live-patient-video');
       const active=!!window.LivePatient?.active&&live?.readyState>=2;
       const audio=document.getElementById('live-patient-audio');
@@ -48,7 +56,7 @@
       const msgs=conversation().filter(m=>m.role==='nurse'||m.role==='patient').slice(-2);
       g.fillStyle='#202443';g.font='18px sans-serif';
       msgs.forEach((m,i)=>text((m.role==='nurse'?'護生：':'病人：')+m.text,24,494+i*66,908,2));
-      if(!camera.getAudioTracks().length){g.fillStyle='#fff';g.font='14px sans-serif';text('此裝置未提供護生麥克風錄音；護生發言請參照字幕。',20,452,920,1);}
+      if(!mic){g.fillStyle='#fff';g.font='14px sans-serif';text('目前未接收護生麥克風；護生發言請參照字幕。',20,452,920,1);}
     }
     draw();const timer=setInterval(draw,67);
     let stream;

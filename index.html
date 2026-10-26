@@ -1219,7 +1219,7 @@ async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
   stopCheckSpeech(); document.getElementById('check-sr-msg').textContent='按一次開始，允許麥克風後直接說「我是護生」，不需要再按。'; document.getElementById('check-voice-msg').textContent='';
-  document.getElementById('check-sr-service').textContent=useIPhoneCloudSpeech()?'iPhone 主畫面：使用 Azure 語音辨識。按下測試才開啟麥克風，辨識期間使用 Azure 額度。':'按下測試才會開啟麥克風與語音辨識。';
+  document.getElementById('check-sr-service').textContent=useIPhoneCloudSpeech()?'此裝置使用 Azure 語音辨識。按下測試才開啟麥克風，辨識期間使用 Azure 額度。':'按下測試才會開啟麥克風與語音辨識。';
   runCheckDiag();
   // Do not acquire camera or microphone until the student explicitly starts.
 }
@@ -1682,7 +1682,7 @@ async function startCamera(){
   const generation=++cameraGeneration;
   try{
     // iOS Safari：鏡頭若同時佔用麥克風，語音辨識會卡住 → iPhone/iPad 只錄畫面（會談內容仍有逐字稿）
-    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:IS_IOS?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:(IS_IOS||useIPhoneCloudSpeech())?false:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(generation!==cameraGeneration){acquired.getTracks().forEach(t=>t.stop());return;}
     camStream=acquired;
   }catch(e){
@@ -1701,7 +1701,7 @@ function startRecording(){
     if(!audioCtx||!window.InteractionRecorder) throw new Error('互動錄影元件無法啟動');
     const capture=InteractionRecorder.create({camera:camStream,context:audioCtx,patientAudio:analyser,
       info:()=>[state.studentId,state.studentName,getCase()?.name,'會談互動錄影'].filter(Boolean).join(' · '),
-      conversation:()=>state.conversation});
+      conversation:()=>state.conversation,microphone:()=>recognition?._run?.stream||null});
     try{recorder=new MediaRecorder(capture.stream,Object.assign(mime?{mimeType:mime}:{},{videoBitsPerSecond:600000,audioBitsPerSecond:48000}));}
     catch(e){capture.stop();throw e;}
     recComposite=true;
@@ -1810,10 +1810,10 @@ async function initConvPhase(){
 
 // 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
 let listenWanted=false, pendingFinal='', finalTimer=null;
-let resetRecognitionPending=()=>{}, listeningResumeTimer=null;
+let resetRecognitionPending=()=>{}, listeningResumeTimer=null, recognitionWatchdogTimer=null;
 const ECHO_TAIL_MS=1000;
 function speechInputBlocked(){ return isSpeaking||!!window.LivePatient?.busy||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
-function useIPhoneCloudSpeech(){return IS_IOS&&IS_STANDALONE&&azureReady();}
+function useIPhoneCloudSpeech(){return ((IS_IOS&&IS_STANDALONE)||(typeof navigator!=='undefined'&&/Android/i.test(navigator.userAgent)))&&azureReady();}
 function createRecognizer(){
   if(useIPhoneCloudSpeech()){
     if(!window.SpeechSDK||!window.IPhoneSpeechRecognizer||!navigator.mediaDevices?.getUserMedia)return null;
@@ -1834,7 +1834,8 @@ function setupRecognition(){
     isRecording=true;
     if(!listenWanted||state.phase!=='conv'||speechInputBlocked()){ pauseListening(); return; }
     document.getElementById('mic-btn').classList.add('recording');
-    setStatus('🎤 聆聽中…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
+    setStatus('🎤 聆聽中（'+sttName()+'）…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
+    if(!recognitionWatchdogTimer)recognitionWatchdogTimer=setTimeout(()=>{recognitionWatchdogTimer=null;if(!listenWanted||state.phase!=='conv'||speechInputBlocked())return;listenWanted=false;pauseListening();document.getElementById('mic-btn').classList.remove('recording','on');document.getElementById('mic-btn').textContent='🎤';setStatus('未收到辨識文字，已停止聆聽。請先做麥克風測試；若一直無文字，請切換網路後再試。');},12000);
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
@@ -1851,6 +1852,7 @@ function setupRecognition(){
       else interim+=e.results[i][0].transcript;
     }
     const shown=(final+interim).trim();
+    if(shown){clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;}
     if((isSpeaking&&!bargeInOn())||isEcho(shown)){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
@@ -1861,10 +1863,11 @@ function setupRecognition(){
   };
   recognition.onerror=(e)=>{
     recognitionError=e.error!=='aborted'&&e.error!=='no-speech';
+    if(recognitionError){clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;}
     isRecording=false;
     document.getElementById('mic-btn').classList.remove('recording');
     if(e.error==='not-allowed'){ listenWanted=false; setStatus('麥克風權限被拒絕，請在網址列允許後重新整理'); }
-    else if(e.error!=='aborted'&&e.error!=='no-speech'){if(useIPhoneCloudSpeech())listenWanted=false;setStatus((e.error==='idle'?'':'識別錯誤：')+(e.message||e.error)+(e.error==='idle'?'':'；請按麥克風重試'));
+    else if(e.error!=='aborted'&&e.error!=='no-speech'){listenWanted=false;setStatus((e.error==='idle'?'':'識別錯誤：')+(e.message||e.error)+(e.error==='idle'?'':'；請按麥克風重試'));
       if(!listenWanted){document.getElementById('mic-btn').classList.remove('on');document.getElementById('mic-btn').textContent='🎤';}}
   };
   recognition.onend=()=>{
@@ -1879,6 +1882,7 @@ function setupRecognition(){
   };
 }
 function pauseListening(){
+  clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;
   clearTimeout(listeningResumeTimer); resetRecognitionPending();
   // Discard pending results rather than flushing speaker audio as a final transcript.
   if(recognition){ try{recognition.abort();}catch(e){} }
@@ -2993,9 +2997,9 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
-<script src="./iphone-speech.js?v=permission-flow-3"></script>
+<script src="./iphone-speech.js?v=android-azure-4"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
-<script src="./interaction-recorder.js?v=origin-safe-1"></script>
+<script src="./interaction-recorder.js?v=shared-mic-2"></script>
 <script src="./simli-sdk.js"></script>
 <script src="./live-patient.js?v=connection-status-2"></script>
 </body>
