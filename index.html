@@ -1048,7 +1048,7 @@ function renderCases(){
   const grid=document.getElementById('case-grid');
   grid.innerHTML=CASES.map(c=>`
     <div class="card case-card ${state.caseId===c.id?'selected':''}" onclick="selectCase(${c.id})">
-      <div class="case-portrait"><img src="${portraitUrl(c)}" alt="${c.age}歲${c.gender}性模擬病人${c.id===6?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
+      <div class="case-portrait"><img src="${portraitUrl(c)}" ${c.id===6?'style="object-fit:contain;background:#626262"':''} alt="${c.age}歲${c.gender}性模擬病人${c.id===6?'真人預覽':'插畫'}" loading="lazy"><span>${String(c.id).padStart(2,'0')} / PATIENT</span></div>
       <div class="dept-badge ${c.deptClass}">${c.icon} ${c.deptLabel}</div>
       <div class="case-name">${c.name}　${c.age}歲 ${c.gender}</div>
       <div class="case-meta">病床 ${c.bed}</div>
