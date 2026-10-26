@@ -83,3 +83,7 @@ div:has(> #set-av-m),div:has(> #set-av-f),label:has(> #set-hands){display:none}
   #check-grid .btn,#check-modal .row-actions .btn{width:100%}
   #check-modal .row-actions{position:sticky;bottom:-16px;background:var(--surface);padding:12px 0 0;gap:8px;z-index:1}
 }
+
+body:has(#check-modal:not(.hidden)){overflow:hidden}
+.split-view>*{min-width:0}
+@media(max-width:760px){#check-modal{overflow-x:hidden}#check-modal>.modal{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}#check-modal .row-actions{bottom:-16px}}
