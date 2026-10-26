@@ -1863,6 +1863,7 @@ async function startConversationRecording(){
 }
 function toggleMic(){
   unlockAudio();
+  if(!listenWanted&&window.LivePatient&&getCase()?.id===6&&getSettings().teacherToken)void LivePatient.connect();
   startConversationRecording();
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
@@ -2228,6 +2229,8 @@ class SentenceSpeaker{
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
+      if(window.LivePatient)await LivePatient.ready();
+      if(this.cancelled)break;
       if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else await browserSpeak(item.t,this.c); }
     this.playing=false; lastSpeakEnd=Date.now(); if(this.finished&&!this.cancelled&&!isSpeaking) setTimeout(resumeListening,IS_MOBILE?900:300); }
 }
@@ -2334,6 +2337,7 @@ function sendTextInput(){
   const t=inp.value.trim();
   if(!t||isSpeaking) return;
   inp.value='';
+  if(window.LivePatient&&getCase()?.id===6&&getSettings().teacherToken)void LivePatient.connect();
   startTimer();
   handleNurseSpeech(t);
 }
@@ -3029,6 +3033,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./patient-view.js"></script>
 <script src="./interaction-recorder.js"></script>
 <script src="./simli-sdk.js"></script>
-<!-- Live pilot entry temporarily removed. -->
+<script src="./live-patient.js?v=wu-preset-1"></script>
 </body>
 </html>
