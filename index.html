@@ -437,7 +437,7 @@ input[type=text]:focus{border-color:var(--primary)}
 <style>
 /* Keep the patient and call controls inside the conversation viewport. */
 body.conv-active #topbar{display:none}
-body.conv-active #steps{padding:4px 8px;margin:0;min-height:32px}
+body.conv-active #steps{padding:4px 8px;margin:0;min-height:32px;top:0}
 body.conv-active #main{padding-top:6px;padding-bottom:8px}
 #phase-conv .section-title{margin-bottom:4px}
 #phase-conv .section-title h2{font-size:1rem}
@@ -779,7 +779,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         </div>
       </details>
       <details id="conversation-settings"><summary>會談與停頓</summary><div class="settings-section-body">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2.5" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2.5 秒</span></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2 秒</span></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled hidden> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
 </div></details>
       <details id="course-settings"><summary>課程連線設定</summary><div class="settings-section-body">
@@ -1065,6 +1065,12 @@ function renderPhase(p){
   if(p==='export') renderExportPhase();
   if(p==='review') renderReviewPhase(); else if(typeof replayStop==='function'){ replayStop(); moveAvatarTo('avatar-wrap'); if(p!=='conv') stopSimli(); }
   window.LivePatient&&LivePatient.refresh();
+  if(p==='conv'){
+    const c=getCase();
+    if(c){moveAvatarTo('avatar-wrap');loadAvatarFor(c);document.getElementById('avatar-label').textContent=`病人・${c.name}（${c.age}歲）`;}
+    const area=document.getElementById('conv-area');
+    if(!area.childElementCount)for(const m of state.conversation)addBubble(m.role,m.text,m.ts||Date.now());
+  }
   window.scrollTo(0,0);
   if(state.caseId)saveState();
 }
@@ -1324,7 +1330,7 @@ function parsePatientReply(raw){
   return {expr,gest,text};
 }
 const CASE_PORTRAITS={1:'wang',2:'li',3:'chen',4:'zhang',5:'lin',6:'wu'};
-function portraitUrl(c){ return c.id===6?'https://app.simli.com/_next/image?url=%2Fcharacters%2Ftrinity2%2F03ce3ee8-db97-4150-a333-8f643d48fee9.jpg&w=3840&q=75':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
+function portraitUrl(c){ return c.id===6?'./portraits/wu-daniel.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
 function loadAvatarFor(c){
   document.getElementById('avatar-loading').classList.add('hidden');
   if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:c.id===6});
@@ -1344,7 +1350,7 @@ function getSettings(){
   try{const st=JSON.parse(localStorage.getItem(SET_KEY)||'{}');
     if(st.chatEconomyVersion!==1){st.oaModel='gpt-6-luna';st.chatEconomyVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.caseVoiceVersion!==1){st.caseVoices={...st.caseVoices,...CASE_VOICE_DEFAULTS};st.caseVoiceVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
-    if(st.pauseTimingVersion!==1){if(!Number.isFinite(Number(st.pauseSec))||Number(st.pauseSec)<=1.6)st.pauseSec=2.5;st.pauseTimingVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    if(st.pauseTimingVersion!==2){if(!Number.isFinite(Number(st.pauseSec))||Number(st.pauseSec)===2.5||(st.pauseTimingVersion!==1&&Number(st.pauseSec)<=1.6))st.pauseSec=2;st.pauseTimingVersion=2;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     return st;
   }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
@@ -1410,7 +1416,7 @@ function openSettings(){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('set-proxy',st.proxyUrl||''); set('set-class',st.classCode||''); set('set-teacher',st.teacherToken||'');
   set('set-drive',st.driveUrl||'');
-  document.getElementById('set-pause').value=st.pauseSec||2.5; document.getElementById('pause-val').textContent=(st.pauseSec||2.5)+' 秒';
+  document.getElementById('set-pause').value=st.pauseSec||2; document.getElementById('pause-val').textContent=(st.pauseSec||2)+' 秒';
   document.getElementById('set-bargein').checked=false;
   document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
   set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-oamodel',st.oaModel||''); set('set-oareport',st.oaReport||''); set('set-oakey',st.oaKey||''); document.getElementById('set-ai').value=st.aiProvider||'openai'; set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
@@ -1423,7 +1429,7 @@ function openSettings(){
 }
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
-  const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:1,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2.5,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
+  const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:2,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
@@ -1697,7 +1703,7 @@ function startRecording(){
     recorder.onstop=()=>{ recBlob=new Blob(recChunks,{type:recorder.mimeType||'video/webm'}); capture.stop(); };
     recorder.start(1000); recStart=Date.now(); updateRecIndicator();
     document.getElementById('cam-label').innerHTML='<span class="rec-dot"></span>錄影中';
-  }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; toast('互動錄影無法啟動：'+(e.message||e.name)); }
+  }catch(e){ document.getElementById('cam-label').textContent='鏡頭（無法錄影）'; toast('本次未能開始錄影，會談仍可繼續：'+(e.message||e.name)); }
 }
 function camUnavailable(msg){
   const off=document.getElementById('cam-off');
@@ -1840,7 +1846,7 @@ function setupRecognition(){
     if((isSpeaking&&!bargeInOn())||isEcho(shown)){ document.getElementById('interim-text').textContent=''; return; }
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
-    // 停頓超過設定秒數（預設 2.5 秒）才視為說完；中途換氣、想詞不會被送出
+    // 停頓超過設定秒數（預設 2 秒）才視為說完；中途換氣、想詞不會被送出
     const pause=pauseMs();
     if(shown&&shown!==lastInterim){ lastInterim=shown; clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
     else if(final&&!interim){ clearTimeout(interimTimer); interimTimer=setTimeout(()=>commit(shown),pause); }
@@ -1878,7 +1884,7 @@ function resumeListening(){
 }
 function bargeInOn(){ return false; }
 let lastPatientText='', lastSpeakEnd=0;
-function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:2.5)*1000); }
+function pauseMs(){ const v=parseFloat(getSettings().pauseSec); return Math.round((isFinite(v)&&v>=0.8&&v<=4?v:2)*1000); }
 // 回音判斷：辨識到的字若大多出現在病人正在說的話裡，視為喇叭回音而非護生插話
 function _overlap(t,body){ body=(body||'').replace(/[\s，。！？、…「」]/g,''); const x=(t||'').replace(/[\s，。！？、…「」]/g,''); if(!body||x.length<2) return 0; let hit=0; for(let i=0;i<x.length-1;i++){ if(body.includes(x.slice(i,i+2))) hit++; } return hit/(x.length-1); }
 function isEcho(t){
@@ -2953,8 +2959,8 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
 <script src="./iphone-speech.js?v=2"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
-<script src="./interaction-recorder.js"></script>
+<script src="./interaction-recorder.js?v=origin-safe-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=word-summary-1"></script>
+<script src="./live-patient.js?v=word-summary-2"></script>
 </body>
 </html>

@@ -36,7 +36,9 @@
       text(info(),20,30,920,1);
       const portrait=document.querySelector('#avatar-3d .patient-art');
       let shown=false;
-      try{shown=active?fit(live,12,78,462,376):!!portrait&&fit(portrait,12,78,462,376);}catch{}
+      // A foreign image without CORS taints the canvas and blocks captureStream.
+      const portraitSafe=portrait&&(new URL(portrait.currentSrc||portrait.src,location.href).origin===location.origin||portrait.crossOrigin==='anonymous');
+      try{shown=active?fit(live,12,78,462,376):!!portraitSafe&&fit(portrait,12,78,462,376);}catch{}
       if(!shown){g.font='20px sans-serif';text('病人畫面尚未就緒',100,260,300,1);}
       try{fit(nurse,486,78,462,376,true);}catch{}
       g.fillStyle='#fff';g.font='18px sans-serif';
@@ -49,7 +51,13 @@
       if(!camera.getAudioTracks().length){g.fillStyle='#fff';g.font='14px sans-serif';text('此裝置未提供護生麥克風錄音；護生發言請參照字幕。',20,452,920,1);}
     }
     draw();const timer=setInterval(draw,67);
-    const stream=canvas.captureStream(15);
+    let stream;
+    try{stream=canvas.captureStream(15);}catch(e){
+      stopped=true;clearInterval(timer);
+      try{mic?.disconnect();remote?.disconnect();patientAudio?.disconnect(destination);}catch{}
+      destination.stream.getTracks().forEach(t=>t.stop());
+      throw new Error(e.name==='SecurityError'?'病人圖片尚未更新，請重新整理後再試。':'此瀏覽器無法建立互動錄影，請改用最新版 Safari 或 Chrome。');
+    }
     destination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
     return {stream,stop(){
       if(stopped)return;stopped=true;clearInterval(timer);
