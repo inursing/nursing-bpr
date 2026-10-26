@@ -2857,6 +2857,7 @@ function renderReviewPhase(){
     const tags=[e.expr&&EXPR_ZH[e.expr]?`表情：${EXPR_ZH[e.expr]}`:'',e.gest&&GEST_ZH[e.gest]?`動作：${GEST_ZH[e.gest]}`:''].filter(Boolean).join('　');
     return `<div class="rv-row" data-i="${e.i}" onclick="replaySeek(${e.rel.toFixed(1)})"><div style="min-width:52px;font-size:.75rem;color:var(--text2);font-variant-numeric:tabular-nums;padding-top:8px">${fmtSec(e.rel)}</div><div style="flex:1;background:var(--patient-bubble);border-radius:10px;padding:8px 12px;font-size:.88rem;line-height:1.6"><span style="font-size:.72rem;color:var(--text2);font-weight:700">病人</span>${tags?`<span style="font-size:.72rem;color:var(--warn);margin-left:8px">${tags}</span>`:''}<br>${escHtml(e.text)}</div></div>`;
   }).join('')||'<div style="color:var(--text2);font-size:.85rem">沒有會談內容</div>';
+  document.getElementById('review-subtitle').hidden=!!(replay.hasVideo&&recComposite);
   document.getElementById('review-subtitle').textContent='按「從頭播放」開始同步回放。';
   replay.fired=0; updateSeekUI(0); updatePlayBtn();
 }
@@ -2920,7 +2921,7 @@ function highlightRow(i){
 function showSubtitle(e){
   const box=document.getElementById('review-subtitle'); if(!e){box.textContent='';return}
   box.innerHTML=`<span style="font-size:.75rem;font-weight:700;color:${e.role==='nurse'?'var(--primary-dark)':'var(--text2)'}">${e.role==='nurse'?'護生':'病人'}</span>　${escHtml(e.text)}`;
-  if(!replay.hasVideo){ const nt=document.getElementById('review-nurse-text'); if(e.role==='nurse') nt.textContent=e.text; }
+
 }
 
 // ===== UTILS =====
