@@ -2764,9 +2764,12 @@ function buildAiFallbackRecord(c){
   `;
 }
 
+let pdfBusy=false;
 async function makePdf(title,innerHtml,filename,returnBlob){
   if(!window.html2pdf){ toast('PDF 產生器尚未載入，請稍後再試'); return; }
-  toast('正在產生 PDF…');
+  if(pdfBusy){toast('PDF 正在製作中，請勿重複點選。');return;}
+  pdfBusy=true;
+  toast('正在排版並製作 PDF，請稍候…');
   // 以固定的列印樣式在隱藏容器中排版（A4 橫向，白底黑字，不受深色模式影響）
   const host=document.createElement('div');
   host.style.cssText='position:absolute;left:-20000px;top:0;width:1100px;background:#fff;color:#111;font-family:"Noto Sans TC",system-ui,sans-serif;font-size:11pt;padding:24px;line-height:1.6';
@@ -2787,8 +2790,8 @@ async function makePdf(title,innerHtml,filename,returnBlob){
   try{
     const blob=await html2pdf().set({
       margin:[10,10,12,10], filename,
-      image:{type:'jpeg',quality:0.95},
-      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0},
+      image:{type:'jpeg',quality:0.9},
+      html2canvas:{scale:1.5,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0},
       jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
       pagebreak:{mode:['css','legacy']}
     }).from(root).outputPdf('blob');
@@ -2796,7 +2799,7 @@ async function makePdf(title,innerHtml,filename,returnBlob){
     saveBlob(filename,blob);
     toast('PDF 已產生');
   }catch(e){ if(e&&e.code!=='cancelled') toast('PDF 產生失敗：'+(e.message||'')); }
-  finally{ host.remove(); }
+  finally{ host.remove(); pdfBusy=false; }
 }
 async function downloadStudentReport(){
   const c=getCase();
