@@ -1490,18 +1490,21 @@ async function openaiSample(input,opts={}){
 }
 async function openaiSampleStream(input,opts={}){
   const messages=typeof input==='string'?[{role:'user',content:input}]:input;
-  const res=await openaiFetch(messages,opts,true); clearTimeout(res.__timer);
-  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
-  while(true){
-    const {value,done}=await reader.read(); if(done) break;
-    buf+=dec.decode(value,{stream:true});
-    const lines=buf.split('\n'); buf=lines.pop();
-    for(const line of lines){
-      if(!line.startsWith('data:')) continue; const d=line.slice(5).trim(); if(d==='[DONE]') continue;
-      try{ const j=JSON.parse(d); recordOpenaiUsage(j,opts.kind); const t=j.choices?.[0]?.delta?.content||''; if(t){ full+=t; opts.onDelta&&opts.onDelta(full,t); } }catch(e){}
-    }
-  }
-  return {text:full};
+  const res=await openaiFetch(messages,opts,true);
+  const reader=res.body.getReader(),dec=new TextDecoder();let buf='',full='',finishReason=null;
+  const accept=line=>{
+    if(!line.startsWith('data:'))return;const d=line.slice(5).trim();if(!d||d==='[DONE]')return;
+    let j;try{j=JSON.parse(d);}catch(e){throw new Error('AI 回應傳輸不完整。');}
+    if(j.error)throw new Error(j.error.message||String(j.error));
+    recordOpenaiUsage(j,opts.kind);const choice=j.choices?.[0];if(choice?.finish_reason)finishReason=choice.finish_reason;
+    const text=choice?.delta?.content||'';if(text){full+=text;opts.onDelta&&opts.onDelta(full,text);}
+  };
+  try{
+    while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop();for(const line of lines)accept(line);}
+    buf+=dec.decode();if(buf.trim())accept(buf);
+    if(!full.trim())throw new Error('AI 未回傳分析內容。');
+    return {text:full,finishReason};
+  }finally{clearTimeout(res.__timer);try{await reader.cancel();}catch(e){}}
 }
 // 訊息格式：{role, content:string} 或 {role, parts:[{text}|{image:dataURL}]}
 function msgParts(m){ return m.parts||[{text:m.content}]; }
@@ -2514,7 +2517,8 @@ async function generateAiRecord(onProgress){
   const progress=setInterval(()=>{const el=document.getElementById('ai-generating');if(el&&state.phase==='export')el.textContent='AI 分析中…（'+Math.floor((Date.now()-started)/1000)+' 秒）';},1000);
   try{
     const res=await apiSampleStream(prompt,{maxTokens:Math.min(10000,2400+pairs.length*100),kind:'report',onDelta:full=>{chars=full.length;}});
-    const raw=(res.text||'').trim();const data=JSON.parse(raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1));
+    if(res.finishReason==='length')throw new Error('AI 分析回應超過輸出上限，內容未完成。');
+    const raw=(res.text||'').trim();let data;try{const first=raw.indexOf('{'),last=raw.lastIndexOf('}');if(first<0||last<first)throw new Error();data=JSON.parse(raw.slice(first,last+1));}catch(e){throw new Error('AI 回傳的報告格式不完整。');}
     if(!Array.isArray(data.rows)||!Array.isArray(data.assessment)||data.assessment.length!==4||data.assessment.some(t=>typeof t!=='string'))throw new Error('AI報告格式不完整，未自動重試。');
     const rows=pairs.map((_,i)=>{const row=data.rows.find(r=>r.turn===i+1);if(!row||!Array.isArray(row.labels)||!row.labels.length)throw new Error('AI會談紀錄不完整，未自動重試。');return {analysis:String(row.analysis||'資料不足，需確認。'),labels:row.labels.slice(0,2).map(x=>String(x).slice(0,25)),nonverbal:'未評估'};});
     return buildAiConversationReport(pairs,rows,data.assessment);
