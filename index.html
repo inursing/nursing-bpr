@@ -457,6 +457,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
     <div class="step" id="step-analysis" onclick="goStep('analysis')"><span class="step-num">5</span>分析反思</div>
     <div class="step" id="step-export" onclick="goStep('export')"><span class="step-num">6</span>產出報告</div>
     <div class="step" id="step-evaluation" onclick="goStep('evaluation')"><span class="step-num">7</span>練習評值</div>
+    <div class="step" id="step-replay" onclick="goStep('replay')" hidden><span class="step-num">8</span>會談回放 <small>（僅電腦版）</small></div>
   </div>
 
   <div id="main">
@@ -666,7 +667,8 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
         <div class="row-actions"><button class="btn btn-primary" onclick="renderPhase('evaluation')">練習評值與建議 →</button></div>
       </div>
     </div>
-    <div id="phase-evaluation" class="hidden"><div id="desktop-replay-panel" class="card" hidden style="max-width:960px;margin:0 auto 20px"><h3 style="margin-bottom:12px">會談回放</h3><video id="desktop-replay-video" controls playsinline controlsList="nodownload" style="display:block;width:100%;aspect-ratio:3/2;max-height:65dvh;object-fit:contain;border-radius:12px;background:#202443"></video><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px"><label id="desktop-replay-select-label" for="desktop-replay-select" style="margin:0">影片段落</label><select id="desktop-replay-select" style="padding:8px"></select><span id="desktop-replay-status" role="status"></span><button type="button" class="btn btn-primary btn-sm" id="desktop-video-submit" onclick="DesktopRecording.submitVideo()">繳交會談影片</button></div><div id="desktop-video-submit-status" role="status" style="margin-top:10px;font-size:.85rem"></div><div id="desktop-replay-transcript" style="margin-top:14px;height:26dvh;min-height:120px;max-height:280px;overflow-y:auto;overscroll-behavior:contain;overflow-anchor:none;display:flex;flex-direction:column;gap:8px"></div></div><div class="section-title"><span class="section-icon">📝</span><h2>練習評值與建議</h2></div><div class="card"><form id="evaluation-form" onsubmit="submitEvaluation(event)"><div id="evaluation-identity" style="margin-bottom:20px;font-weight:700"></div><div id="evaluation-questions"></div><label for="evaluation-issues">使用時遇到哪些問題？</label><textarea id="evaluation-issues" maxlength="2000" rows="3"></textarea><label for="evaluation-suggestions">希望增加或改善哪些功能？</label><textarea id="evaluation-suggestions" maxlength="2000" rows="3"></textarea><div class="row-actions"><button type="button" class="btn btn-outline" onclick="goStep('export')">← 返回報告</button><button class="btn btn-primary" id="evaluation-submit" type="submit">送出評值</button></div><div id="evaluation-status" role="status" style="margin-top:12px"></div></form></div></div>
+    <div id="phase-evaluation" class="hidden"><div class="section-title"><span class="section-icon">📝</span><h2>練習評值與建議</h2></div><div class="card"><form id="evaluation-form" onsubmit="submitEvaluation(event)"><div id="evaluation-identity" style="margin-bottom:20px;font-weight:700"></div><div id="evaluation-questions"></div><label for="evaluation-issues">使用時遇到哪些問題？</label><textarea id="evaluation-issues" maxlength="2000" rows="3"></textarea><label for="evaluation-suggestions">希望增加或改善哪些功能？</label><textarea id="evaluation-suggestions" maxlength="2000" rows="3"></textarea><div class="row-actions"><button type="button" class="btn btn-outline" onclick="goStep('export')">← 返回報告</button><button class="btn btn-primary" id="evaluation-submit" type="submit">送出評值</button><button type="button" class="btn btn-outline" id="evaluation-replay-next" hidden onclick="renderPhase('replay')">會談回放 →</button></div><div id="evaluation-status" role="status" style="margin-top:12px"></div></form></div></div>
+    <div id="phase-replay" class="hidden"><div class="section-title"><span class="section-icon">🎬</span><h2>會談回放 <small style="font-size:.75em;color:var(--text2)">（僅電腦版）</small></h2></div><div id="desktop-replay-empty" class="card">此次會談未錄製影片。</div><div id="desktop-replay-panel" class="card" hidden style="max-width:960px;margin:0 auto 20px"><h3 style="margin-bottom:12px">會談回放</h3><video id="desktop-replay-video" controls playsinline controlsList="nodownload" style="display:block;width:100%;aspect-ratio:3/2;max-height:65dvh;object-fit:contain;border-radius:12px;background:#202443"></video><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px"><label id="desktop-replay-select-label" for="desktop-replay-select" style="margin:0">影片段落</label><select id="desktop-replay-select" style="padding:8px"></select><span id="desktop-replay-status" role="status"></span><button type="button" class="btn btn-primary btn-sm" id="desktop-video-submit" onclick="DesktopRecording.submitVideo()">繳交會談影片</button></div><div id="desktop-video-submit-status" role="status" style="margin-top:10px;font-size:.85rem"></div><div id="desktop-replay-transcript" style="margin-top:14px;height:26dvh;min-height:120px;max-height:280px;overflow-y:auto;overscroll-behavior:contain;overflow-anchor:none;display:flex;flex-direction:column;gap:8px"></div></div><div class="row-actions"><button class="btn btn-outline" onclick="goStep('evaluation')">← 返回練習評值</button></div></div>
   </div>
 </div>
 
@@ -951,7 +953,7 @@ let state = {
 function getCase(){ return CASES.find(c=>c.id===state.caseId) }
 
 // ===== STEP NAVIGATION =====
-const PHASES = ['cases','goals','conv','record','analysis','export','evaluation'];
+const PHASES = ['cases','goals','conv','record','analysis','export','evaluation','replay'];
 function goStep(p){
   if(p===state.phase) return;
   const idx=PHASES.indexOf(p);
@@ -963,7 +965,8 @@ function goStep(p){
 }
 function renderPhase(p){
   if(!PHASES.includes(p))return;
-  if(p!=='evaluation')window.DesktopRecording?.pausePlayback();
+  if(p==='replay'&&!window.DesktopRecording?.isDesktop())return;
+  if(p!=='replay')window.DesktopRecording?.pausePlayback();
   if(state.phase==='conv'&&p!=='conv') stopConversationMedia();
   syncRecordFromDOM();
   if(state.phase==='analysis')syncReflections();
@@ -991,7 +994,8 @@ function renderPhase(p){
   if(p==='record'){renderRecordTable();startBackgroundAnalysis();}
   if(p==='analysis') renderAnalysisPhase();
   if(p==='export')renderExportPhase();
-  if(p==='evaluation'){renderEvaluation();window.DesktopRecording?.renderPlayback();}
+  if(p==='evaluation')renderEvaluation();
+  if(p==='replay')window.DesktopRecording?.renderPlayback();
   if(p!=='conv') stopSimli();
   window.LivePatient&&LivePatient.refresh();
   if(p==='conv'){
@@ -2663,6 +2667,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./simli-sdk.js"></script>
 <script src="./live-patient.js?v=plain-label-1"></script>
 <script src="./interaction-recorder.js?v=shared-mic-2"></script>
-<script src="./desktop-recording.js?v=replay-4"></script>
+<script src="./desktop-recording.js?v=step8-5"></script>
 </body>
 </html>

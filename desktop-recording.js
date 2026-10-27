@@ -6,6 +6,7 @@
  const el=id=>document.getElementById(id);
  function refresh(){
   document.body.classList.toggle('desktop-practice',mode==='desktop');
+  for(const id of ['step-replay','evaluation-replay-next']){const node=el(id);if(node)node.hidden=mode!=='desktop';}
   el('practice-device').value=mode;el('desktop-record-choice').hidden=mode!=='desktop';el('desktop-record-enabled').checked=enabled;
  }
  function stop(){
@@ -69,12 +70,13 @@
  }
  function renderPlayback(){
   const box=el('desktop-replay-panel');if(!box)return;box.hidden=mode!=='desktop'||!clips.length;
+  const empty=el('desktop-replay-empty');if(empty)empty.hidden=clips.length>0;
   if(box.hidden){pausePlayback();return;}
   const select=el('desktop-replay-select');select.replaceChildren();
   clips.forEach((_,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent='第 '+(i+1)+' 段';select.append(option);});
   select.hidden=el('desktop-replay-select-label').hidden=clips.length<2;
   select.onchange=()=>selectPlayback(Number(select.value));
-  const v=el('desktop-replay-video');v.onended=()=>{if(playbackIndex+1<clips.length&&state.phase==='evaluation')selectPlayback(playbackIndex+1,true);};
+  const v=el('desktop-replay-video');v.onended=()=>{if(playbackIndex+1<clips.length&&state.phase==='replay')selectPlayback(playbackIndex+1,true);};
   const transcript=el('desktop-replay-transcript');if(transcript){transcript.replaceChildren();
    state.conversation.forEach(m=>{const row=document.createElement('button');row.type='button';row.style.cssText='text-align:left;border:1px solid var(--border);border-radius:10px;padding:10px;background:'+(m.role==='nurse'?'var(--nurse-bubble)':'var(--patient-bubble)')+';color:var(--text);line-height:1.7;cursor:pointer';row.textContent=(m.role==='nurse'?'護生：':'病人：')+m.text;
     row.onclick=()=>{const index=clips.findIndex(c=>m.ts>=c.start&&m.ts<=c.end);if(index<0)return;selectPlayback(index);v.currentTime=Math.max(0,(m.ts-clips[index].start)/1000-1);void v.play().catch(()=>{});};transcript.append(row);});
@@ -111,5 +113,5 @@
  }
  function reset(){practice++;stop();pausePlayback();clips=[];playbackUrls.forEach(url=>URL.revokeObjectURL(url));playbackUrls=[];playbackIndex=0;const v=el('desktop-replay-video');if(v){v.removeAttribute('src');v.load();}renderPlayback();}
  el('avatar-wrap').append(el('desktop-record-panel'));
- window.DesktopRecording={start,stop,preview,stopPreview,setMode,setEnabled,disable,refresh,renderPlayback,pausePlayback,submitVideo,reset};refresh();
+ window.DesktopRecording={isDesktop:()=>mode==='desktop',start,stop,preview,stopPreview,setMode,setEnabled,disable,refresh,renderPlayback,pausePlayback,submitVideo,reset};refresh();
 })();
