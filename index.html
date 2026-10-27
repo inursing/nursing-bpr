@@ -461,9 +461,6 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         <div class="hero-art" aria-hidden="true"><span class="hero-orbit">✳</span><div class="hero-photo"><img src="./portraits/wang-65-sketch.jpg" alt=""></div><div class="hero-note">「我想多聽你說一點。」<span>從理解開始，練習回應。</span></div><span class="hero-spark">✦</span></div>
       </section>
       <div class="section-title"><span class="section-icon">📋</span><h2>今天，從一段對話開始</h2></div>
-      <div class="info-box info-primary" style="margin-bottom:16px">
-        選擇一個虛擬個案，查看病歷後開始練習。每位病人都有自己的故事。先了解病歷與照護需求，再開始一段對話。
-      </div>
       <div class="card-grid" id="case-grid"></div>
     </div>
 
@@ -475,8 +472,8 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
           <div class="card" style="margin-bottom:16px" id="selected-case-summary"></div>
           <div class="card">
             <div style="margin-bottom:16px">
-              <label>學生姓名（練習者）</label>
-              <div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="student-name" placeholder="請輸入您的姓名" style="max-width:240px"><input type="text" id="student-id" placeholder="學號" style="max-width:220px"></div>
+              <label>姓名</label>
+              <div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="student-name" placeholder="姓名" style="max-width:240px"><input type="text" id="student-id" placeholder="學號" style="max-width:220px"></div>
             </div>
             <div style="margin-bottom:16px">
               <label>今日會談目的 <span style="color:var(--danger)">*</span></label>
@@ -529,10 +526,10 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
             <button class="btn btn-danger btn-sm" id="end-conv-btn" onclick="endConv()" disabled>結束會談</button>
           </div>
           <div id="text-fallback">
-            <input type="text" id="text-input" placeholder="或在此輸入文字後按 Enter（語音無法使用時）" onkeydown="if(event.key==='Enter'){sendTextInput()}">
+            <input type="text" id="text-input" placeholder="輸入訊息" onkeydown="if(event.key==='Enter'){sendTextInput()}">
             <button class="btn btn-outline btn-sm" onclick="sendTextInput()">送出</button>
           </div>
-          <div id="qr-big" class="modal-overlay hidden" onclick="this.classList.add('hidden')" style="z-index:9999;background:#fff;display:grid;place-items:center;cursor:pointer"><div style="text-align:center"><div id="qr-big-img" style="line-height:0"></div><div style="margin-top:14px;font-size:1.1rem;color:#333">用手機掃描 QR Code，開啟後設定會自動套用（點任意處關閉）</div></div></div>
+          <div id="qr-big" class="modal-overlay hidden" onclick="this.classList.add('hidden')" style="z-index:9999;background:#fff;display:grid;place-items:center;cursor:pointer"><div style="text-align:center"><div id="qr-big-img" style="line-height:0"></div><div style="margin-top:14px;font-size:1.1rem;color:#333">掃描 QR Code 開啟課程 · 點一下關閉</div></div></div>
 <div id="end-confirm" class="modal-overlay hidden" onclick="if(event.target.id==='end-confirm')this.classList.add('hidden')">
             <div class="modal" style="max-width:420px;text-align:center">
               <h3 style="margin-bottom:10px">要結束會談嗎？</h3>
@@ -544,7 +541,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
             </div>
           </div>
           <div class="info-box info-warn" style="margin-top:12px;font-size:.8rem">
-            💡 按一次麥克風後會持續聆聽：說完稍停一下就送出，病人說話時自動暫停、說完自動恢復；再按一次可暫停。建議戴耳機，避免病人的聲音被麥克風收進去。
+            按麥克風開始／暫停。建議戴耳機。
           </div>
         </div>
         <div id="conv-side" class="hidden" style="margin-top:16px">
@@ -560,10 +557,6 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
     <!-- PHASE 4: PROCESS RECORD -->
     <div id="phase-record" class="hidden">
       <div class="section-title"><span class="section-icon">✍️</span><h2>填寫行為過程記錄</h2></div>
-      <div class="ai-status" role="status" style="font-size:.8rem;color:var(--text2);margin-bottom:10px">AI分析會在背景進行，不影響您填寫紀錄。</div>
-      <div class="info-box info-primary" style="margin-bottom:16px">
-        請憑記憶，依會談的先後順序寫下每一句互動：您說了什麼、做了什麼（表情、姿勢、眼神、動作），病人說了什麼、做了什麼。此階段<strong>不會顯示會談逐字稿</strong>，請盡量回想。寫完後進入下一步分析，之後仍可隨時回來增補。
-      </div>
       <div class="card" style="overflow-x:auto">
         <table class="record-table" id="record-table">
           <thead>
@@ -597,9 +590,6 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
     <!-- PHASE 5: ANALYSIS -->
     <div id="phase-analysis" class="hidden">
       <div class="section-title"><span class="section-icon">🔍</span><h2>分析與反思</h2></div>
-      <div class="info-box info-primary" style="margin-bottom:16px">
-        以下是您剛才寫下的會談過程。請為<strong>每一句</strong>標示您使用的溝通技巧，並寫下自我分析。所有欄位仍可修改，想起遺漏可用「＋ 新增一列」補上。
-      </div>
       <div class="card" style="overflow-x:auto;margin-bottom:20px">
         <table class="record-table" id="analysis-table"><thead><tr><th style="width:40px">序</th><th style="min-width:150px">護生語言</th><th style="min-width:120px">護生非語言</th><th style="min-width:150px">病人語言</th><th style="min-width:120px">病人非語言</th><th style="min-width:170px">使用技巧</th><th style="min-width:170px">自我分析</th><th style="width:44px"></th></tr></thead><tbody id="analysis-tbody"></tbody></table>
         <div style="margin-top:10px;display:flex;align-items:center;gap:8px"><button class="btn btn-outline btn-sm" onclick="addRow()">＋ 新增一列</button></div>
@@ -661,7 +651,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         </div>
         <div class="card" id="submit-card">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-            <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">會把學生版 Word 與 AI 版 Word 上傳到老師的雲端硬碟；資料夾與檔名包含學號、姓名、個案與繳交時間。</div></div>
+            <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">學生版 Word、AI 版 Word</div></div>
             <button class="btn btn-primary" id="submit-btn" onclick="submitToTeacher()">📤 繳交練習</button>
           </div>
           <div id="submit-status" style="margin-top:10px;font-size:.85rem;line-height:1.7"></div>
@@ -678,7 +668,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
   <div class="modal" style="max-width:720px">
     <h2>會談前檢查</h2>
     <div id="check-scene" class="info-box info-primary" style="margin-bottom:12px;font-size:.85rem"></div>
-    <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">先測試語音辨識與病人聲音，再開始會談。</div>
+    <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">測試麥克風與病人聲音。</div>
     <div style="display:grid;grid-template-columns:1fr;gap:12px" id="check-grid">
 
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -702,33 +692,32 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem">學生課後練習</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
           <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課後可使用自己的 Gemini 金鑰練習，金鑰儲存在此裝置。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
-          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用我自己的金鑰（勾選後不走老師的課程代理）</label>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用自己的金鑰</label>
           <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
           <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
         </div>
       </details>
       <details id="conversation-settings"><summary>會談與停頓</summary><div class="settings-section-body">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">護生停頓幾秒算說完</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2 秒</span></div>
-      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled hidden> 病人說話時自動暫停辨識，說完後恢復聆聽（避免收錄喇叭回音）</label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">說話停頓時間</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2 秒</span></div>
+      <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled hidden> 病人說話時暫停收音</label>
 </div></details>
       <details id="course-settings"><summary>課程連線設定</summary><div class="settings-section-body">
       <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
       <div><label>AI 供應商（病人對話與 AI 報告）</label>
         <select id="set-ai" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
-          <option value="openai">OpenAI GPT（付費，穩定；Worker 需設 OPENAI_KEY）</option>
-          <option value="gemini">Google Gemini（免費額度有限；Worker 需設 GEMINI_KEY）</option>
+          <option value="openai">OpenAI GPT</option>
+          <option value="gemini">Google Gemini</option>
         </select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label>代理網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
-        <div><label>課程代碼</label><input type="text" id="set-class" placeholder="與 Worker 的 CLASS_CODE 相同"></div>
+        <div><label>課程服務網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
+        <div><label>課程代碼</label><input type="text" id="set-class" placeholder="課程代碼"></div>
       </div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
 
 </div></details>
       <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具：練習次數</summary>
         <div style="display:grid;gap:8px;margin-top:8px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">每位學生可用課堂金鑰的練習次數由 Worker 的 <code>MAX_SESSIONS</code> 決定（目前 3 次，以學號計）。填入教師密語後，這台裝置不受限制，並可查看／重設學生次數；密語不會放進連結或 QR。</div>
-          <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="與 Worker 的 TEACHER_TOKEN 相同"></div>
+          <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="教師密語"></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
           <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
         </div>
@@ -738,8 +727,8 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
 </div></details>
       <details id="sharing-settings"><summary>分享課程連結與 QR Code</summary><div class="settings-section-body">
-      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">請分享下方完整課程連結或 QR。一般網站網址不包含您的設定。課程連結<b>不含 API 金鑰與教師密語</b>。</div>
-      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">請先完成「課程連線設定」。本平台不提供分享個人 API 金鑰的連結。</div>
+      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">分享課程連結或 QR Code。</div>
+      <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">請先完成課程連線設定。</div>
       <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
       <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
       <div id="setup-qr-box" class="hidden" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -2329,6 +2318,7 @@ function syncReflections(){
   });
 }
 
+function cleanAiReportCopy(html){return String(html||'').replace(/<p>依實際會談整理；未比對學生書寫內容。保留完整對話，表格AI分析獨立呈現，下方整體評估不超過1,000字。<\/p>/g,'');}
 // ===== PHASE 6: EXPORT =====
 async function renderExportPhase(generate=false){
   syncReflections();
@@ -2336,19 +2326,19 @@ async function renderExportPhase(generate=false){
   document.getElementById('step-export').classList.add('done');
   document.getElementById('student-report-preview').innerHTML=buildStudentReportHTML();
   document.getElementById('ai-generating').classList.remove('hidden');
-  document.getElementById('ai-report-preview').innerHTML=aiJobText||'';
+  document.getElementById('ai-report-preview').innerHTML=cleanAiReportCopy(aiJobText);
   try{
     let aiText;
     const key=reportInputKey();
     if(!state.conversation.some((m,i,a)=>m.role==='nurse'&&m.text?.trim()&&a[i+1]?.role==='patient'&&a[i+1].text?.trim())){
-      document.getElementById('ai-generating').textContent='尚無有效會談，未呼叫 AI。請先完成護生與病人的對話。';
+      document.getElementById('ai-generating').textContent='請先完成會談。';
       document.getElementById('ai-report-preview').innerHTML=''; return;
     }
     if(state.aiRecord&&state.aiRecordInputKey===key) aiRecordKey=key;
-    if(state.aiRecord && aiRecordKey===key){ aiText=state.aiRecord; }
+    if(state.aiRecord && aiRecordKey===key){ aiText=cleanAiReportCopy(state.aiRecord); }
     else {
       if(!generate&&(!aiJob||aiRecordKey!==key||aiJobError)){
-        document.getElementById('ai-generating').innerHTML='產生分析會使用 AI 額度。<button class="btn btn-primary btn-sm" onclick="renderExportPhase(true)">產生 AI 分析</button>';
+        document.getElementById('ai-generating').innerHTML='<button class="btn btn-primary btn-sm" onclick="renderExportPhase(true)">產生 AI 分析</button>';
         document.getElementById('ai-report-preview').innerHTML=''; return;
       }
       if(!aiJob || aiRecordKey!==key || aiJobError){
@@ -2359,7 +2349,7 @@ async function renderExportPhase(generate=false){
       const waitingSince=Date.now();
       const waitingTimer=setInterval(()=>{
         const el=document.getElementById('ai-generating');
-        if(el&&state.phase==='export')el.textContent=aiJobText?'AI 正在分析會談過程…（已產生 '+aiJobText.length+' 字）':'AI 正在閱讀會談…（已等候 '+Math.floor((Date.now()-waitingSince)/1000)+' 秒，請勿重複點選）';
+        if(el&&state.phase==='export')el.textContent='AI 分析中…（'+Math.floor((Date.now()-waitingSince)/1000)+' 秒）';
       },1000);
       try{aiText=await aiJob;}finally{clearInterval(waitingTimer);}
       if(reportInputKey()!==key) return;
@@ -2367,7 +2357,7 @@ async function renderExportPhase(generate=false){
       state.aiRecordInputKey=key; saveState();
     }
     document.getElementById('ai-generating').classList.add('hidden');
-    document.getElementById('ai-report-preview').innerHTML=aiText;
+    document.getElementById('ai-report-preview').innerHTML=cleanAiReportCopy(aiText);
   }catch(e){
     document.getElementById('ai-generating').innerHTML='⚠️ AI分析暫時無法生成：'+escHtml(e&&e.message||'')+' <button class="btn btn-outline btn-sm" onclick="renderExportPhase(true)">重試分析（使用額度）</button>';
   }
@@ -2486,7 +2476,7 @@ function buildAiConversationReport(pairs,rows,assessment){
     const text=Array.from(String(assessment[i]||'資料不足，無法判定。').trim()).slice(0,Math.max(0,budget)).join('');budget-=Array.from(text).length;
     return '<h4>'+h+'</h4><p>'+escHtml(text)+'</p>';
   }).join('');
-  return '<h3>AI版行為過程紀錄</h3><p>依實際會談整理；未比對學生書寫內容。保留完整對話，表格AI分析獨立呈現，下方整體評估不超過1,000字。</p><table class="record-table"><thead><tr><th>序</th><th>護生語言反應</th><th>護生非語言</th><th>病人語言反應</th><th>病人非語言</th><th>使用技巧</th><th>AI分析</th></tr></thead><tbody>'+
+  return '<h3>AI版行為過程紀錄</h3><table class="record-table"><thead><tr><th>序</th><th>護生語言反應</th><th>護生非語言</th><th>病人語言反應</th><th>病人非語言</th><th>使用技巧</th><th>AI分析</th></tr></thead><tbody>'+
     pairs.map((p,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(p.n)+'</td><td>'+escHtml(rows[i]?.nonverbal||'未觀察')+'</td><td>'+escHtml(p.p)+'</td><td>未觀察：模擬對話</td><td>'+escHtml((rows[i]?.labels||['尚未分析']).join('、'))+'</td><td>'+escHtml(notes[i])+'</td></tr>').join('')+
     '</tbody></table><h3>整體評估</h3>'+summary;
 }
@@ -2503,7 +2493,7 @@ async function generateAiRecord(onProgress){
     '沒有蒐集護生影像，nonverbal一律填未評估，不分析或推測表情、動作、眼神、專注程度或情緒。';
   
   const started=Date.now();let chars=0;
-  const progress=setInterval(()=>{const el=document.getElementById('ai-generating');if(el&&state.phase==='export')el.textContent='AI正在整理會談重點…（'+Math.floor((Date.now()-started)/1000)+'秒'+(chars?'，已收到'+chars+'字':'')+'）';},1000);
+  const progress=setInterval(()=>{const el=document.getElementById('ai-generating');if(el&&state.phase==='export')el.textContent='AI 分析中…（'+Math.floor((Date.now()-started)/1000)+' 秒）';},1000);
   try{
     const res=await apiSampleStream(prompt,{maxTokens:Math.min(10000,2400+pairs.length*100),kind:'report',onDelta:full=>{chars=full.length;}});
     const raw=(res.text||'').trim();const data=JSON.parse(raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1));
