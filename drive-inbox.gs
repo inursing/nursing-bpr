@@ -119,8 +119,8 @@ function receiveEvaluation(d){
  const rows=[['填答時間','學號','姓名','練習個案',...q,'遇到的問題','改善建議'],...all.map(x=>[x.at,x.studentId,x.studentName,x.caseName,...x.ratings.map(v=>v===0?'無法評估':v),x.issues,x.suggestions])];
  const summary=[['題目','有效評分人數','平均分數','無法評估人數'],...q.map((t,i)=>{const n=all.map(x=>x.ratings[i]).filter(v=>v>0);return[t,n.length,n.length?Math.round(n.reduce((a,b)=>a+b,0)/n.length*100)/100:'',all.length-n.length];}),['總填答筆數',all.length]];
  const blob=evaluationWorkbook(rows,summary),old=root.getFilesByName('練習評值統整.xlsx');
- const created=root.createFile(blob);
- while(old.hasNext())old.next().setTrashed(true);
+ const previous=[];while(old.hasNext())previous.push(old.next());
+ root.createFile(blob);previous.forEach(f=>f.setTrashed(true));
  return out({ok:true,service:'evaluation-v1'});
  }finally{lock.releaseLock();}
 }
