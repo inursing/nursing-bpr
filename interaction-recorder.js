@@ -1,10 +1,11 @@
 /* Record the actual patient feed and nurse camera together; never replay TTS to record it. */
 (() => {
-  function create({camera,context,patientAudio,info,conversation,microphone=()=>null}) {
+  function create({camera,context,patientAudio,info,conversation,microphone=()=>null,onSource=()=>{}}) {
     const canvas=document.createElement('canvas');canvas.width=960;canvas.height=640;
     const g=canvas.getContext('2d'), destination=context.createMediaStreamDestination();
     const nurse=document.getElementById('cam-video');
-    let mic=null, micTrack=null, remote=null, remoteTrack=null, stopped=false;
+    let mic=null, micTrack=null, remote=null, remoteTrack=null, stopped=false,lastSource=null;
+    const stats={liveFrames:0,portraitFrames:0,drawErrors:0};
     function syncMicrophone(){
       const input=camera.getAudioTracks().length?camera:microphone();
       const track=input?.getAudioTracks().find(t=>t.readyState!=='ended')||null;
@@ -32,7 +33,7 @@
       if(stopped)return;
       syncMicrophone();
       const live=document.getElementById('live-patient-video');
-      const active=!!window.LivePatient?.active&&live?.readyState>=2;
+      const active=!!live?.srcObject&&live.readyState>=2&&live.videoWidth>0&&live.srcObject.getVideoTracks().some(t=>t.readyState==='live');
       const audio=document.getElementById('live-patient-audio');
       const track=active?audio?.srcObject?.getAudioTracks()[0]:null;
       if(track!==remoteTrack){
@@ -46,7 +47,8 @@
       let shown=false;
       // A foreign image without CORS taints the canvas and blocks captureStream.
       const portraitSafe=portrait&&(new URL(portrait.currentSrc||portrait.src,location.href).origin===location.origin||portrait.crossOrigin==='anonymous');
-      try{shown=active?fit(live,12,78,462,376):!!portraitSafe&&fit(portrait,12,78,462,376);}catch{}
+      try{shown=active?fit(live,12,78,462,376):!!portraitSafe&&fit(portrait,12,78,462,376);}catch{stats.drawErrors++;}
+      const source=active&&shown?'live':'portrait';stats[source==='live'?'liveFrames':'portraitFrames']++;if(source!==lastSource){lastSource=source;onSource(source);}
       if(!shown){g.font='20px sans-serif';text('病人畫面尚未就緒',100,260,300,1);}
       try{fit(nurse,486,78,462,376,true);}catch{}
       g.fillStyle='#fff';g.font='18px sans-serif';
@@ -67,7 +69,7 @@
       throw new Error(e.name==='SecurityError'?'病人圖片尚未更新，請重新整理後再試。':'此瀏覽器無法建立互動錄影，請改用最新版 Safari 或 Chrome。');
     }
     destination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-    return {stream,stop(){
+    return {stream,stats:()=>({...stats}),stop(){
       if(stopped)return;stopped=true;clearInterval(timer);
       try{mic?.disconnect();remote?.disconnect();patientAudio?.disconnect(destination);}catch{}
       stream.getTracks().forEach(t=>t.stop());

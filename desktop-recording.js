@@ -50,15 +50,16 @@
    if(generation!==epoch||state.phase!=='conv'||!listenWanted||!enabled){acquired.getTracks().forEach(t=>t.stop());return;}
    stream=acquired;const v=el('cam-video');v.srcObject=stream;await v.play();
    if(generation!==epoch||state.phase!=='conv'||!listenWanted||!enabled)return;
-   ensureAudioCtx();capture=InteractionRecorder.create({camera:stream,context:audioCtx,patientAudio:analyser,info:()=>[state.studentId,state.studentName,getCase()?.name].filter(Boolean).join(' · '),conversation:()=>state.conversation});
+   ensureAudioCtx();capture=InteractionRecorder.create({camera:stream,context:audioCtx,patientAudio:analyser,info:()=>[state.studentId,state.studentName,getCase()?.name].filter(Boolean).join(' · '),conversation:()=>state.conversation,onSource:source=>{el('desktop-record-status').textContent=source==='live'?'● 錄影中 · 已接入 Live 人物':'● 錄影中 · 尚未錄到 Live 人物，目前為情境插畫';}});
+   const recordingCapture=capture;
    const mime=['video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
    const r=new MediaRecorder(capture.stream,{...(mime?{mimeType:mime}:{}),videoBitsPerSecond:600000,audioBitsPerSecond:48000});
    const chunks=[],identity=[state.studentId,state.studentName,getCase()?.name].filter(Boolean).join('_');
    r.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
-   r.onstop=()=>{const blob=new Blob(chunks,{type:r.mimeType||'video/webm'});if(blob.size&&caseId===state.caseId&&practiceId===practice){clips.push({blob,identity,start:startedAt,end:Date.now()});renderPlayback();}};
+   r.onstop=()=>{const blob=new Blob(chunks,{type:r.mimeType||'video/webm'});if(blob.size&&caseId===state.caseId&&practiceId===practice){clips.push({blob,identity,start:startedAt,end:Date.now(),sources:recordingCapture.stats?.()||null});renderPlayback();}};
    r.onerror=()=>{stop();toast('錄影中斷，仍可繼續會談。');};
    const startedAt=Date.now();
-   recorder=r;r.start(1000);snapshot();frameTimer=setInterval(snapshot,30000);el('desktop-record-status').textContent='● 錄影中';
+   recorder=r;r.start(1000);snapshot();frameTimer=setInterval(snapshot,30000);el('desktop-record-status').textContent=recordingCapture.stats?.().liveFrames>0?'● 錄影中 · 已接入 Live 人物':'● 錄影中 · 尚未錄到 Live 人物，目前為情境插畫';
   }catch(e){if(generation===epoch){stop();enabled=false;refresh();toast('無法錄影，仍可繼續會談。');}}
   finally{if(generation===epoch)pending=false;}
  }
@@ -67,7 +68,8 @@
   if(!clips[index])return;playbackIndex=index;const v=el('desktop-replay-video');
   if(!playbackUrls[index])playbackUrls[index]=URL.createObjectURL(clips[index].blob);
   v.src=playbackUrls[index];el('desktop-replay-select').value=String(index);
-  el('desktop-replay-status').textContent=clips.length>1?'第 '+(index+1)+'／'+clips.length+' 段':'';
+  const sources=clips[index].sources;const note=!sources?'此片段未記錄影像來源':sources.liveFrames===0?'此片段未錄到 Live 人物，病人畫面為情境插畫':sources.portraitFrames>0?'此片段部分時間為情境插畫，其餘為 Live 人物':'此片段已錄到 Live 人物';
+  el('desktop-replay-status').textContent=(clips.length>1?'第 '+(index+1)+'／'+clips.length+' 段 · ':'')+note;
   if(autoplay)void v.play().catch(()=>{});
  }
  function renderPlayback(){
