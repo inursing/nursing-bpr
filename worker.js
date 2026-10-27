@@ -7,7 +7,7 @@
 //   OPENAI_KEY    = 你的 OpenAI API 金鑰（Secret；平台設定選「OpenAI GPT」時使用）
 //   AZURE_KEY     = 你的 Azure 語音金鑰（Secret）
 //   AZURE_REGION  = 例如 eastasia（Text 即可）
-//   ELEVENLABS_KEY = ElevenLabs 語音 API 金鑰（Secret；僅教師裝置測試）
+//   ELEVENLABS_KEY = ElevenLabs 語音 API 金鑰（Secret；課程裝置使用）
 //   CLASS_CODE    = 自訂課程代碼，例如 n2026fall（Secret；每學期可以換）
 //   ALLOWED_ORIGIN= （可選）只允許某個網站呼叫，例如 https://inursing.github.io
 //   MAX_SESSIONS  = 每位學生可用課堂金鑰練習的次數，例如 3（Text；留空＝不限制）
@@ -41,11 +41,10 @@ export default {
     const isTeacher = !!env.TEACHER_TOKEN && req.headers.get('X-Teacher-Token') === env.TEACHER_TOKEN;
     const patientVoices = {1:'VWAVJ9V9uViHiR8dUFkU',2:'sKba8tFwZaKT6HwHl1Bs',3:'svqYpJQkGmNxRHGMp0Cl',4:'mCkrEZIMC8rMOAvc8QHl',5:'kIL4Puk4YO3p9mVQPW76',6:'LkiA69wdTE4y8ckVrM1z'};
     if (url.pathname === '/speech/status' && req.method === 'GET') {
-      return json({provider:'elevenlabs',cases:isTeacher&&env.ELEVENLABS_KEY?[1,2,3,4,5,6]:[],model:'eleven_v4_turbo'});
+      return json({provider:'elevenlabs',cases:env.ELEVENLABS_KEY?[1,2,3,4,5,6]:[],model:'eleven_v4_turbo'});
     }
     if (url.pathname === '/speech/synthesize') {
       if (req.method !== 'POST') return json({error:'method not allowed'},405);
-      if (!isTeacher) return json({error:'新聲音目前僅供教師測試'},403);
       if (!env.ELEVENLABS_KEY) return json({error:'ElevenLabs 語音金鑰尚未設定'},503);
       let b;try{b=await req.json();}catch{return json({error:'invalid JSON'},400);}
       if (![1,2,3,4,5,6].includes(b.caseId) || typeof b.text!=='string' || !b.text.trim() || b.text.length>600) return json({error:'不支援的病人或語音文字長度'},400);
@@ -74,12 +73,12 @@ export default {
     if (url.pathname === '/simli/status' || url.pathname === '/simli/session') {
       const liveSid=req.headers.get('X-Session')||'';
       if(!isTeacher&&(!liveSid||!env.QUOTA||!(await env.QUOTA.get('sid:'+liveSid))))return json({error:'請先登記課堂練習，再開始真人會談'},403);
-      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 6, caseIds: [4,6], maxSessionLength: 720 });
+      if (url.pathname === '/simli/status' && req.method === 'GET') return json({ ready: !!env.SIMLI_KEY, caseId: 6, caseIds: [1,4,6], maxSessionLength: 720 });
       if (url.pathname !== '/simli/session' || req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
       if (!env.SIMLI_KEY) return json({ error: '尚未設定 SIMLI_KEY，未啟動付費連線' }, 503);
       let b; try { b = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
-      const faces={4:'828eaab3-4f7d-44c9-8b13-b67bfe37cb88',6:'03ce3ee8-db97-4150-a333-8f643d48fee9'};
-      if (![4,6].includes(b.caseId)) return json({ error: '此人物尚未完成真人影像製作' }, 400);
+      const faces={1:'7e53fcfd-8079-4ad8-868f-2c15a6f4c578',4:'828eaab3-4f7d-44c9-8b13-b67bfe37cb88',6:'03ce3ee8-db97-4150-a333-8f643d48fee9'};
+      if (![1,4,6].includes(b.caseId)) return json({ error: '此人物尚未完成真人影像製作' }, 400);
       if (env.QUOTA) {
         const liveRateKey='simli:session:'+(liveSid||'teacher');
         const previous = Number(await env.QUOTA.get(liveRateKey)) || 0;
