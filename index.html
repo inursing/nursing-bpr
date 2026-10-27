@@ -1822,7 +1822,7 @@ async function initConvPhase(){
 
 // 自動聆聽：按一次開始後持續聆聽；病人說話時暫停，說完自動恢復；再按一次暫停
 let listenWanted=false, pendingFinal='', finalTimer=null;
-let resetRecognitionPending=()=>{}, listeningResumeTimer=null, recognitionWatchdogTimer=null;
+let resetRecognitionPending=()=>{}, listeningResumeTimer=null, recognitionWatchdogTimer=null, recognitionStopReason='';
 const ECHO_TAIL_MS=1000;
 function speechInputBlocked(){ return isSpeaking||!!window.LivePatient?.busy||!!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)||Date.now()-lastSpeakEnd<ECHO_TAIL_MS; }
 function updateSpeechChoice(){
@@ -1845,7 +1845,7 @@ function setupRecognition(){
     if(!listenWanted||state.phase!=='conv'||speechInputBlocked()){ pauseListening(); return; }
     document.getElementById('mic-btn').classList.add('recording');
     setStatus('🎤 聆聽中（'+sttName()+'）…說完停頓約 '+(pauseMs()/1000)+' 秒就會送出');
-    if(!recognitionWatchdogTimer)recognitionWatchdogTimer=setTimeout(()=>{recognitionWatchdogTimer=null;if(!listenWanted||state.phase!=='conv'||speechInputBlocked())return;listenWanted=false;pauseListening();document.getElementById('mic-btn').classList.remove('recording','on');document.getElementById('mic-btn').textContent='🎤';setStatus('未收到辨識文字，已停止聆聽。請先做麥克風測試；若一直無文字，請切換網路後再試。');},12000);
+    armRecognitionWatchdog();
     startTimer();
   };
   let lastInterim='', interimTimer=null, committedAt=0, committedText='';
@@ -1862,8 +1862,8 @@ function setupRecognition(){
       else interim+=e.results[i][0].transcript;
     }
     const shown=(final+interim).trim();
-    if(shown){clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;}
     if((isSpeaking&&!bargeInOn())||isEcho(shown)){ document.getElementById('interim-text').textContent=''; return; }
+    if(shown){clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;}
     document.getElementById('interim-text').textContent=shown;
     // 即時字幕 0.8 秒沒變化就視為說完，不等瀏覽器的最終結果（快 1–2 秒）
     // 停頓超過設定秒數（預設 2 秒）才視為說完；中途換氣、想詞不會被送出
@@ -1884,6 +1884,7 @@ function setupRecognition(){
     isRecording=false;
     document.getElementById('mic-btn').classList.remove('recording');
     // Keep an unsent utterance until its pause timer fires before restarting.
+    if(recognitionStopReason)return;
     if(lastInterim&&listenWanted&&state.phase==='conv'&&!speechInputBlocked()) return;
     document.getElementById('interim-text').textContent='';
     // 瀏覽器會自行結束 continuous 聆聽；若仍要聆聽且病人沒在說話，就自動重啟
@@ -1891,7 +1892,18 @@ function setupRecognition(){
     else if(!isSpeaking&&!recognitionError) setStatus(listenWanted?'（已暫停聆聽）':'按下麥克風開始聆聽');
   };
 }
+function armRecognitionWatchdog(){
+  if(recognitionWatchdogTimer)return;
+  recognitionWatchdogTimer=setTimeout(()=>{
+    recognitionWatchdogTimer=null;
+    if(!listenWanted||state.phase!=='conv')return;
+    recognitionStopReason='no-result';stopConversationMedia();
+    const mic=document.getElementById('mic-btn');mic.classList.remove('recording','on');mic.textContent='🎤';
+    setStatus('12 秒內未收到辨識文字，會談已暫停，收音與錄影已停止。請測試麥克風，或在文字欄使用手機鍵盤語音輸入後送出。');
+  },12000);
+}
 function pauseListening(){
+  isRecording=false;
   clearTimeout(recognitionWatchdogTimer);recognitionWatchdogTimer=null;
   clearTimeout(listeningResumeTimer); resetRecognitionPending();
   // Discard pending results rather than flushing speaker audio as a final transcript.
@@ -1904,7 +1916,8 @@ function resumeListening(){
     if(!isSpeaking&&!(SentenceSpeaker.current&&SentenceSpeaker.current.playing)) listeningResumeTimer=setTimeout(resumeListening,Math.max(50,ECHO_TAIL_MS-(Date.now()-lastSpeakEnd)));
     return;
   }
-  try{recognition.start();}catch(e){}
+  recognitionStopReason='';armRecognitionWatchdog();
+  try{recognition.start();}catch(e){recognitionStopReason='start-failed';stopConversationMedia();setStatus('無法啟動語音辨識，已停止收音；請重新測試麥克風，或改用文字輸入。');}
 }
 function bargeInOn(){ return false; }
 let lastPatientText='', lastSpeakEnd=0;
