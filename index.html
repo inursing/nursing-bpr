@@ -2261,7 +2261,10 @@ function addRow(){
 }
 function removeRow(i){
   syncRecordFromDOM();
-  if(state.processRecord.length<=1) return;
+  if(state.phase==='analysis')syncReflections();
+  if(!Number.isInteger(i)||i<0||i>=state.processRecord.length)return;
+  if(state.processRecord.length<=1){toast('至少保留一筆紀錄。');return;}
+  if(!window.confirm('確定刪除第 '+(i+1)+' 筆互動紀錄？這一列的所有內容都會刪除。'))return;
   state.processRecord.splice(i,1);
   saveState();
   if(state.phase==='record') renderRecordTable(); else renderAnalysisPhase();
@@ -2276,7 +2279,7 @@ function insertRowAt(index){
   const body=document.getElementById(state.phase==='record'?'record-tbody':'analysis-tbody');
   body.querySelector('tr[data-row="'+position+'"] textarea')?.focus();
 }
-const delBtn=i=>`<td class="row-num record-row-tools"><button type="button" class="btn btn-sm" title="在第${i+1}筆前插入互動" onclick="insertRowAt(${i})">↑ 前面補一筆</button><button type="button" class="btn btn-sm" title="在第${i+1}筆後插入互動" onclick="insertRowAt(${i+1})">↓ 後面補一筆</button><button type="button" class="btn btn-sm" style="background:transparent;color:var(--text2);padding:4px" title="刪除此列" aria-label="刪除第${i+1}筆互動" onclick="removeRow(${i})">✕</button></td>`;
+const delBtn=i=>`<td class="row-num record-row-tools"><button type="button" class="btn btn-sm" title="在第${i+1}筆前插入互動" onclick="insertRowAt(${i})">↑ 前面補一筆</button><button type="button" class="btn btn-sm" title="在第${i+1}筆後插入互動" onclick="insertRowAt(${i+1})">↓ 後面補一筆</button><button type="button" class="btn btn-sm" style="background:transparent;color:var(--danger);border:1px solid var(--danger);padding:8px;min-height:40px;margin-top:8px" title="刪除此列" aria-label="刪除第${i+1}筆互動" onclick="removeRow(${i})">刪除此列</button></td>`;
 
 function renderRecordTable(){
   buildProcessRecord();
