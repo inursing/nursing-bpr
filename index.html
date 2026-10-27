@@ -675,7 +675,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
 <div class="modal-overlay hidden" id="check-modal">
   <div class="modal" style="max-width:720px">
     <h2>會談前檢查</h2>
-    <div class="card" style="padding:12px"><label for="practice-device">使用方式</label><select id="practice-device" onchange="DesktopRecording.setMode(this.value)" style="padding:10px;max-width:100%"><option value="mobile">手機版</option><option value="desktop">電腦版</option></select><label id="desktop-record-choice" hidden style="margin:12px 0 0"><input type="checkbox" id="desktop-record-enabled" onchange="DesktopRecording.setEnabled(this.checked)"> 錄製會談影片</label></div>
+    <div class="card" style="padding:12px"><label for="practice-device">使用方式</label><select id="practice-device" onchange="DesktopRecording.setMode(this.value)" style="padding:10px;max-width:100%"><option value="mobile">手機版</option><option value="desktop">電腦版</option></select><label id="desktop-record-choice" hidden style="margin:12px 0 0"><input type="checkbox" id="desktop-record-enabled" onchange="DesktopRecording.setEnabled(this.checked)"> 錄製會談影片</label><div id="desktop-check-preview" hidden style="margin-top:12px"><video id="desktop-check-video" autoplay muted playsinline style="display:block;width:100%;max-width:360px;aspect-ratio:4/3;object-fit:cover;transform:scaleX(-1);border-radius:12px;background:#202443"></video><div id="desktop-check-status" role="status" style="margin-top:8px;font-size:.85rem"></div></div></div>
     <div id="check-scene" class="info-box info-primary" style="margin-bottom:12px;font-size:.85rem"></div>
     <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">測試麥克風與病人聲音。</div>
     <div style="display:grid;grid-template-columns:1fr;gap:12px" id="check-grid">
@@ -1136,6 +1136,7 @@ async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
   window.DesktopRecording?.refresh();
+  void window.DesktopRecording?.preview();
   stopCheckSpeech(); document.getElementById('check-sr-msg').textContent='按一次開始，允許麥克風後直接說「我是護生」，不需要再按。'; document.getElementById('check-voice-msg').textContent='';
   updateSpeechChoice();
   runCheckDiag();
@@ -1159,6 +1160,7 @@ async function runCheckDiag(){
   }
 }
 function closeCheck(){
+  window.DesktopRecording?.stopPreview();
   
   stopCheckSpeech();
   stopAudio();window.speechSynthesis&&window.speechSynthesis.cancel();
@@ -2661,6 +2663,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./simli-sdk.js"></script>
 <script src="./live-patient.js?v=plain-label-1"></script>
 <script src="./interaction-recorder.js?v=shared-mic-2"></script>
-<script src="./desktop-recording.js?v=1"></script>
+<script src="./desktop-recording.js?v=preview-2"></script>
 </body>
 </html>

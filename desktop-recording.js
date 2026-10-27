@@ -2,12 +2,14 @@
 (() => {
  let mode=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)?'mobile':'desktop';
  let enabled=false,stream=null,recorder=null,capture=null,epoch=0,pending=false,clips=[],practice=0;
+ let previewStream=null,previewEpoch=0,previewPending=false;
  const el=id=>document.getElementById(id);
  function refresh(){
   document.body.classList.toggle('desktop-practice',mode==='desktop');
   el('practice-device').value=mode;el('desktop-record-choice').hidden=mode!=='desktop';el('desktop-record-enabled').checked=enabled;
  }
  function stop(){
+  stopPreview();
   epoch++;pending=false;
   const r=recorder;recorder=null;
   try{if(r&&r.state!=='inactive')r.stop();}catch{}
@@ -17,7 +19,23 @@
   el('desktop-record-panel').hidden=true;
  }
  function setMode(value){mode=value==='desktop'?'desktop':'mobile';if(mode==='mobile'){enabled=false;stop();}refresh();}
- function setEnabled(value){enabled=mode==='desktop'&&!!value;if(!enabled)stop();refresh();}
+ function setEnabled(value){enabled=mode==='desktop'&&!!value;if(!enabled)stop();refresh();if(enabled)void preview();}
+ function stopPreview(){
+  previewEpoch++;previewPending=false;previewStream?.getTracks().forEach(t=>t.stop());previewStream=null;
+  const v=el('desktop-check-video');if(v){v.pause();v.srcObject=null;}const box=el('desktop-check-preview');if(box)box.hidden=true;
+ }
+ async function preview(){
+  if(mode!=='desktop'||!enabled||el('check-modal').classList.contains('hidden')||previewStream||previewPending)return;
+  previewPending=true;const id=++previewEpoch;el('desktop-check-preview').hidden=false;el('desktop-check-status').textContent='正在開啟鏡頭…';
+  if(!navigator.mediaDevices?.getUserMedia){el('desktop-check-status').textContent='此瀏覽器無法開啟鏡頭。';previewPending=false;return;}
+  try{
+   const acquired=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'},audio:false});
+   if(id!==previewEpoch||!enabled||mode!=='desktop'||el('check-modal').classList.contains('hidden')){acquired.getTracks().forEach(t=>t.stop());return;}
+   previewStream=acquired;const v=el('desktop-check-video');v.srcObject=acquired;await v.play();
+   if(id===previewEpoch)el('desktop-check-status').textContent='鏡頭預覽';
+  }catch(e){if(id===previewEpoch){previewStream?.getTracks().forEach(t=>t.stop());previewStream=null;el('desktop-check-status').textContent=e.name==='NotAllowedError'?'請允許使用攝影機，或取消錄影。':'鏡頭無法開啟，請確認未被其他程式占用。';}}
+  finally{if(id===previewEpoch)previewPending=false;}
+ }
  function disable(){setEnabled(false);toast('錄影已停止，可繼續會談。');}
  async function start(){
   if(mode!=='desktop'||!enabled||pending||recorder||state.phase!=='conv'||!listenWanted)return;
@@ -47,5 +65,5 @@
  }
  function reset(){practice++;stop();clips=[];renderDownloads();}
  el('avatar-wrap').append(el('desktop-record-panel'));
- window.DesktopRecording={start,stop,setMode,setEnabled,disable,refresh,renderDownloads,reset};refresh();
+ window.DesktopRecording={start,stop,preview,stopPreview,setMode,setEnabled,disable,refresh,renderDownloads,reset};refresh();
 })();
