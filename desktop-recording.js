@@ -1,7 +1,9 @@
-/* Optional local desktop recording. Never uploads footage or sends frames to AI. */
+/* Optional desktop recording; bounded nurse-only snapshots support AI feedback. */
 (() => {
  let mode=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)?'mobile':'desktop';
  let enabled=false,stream=null,recorder=null,capture=null,epoch=0,pending=false,clips=[],practice=0,playbackIndex=0,playbackUrls=[],uploading=false;
+ let aiFrames=[],frameTimer=null;
+ function snapshot(){const v=el('cam-video');if(!recorder||!v?.videoWidth||aiFrames.length>=18)return;try{const c=document.createElement('canvas');c.width=320;c.height=Math.round(320*v.videoHeight/v.videoWidth);c.getContext('2d').drawImage(v,0,0,c.width,c.height);aiFrames.push({ts:Date.now(),image:c.toDataURL('image/jpeg',0.65)});}catch{}}
  let previewStream=null,previewEpoch=0,previewPending=false;
  const el=id=>document.getElementById(id);
  function refresh(){
@@ -10,7 +12,7 @@
   el('practice-device').value=mode;el('desktop-record-choice').hidden=mode!=='desktop';el('desktop-record-enabled').checked=enabled;
  }
  function stop(){
-  pausePlayback();stopPreview();
+  pausePlayback();stopPreview();clearInterval(frameTimer);frameTimer=null;
   epoch++;pending=false;
   const r=recorder;recorder=null;
   try{if(r&&r.state!=='inactive')r.stop();}catch{}
@@ -56,7 +58,7 @@
    r.onstop=()=>{const blob=new Blob(chunks,{type:r.mimeType||'video/webm'});if(blob.size&&caseId===state.caseId&&practiceId===practice){clips.push({blob,identity,start:startedAt,end:Date.now()});renderPlayback();}};
    r.onerror=()=>{stop();toast('錄影中斷，仍可繼續會談。');};
    const startedAt=Date.now();
-   recorder=r;r.start(1000);el('desktop-record-status').textContent='● 錄影中';
+   recorder=r;r.start(1000);snapshot();frameTimer=setInterval(snapshot,30000);el('desktop-record-status').textContent='● 錄影中';
   }catch(e){if(generation===epoch){stop();enabled=false;refresh();toast('無法錄影，仍可繼續會談。');}}
   finally{if(generation===epoch)pending=false;}
  }
@@ -91,10 +93,7 @@
   if(clips.some(c=>c.blob.size>50*1024*1024)){box.textContent='有影片超過50MB，尚未繳交。';return;}
   const queue=clips.slice();uploading=true;button.disabled=true;
   try{
-   const now=new Date(),date=now.toLocaleDateString('sv-SE'),hm=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
-   const clean=v=>String(v||'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'-').slice(0,20);
-   const prefix=[clean(state.studentId),clean(state.studentName),clean(getCase()?.name),date.slice(5).replace(/-/g,'')+'_'+hm].join('_');
-   const folder=state.submitted?.folder||prefix;
+   const {date,folder,filePrefix:prefix}=submissionTarget();
    for(let n=0;n<queue.length;n++){
     const clip=queue[n];if(clip.uploaded)continue;
     if(!clip.upload)clip.upload={classCode:getSettings().classCode||'',date,folder,uploadId:crypto.randomUUID(),total:Math.ceil(clip.blob.size/(256*1024)),file:{name:prefix+'_會談影片_'+(n+1)+(clip.blob.type.includes('mp4')?'.mp4':'.webm'),type:clip.blob.type,size:clip.blob.size}};
@@ -111,7 +110,7 @@
   }catch(e){box.textContent='影片尚未全部繳交，請稍後重試。';}
   finally{uploading=false;button.disabled=false;}
  }
- function reset(){practice++;stop();pausePlayback();clips=[];playbackUrls.forEach(url=>URL.revokeObjectURL(url));playbackUrls=[];playbackIndex=0;const v=el('desktop-replay-video');if(v){v.removeAttribute('src');v.load();}renderPlayback();}
+ function reset(){aiFrames=[];practice++;stop();pausePlayback();clips=[];playbackUrls.forEach(url=>URL.revokeObjectURL(url));playbackUrls=[];playbackIndex=0;const v=el('desktop-replay-video');if(v){v.removeAttribute('src');v.load();}renderPlayback();}
  el('avatar-wrap').append(el('desktop-record-panel'));
- window.DesktopRecording={isDesktop:()=>mode==='desktop',start,stop,preview,stopPreview,setMode,setEnabled,disable,refresh,renderPlayback,pausePlayback,submitVideo,reset};refresh();
+ window.DesktopRecording={analysisFrames:()=>aiFrames.slice(),isDesktop:()=>mode==='desktop',start,stop,preview,stopPreview,setMode,setEnabled,disable,refresh,renderPlayback,pausePlayback,submitVideo,reset};refresh();
 })();
