@@ -5,7 +5,7 @@
   const host=document.getElementById('avatar-engine');
   const panel=document.createElement('div');
   panel.style.cssText='position:absolute;inset:0;z-index:3;background:#171b30;display:none';
-  panel.innerHTML='<video id="live-patient-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain"></video><audio id="live-patient-audio" autoplay></audio><span style="position:absolute;top:12px;right:12px;background:#233a31;color:white;padding:4px 10px;border-radius:14px;font-size:12px">LIVE · 吳先生（內建人物）</span>';
+  panel.innerHTML='<video id="live-patient-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain"></video><audio id="live-patient-audio" autoplay></audio><span style="position:absolute;top:12px;right:12px;background:#233a31;color:white;padding:4px 10px;border-radius:14px;font-size:12px">LIVE · 吳先生</span>';
   host.append(panel);
   const controls=document.createElement('div');
   controls.className='info-box live-patient-controls';
@@ -24,7 +24,7 @@
   }
   function refresh(){
     const c=getCase(); controls.style.display=state.phase==='conv'&&supports(c?.id)&&proxyOn()?'flex':'none';
-    panel.querySelector('span').textContent='LIVE · '+(c?.name||'病人')+(c?.id===6?'（內建人物）':'（自訂人物）');
+    panel.querySelector('span').textContent='LIVE · '+(c?.name||'病人');
     if(!client&&!connectJob&&status.textContent.startsWith('按麥克風'))message(readyMessage());
     start.disabled=!!client; stop.hidden=!client;
     const unmute=controls.querySelector('#live-patient-unmute');if(unmute)unmute.disabled=!connected;

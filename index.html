@@ -431,6 +431,12 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
 #phase-conv .live-patient-controls{gap:4px 8px;align-items:center;flex-wrap:wrap;padding:5px 8px!important;margin:4px 0!important}
 #phase-conv #live-patient-status{flex:1;min-width:180px;margin:0!important;font-size:.72rem!important}
 @media(max-width:640px){#phase-conv .stage-box{height:clamp(160px,calc(100dvh - 380px),440px)}}
+body.desktop-practice #phase-conv #stage{max-width:760px;width:100%}
+body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
+#avatar-wrap #desktop-record-panel{position:absolute;right:10px;bottom:10px;width:150px;max-width:28%;z-index:5;margin:0!important;padding:5px!important;background:rgba(255,250,242,.96);box-shadow:0 3px 14px #20244320}
+#avatar-wrap #desktop-record-panel video{width:100%!important;display:block;aspect-ratio:4/3;object-fit:cover}
+#avatar-wrap #desktop-record-status{font-size:.7rem}
+#avatar-wrap #desktop-record-panel button{font-size:.65rem;padding:4px;white-space:normal}
 </style>
 <script src="./chart-data.js"></script>
 <div id="app">
@@ -516,6 +522,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
               <div id="avatar-engine" style="position:absolute;inset:0"><div id="avatar-3d" style="position:absolute;inset:0"></div></div><div id="avatar-loading" style="position:absolute;inset:0;display:grid;place-items:center;font-size:.8rem;color:#345">載入病人插畫中…</div>
             </div>
           </div>
+          <div id="desktop-record-panel" hidden class="card" style="padding:12px;margin-top:10px"><video id="cam-video" autoplay muted playsinline style="width:180px;max-width:100%;border-radius:10px;transform:scaleX(-1)"></video><div id="desktop-record-status" role="status"></div><button type="button" class="btn btn-outline btn-sm" onclick="DesktopRecording.disable()">停止錄影，繼續會談</button></div>
           <div id="conv-area" style="min-height:140px;max-height:220px"></div>
           <div id="mic-bar" style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <button class="btn-record" id="mic-btn" onclick="toggleMic()" title="按下說話">🎤</button>
@@ -649,6 +656,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
           <div id="ai-generating" class="info-box info-warn">AI 正在分析會談過程，請稍候…</div>
           <div id="ai-report-preview" style="font-size:.82rem"></div>
         </div>
+        <div id="desktop-record-downloads" class="card" hidden></div>
         <div class="card" id="submit-card">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
             <div><h3>📤 繳交給老師</h3><div style="font-size:.8rem;color:var(--text2)">學生版 Word、AI 版 Word</div></div>
@@ -667,6 +675,7 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
 <div class="modal-overlay hidden" id="check-modal">
   <div class="modal" style="max-width:720px">
     <h2>會談前檢查</h2>
+    <div class="card" style="padding:12px"><label for="practice-device">使用方式</label><select id="practice-device" onchange="DesktopRecording.setMode(this.value)" style="padding:10px;max-width:100%"><option value="mobile">手機版</option><option value="desktop">電腦版</option></select><label id="desktop-record-choice" hidden style="margin:12px 0 0"><input type="checkbox" id="desktop-record-enabled" onchange="DesktopRecording.setEnabled(this.checked)"> 錄製會談影片</label></div>
     <div id="check-scene" class="info-box info-primary" style="margin-bottom:12px;font-size:.85rem"></div>
     <div style="font-size:.85rem;color:var(--text2);margin-bottom:12px">測試麥克風與病人聲音。</div>
     <div style="display:grid;grid-template-columns:1fr;gap:12px" id="check-grid">
@@ -726,8 +735,8 @@ body.conv-active #main{padding-top:6px;padding-bottom:8px}
       <div><label>收件網址（Apps Script 網頁應用程式）</label><input type="text" id="set-drive" placeholder="https://script.google.com/macros/s/…/exec"></div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testDrive()">▶ 測試收件</button> <span id="drive-msg"></span></div>
 </div></details>
-      <details id="sharing-settings"><summary>分享課程連結與 QR Code</summary><div class="settings-section-body">
-      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">分享課程連結或 QR Code。</div>
+      <details id="sharing-settings"><summary>開啟課程連結／掃描 QR Code</summary><div class="settings-section-body">
+      <div id="link-hint-proxy" class="hidden" style="font-size:.78rem;color:var(--text2);line-height:1.6">電腦開啟課程連結；手機也可掃描 QR Code。</div>
       <div id="link-hint-nokey" style="font-size:.78rem;color:var(--text2);line-height:1.6">請先完成課程連線設定。</div>
       <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" type="button" onclick="makeSetupLink()">🔗 產生設定連結與 QR</button><span id="setup-link-msg" style="font-size:.78rem;color:var(--text2)"></span></div>
       <input type="text" id="setup-link-out" readonly style="font-size:.75rem" placeholder="按上方按鈕後出現連結，複製給學生">
@@ -981,7 +990,7 @@ function renderPhase(p){
   if(p==='goals') renderGoalsPhase();
   if(p==='record'){renderRecordTable();startBackgroundAnalysis();}
   if(p==='analysis') renderAnalysisPhase();
-  if(p==='export') renderExportPhase();
+  if(p==='export'){renderExportPhase();window.DesktopRecording?.renderDownloads();}
   if(p==='evaluation') renderEvaluation();
   if(p!=='conv') stopSimli();
   window.LivePatient&&LivePatient.refresh();
@@ -1019,6 +1028,7 @@ function renderCases(){
 }
 function selectCase(id){
   if(state.caseId===id){renderCases();return;}
+  window.DesktopRecording?.reset();
   state.caseId=id;
   state.evaluation=null;
   state.furthestPhase=1;
@@ -1125,6 +1135,7 @@ let checkMicCtx=null, checkMicRAF=null, checkMicStream=null;
 async function openCheck(){
   document.getElementById('check-modal').classList.remove('hidden');
   const c=getCase(); document.getElementById('check-scene').innerHTML=c&&c.scene?`<strong>會談情境</strong>｜${c.name}，${c.age}歲，${c.dx}。<br>${c.scene}`:'';
+  window.DesktopRecording?.refresh();
   stopCheckSpeech(); document.getElementById('check-sr-msg').textContent='按一次開始，允許麥克風後直接說「我是護生」，不需要再按。'; document.getElementById('check-voice-msg').textContent='';
   updateSpeechChoice();
   runCheckDiag();
@@ -1585,6 +1596,7 @@ function saveBlob(filename,blob){
 // Conversation uses native speech recognition only; no camera capture.
 
 function stopConversationMedia(){
+  window.DesktopRecording?.stop();
   listenWanted=false; pauseListening();
   convGen++;
   if(curReply){curReply.done=true;curReply.speaker.cancel();curReply=null;}
@@ -1771,8 +1783,8 @@ function toggleMic(){
   if(!listenWanted&&window.LivePatient&&LivePatient.supports(getCase()?.id)&&proxyOn())void LivePatient.connect();
   if(!recognition) setupRecognition();
   if(!recognition){setStatus('⚠️ 不支援語音識別');return}
-  if(listenWanted){ listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
-  listenWanted=true; document.getElementById('mic-btn').classList.add('on'); document.getElementById('mic-btn').textContent='⏸';
+  if(listenWanted){ window.DesktopRecording?.stop(); listenWanted=false; pauseListening(); document.getElementById('mic-btn').classList.remove('recording','on'); document.getElementById('mic-btn').textContent='🎤'; setStatus('已暫停聆聽，按麥克風繼續'); return; }
+  listenWanted=true; void window.DesktopRecording?.start(); document.getElementById('mic-btn').classList.add('on'); document.getElementById('mic-btn').textContent='⏸';
   if(isSpeaking){ setStatus('病人說完後會自動開始聆聽'); return; }
   resumeListening();
 }
@@ -2647,6 +2659,8 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./iphone-speech.js?v=android-azure-4"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=wang-ready-1"></script>
+<script src="./live-patient.js?v=plain-label-1"></script>
+<script src="./interaction-recorder.js?v=shared-mic-2"></script>
+<script src="./desktop-recording.js?v=1"></script>
 </body>
 </html>
