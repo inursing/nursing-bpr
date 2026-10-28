@@ -727,10 +727,11 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
 
 </div></details>
-      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具：練習次數</summary>
+      <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具</summary>
         <div style="display:grid;gap:8px;margin-top:8px">
-          <div><label>教師密語</label><input type="text" id="set-teacher" placeholder="教師密語"></div>
+          <div><label>教師密語</label><input type="password" id="set-teacher" placeholder="教師密語"></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
+          <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();TeacherPR.open()">PR 示範範本</button></div>
           <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
         </div>
       </details>
@@ -2716,5 +2717,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./live-patient.js?v=audio-diagnostics-1"></script>
 <script src="./interaction-recorder.js?v=live-source-3"></script>
 <script src="./desktop-recording.js?v=live-source-7"></script>
+<script src="teacher-pr.js?v=1"></script>
 </body>
 </html>

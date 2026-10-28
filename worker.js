@@ -39,6 +39,26 @@ export default {
     if (env.CLASS_CODE && req.headers.get('X-Class-Code') !== env.CLASS_CODE) return json({ error: '課程代碼錯誤' }, 401);
 
     const isTeacher = !!env.TEACHER_TOKEN && req.headers.get('X-Teacher-Token') === env.TEACHER_TOKEN;
+    // Private teacher library. Never embed its transcripts in this public source.
+    if (url.pathname === '/admin/pr' || url.pathname.startsWith('/admin/pr/')) {
+      const privateJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'private, no-store','Pragma':'no-cache','X-Content-Type-Options':'nosniff'}});
+      if (!isTeacher) return privateJson({error:'教師密語不正確'},403);
+      if (!env.QUOTA) return privateJson({error:'範本儲存服務尚未設定'},503);
+      if (url.pathname === '/admin/pr/import' && req.method === 'POST') {
+        let pack;try{const text=await req.text();if(new TextEncoder().encode(text).length>950000)return privateJson({error:'範本檔案過大'},413);pack=JSON.parse(text);}catch{return privateJson({error:'範本格式不正確'},400);}
+        if(pack?.version!==1||!Array.isArray(pack.cases)||pack.cases.length!==6)return privateJson({error:'需要六份範本'},400);
+        const ids=new Set();for(const item of pack.cases){if(!Number.isInteger(item.id)||item.id<1||item.id>6||ids.has(item.id)||typeof item.name!=='string'||item.name.length>40||typeof item.theme!=='string'||item.theme.length>100||!Number.isInteger(item.turns)||item.turns<1||item.turns>100||typeof item.html!=='string'||!item.html.trim()||new TextEncoder().encode(item.html).length>150000)return privateJson({error:'範本欄位不完整'},400);ids.add(item.id);}
+        const version=crypto.randomUUID();
+        try{await Promise.all(pack.cases.map(item=>env.QUOTA.put('teacher:pr:'+version+':'+item.id,JSON.stringify({id:item.id,name:item.name,html:item.html}))));await env.QUOTA.put('teacher:pr:manifest',JSON.stringify({version,cases:pack.cases.map(({id,name,theme,turns})=>({id,name,theme,turns}))}));}catch{return privateJson({error:'範本儲存失敗，請稍後重試'},503);}
+        return privateJson({ok:true,count:6});
+      }
+      if(req.method!=='GET')return privateJson({error:'method not allowed'},405);
+      const raw=await env.QUOTA.get('teacher:pr:manifest');if(!raw)return privateJson({cases:[]});let manifest;try{manifest=JSON.parse(raw);}catch{return privateJson({error:'範本目錄讀取失敗'},503);}
+      if(url.pathname==='/admin/pr')return privateJson({cases:manifest.cases});
+      const match=url.pathname.match(/^\/admin\/pr\/([1-6])$/);if(!match)return privateJson({error:'找不到範本'},404);
+      const item=await env.QUOTA.get('teacher:pr:'+manifest.version+':'+match[1]);if(!item)return privateJson({error:'找不到範本'},404);
+      return new Response(item,{headers:{...cors,'Content-Type':'application/json','Cache-Control':'private, no-store','Pragma':'no-cache','X-Content-Type-Options':'nosniff'}});
+    }
     const patientVoices = {1:'VWAVJ9V9uViHiR8dUFkU',2:'sKba8tFwZaKT6HwHl1Bs',3:'svqYpJQkGmNxRHGMp0Cl',4:'mCkrEZIMC8rMOAvc8QHl',5:'kIL4Puk4YO3p9mVQPW76',6:'LkiA69wdTE4y8ckVrM1z'};
     if (url.pathname === '/speech/status' && req.method === 'GET') {
       return json({provider:'elevenlabs',cases:env.ELEVENLABS_KEY?[1,2,3,4,5,6]:[],model:'eleven_v4_turbo'});
