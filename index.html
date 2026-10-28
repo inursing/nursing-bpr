@@ -1849,6 +1849,7 @@ async function handleNurseSpeech(text){
   convHistory.push({role:'user',content:`護生說：「${text}」`});
   isSpeaking=true; if(!bargeInOn()) pauseListening();
   const gen=++convGen;
+  window.ConversationDiagnostics?.record('ai-start');
   const thinkT0=Date.now(); window.__thinkTimer&&clearInterval(window.__thinkTimer); window.__thinkTimer=setInterval(()=>{ const sec=Math.round((Date.now()-thinkT0)/1000); if(isSpeaking) setStatus('⏳ 病人正在想怎麼回答…（'+sec+' 秒）'); },500); setStatus('⏳ 病人正在想怎麼回答…');
   document.getElementById('mic-btn').classList.add('waiting');
   document.getElementById('mic-btn').textContent='⏳';
@@ -1883,14 +1884,18 @@ async function handleNurseSpeech(text){
       const systemMsg=buildPatientSystem(c);
       const trimmed=convHistory.slice(Math.max(0,convHistory.length-30));
       const res=await apiSampleStream(trimmed,{system:systemMsg,maxTokens:400,onDelta});
+      window.ConversationDiagnostics?.record('ai-success',{characters:(res.text||'').length});
       response=res.text||'（病人沉默）';
     } else {
+      window.ConversationDiagnostics?.record('ai-fallback',{reason:'not-configured'});
       response=fallbackPatientResponse(c,text);
     }
   }catch(e){
+    window.ConversationDiagnostics?.record('ai-failed',{code:e?.code==='quota'?'quota':'request-failed'});
     console.error(e);
     if(e&&e.code==='quota'){ toast(e.message,8000); bubble.textContent='（'+e.message+'）'; liveEl.querySelector('.bubble-ts').textContent=''; reply.done=true; curReply=null; isSpeaking=false; if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; } document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤'; setStatus('⚠ '+e.message); state.conversation.pop(); convHistory.pop(); return; }
     { const m=String(e.message||''); toast(/quota|429/i.test(m)?(useOpenAI()?'OpenAI 額度不足或請求過多，請老師確認儲值':'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費'):/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
+    window.ConversationDiagnostics?.record('ai-fallback',{reason:'request-failed'});
     response=fallbackPatientResponse(c,text);
   }
   if(gen!==convGen||reply.done) return;   // 已被護生打斷
@@ -2059,9 +2064,12 @@ async function elevenPatientSpeech(text,c){
   if(patientSpeechPending.has(key))return patientSpeechPending.get(key);
   const pending=(async()=>{
     const spoken=text.replace(/[（(][^）)]*[）)]/g,'').replace(/\[[^\]]*\]/g,'').trim();
+    window.ConversationDiagnostics?.record('tts-start',{caseId:c.id,characters:spoken.length});
     const r=await fetch(getSettings().proxyUrl+'/speech/synthesize',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:c.id,text:spoken}),signal:AbortSignal.timeout(23000)});
+    window.ConversationDiagnostics?.record('tts-response',{status:r.status});
     if(!r.ok){let message='ElevenLabs 語音失敗';try{message=(await r.json()).error||message;}catch{}throw new Error(message);}
     const out={blob:await r.blob(),visemes:null,provider:'elevenlabs'};
+    window.ConversationDiagnostics?.record('tts-audio-ready',{bytes:out.blob.size});
     if(!out.blob.size)throw new Error('ElevenLabs 未回傳音訊');
     if(azCache.size>60)azCache.delete(azCache.keys().next().value);azCache.set(key,out);return out;
   })();
@@ -2171,7 +2179,7 @@ class SentenceSpeaker{
   cancel(){ this.cancelled=true; this.q=[]; }
   async run(){ if(this.playing) return; this.playing=true;
     while(this.q.length&&!this.cancelled){ const item=this.q.shift(); let blob=null; if(item.p) blob=await item.p; if(this.cancelled) break;
-      if(blob?.error){toast('病人指定聲音未能載入，請重試；本句保留文字。',6000);continue;}
+      if(blob?.error){window.ConversationDiagnostics?.record('tts-failed',{code:'synthesis-failed'});if(window.LivePatient?.active)await LivePatient.stop('病人語音產生失敗，Live 已停止；本句保留文字，未自動重試。');toast('病人指定聲音未能載入，請重試；本句保留文字。',6000);continue;}
       if(window.LivePatient)await LivePatient.ready();
       if(this.cancelled)break;
       if(blob&&vidEngine()) await simliSpeak(blob); else if(blob) await playBlob(blob,/[？?]\s*$/.test(item.t)?'question':'statement'); else toast('病人語音尚未設定，本句保留文字，請確認課程連線。',5000); }
@@ -2705,7 +2713,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./iphone-speech.js?v=android-azure-4"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=lin-live-1"></script>
+<script src="./live-patient.js?v=audio-diagnostics-1"></script>
 <script src="./interaction-recorder.js?v=live-source-3"></script>
 <script src="./desktop-recording.js?v=live-source-7"></script>
 </body>

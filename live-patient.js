@@ -1,5 +1,9 @@
 /* Course Live: ready cases use their own face with existing patient audio. */
 (() => {
+  const trace=[];
+  const note=(stage,detail={})=>{const event={at:Date.now(),stage,...detail};trace.push(event);if(trace.length>200)trace.shift();window.dispatchEvent(new CustomEvent('bpr-diagnostic',{detail:event}));};
+  window.ConversationDiagnostics={record:note,snapshot:()=>trace.map(e=>({...e}))};
+  let speechQueue=Promise.resolve();
   let client=null, generation=0, connected=false, busy=false, ending=false, connectJob=null;
   let idleTimer=null, limitTimer=null, finishSpeech=null, lastActivity=0, utteranceStarted=false;
   const host=document.getElementById('avatar-engine');
@@ -32,6 +36,7 @@
   function touch(){lastActivity=Date.now();}
   async function disconnect(reason=null){
     const hadSession=!!client||start.disabled;
+    note('live-stop',{reason:reason?.includes('逾時')?'timeout':reason?.includes('閒置')?'idle':reason?'interrupted':'requested'});
     generation++; connected=false; busy=false; ending=true;
     clearInterval(idleTimer); clearTimeout(limitTimer); idleTimer=null; limitTimer=null;
     if(finishSpeech){finishSpeech();finishSpeech=null;}
@@ -53,19 +58,19 @@
     if(!window.SimliSDK){message('Live 元件載入失敗，請重新整理。');return;}
     const id=++generation;start.disabled=true;message('正在建立 Live 連線，最多等待20秒…');
     try{
-      await ensureSession();
+      note('live-register-start');await ensureSession();note('live-register-done');
       if(id!==generation||state.phase!=='conv')return;
       const r=await fetch(st.proxyUrl+'/simli/session',{method:'POST',headers:proxyHeaders({'Content-Type':'application/json'}),body:JSON.stringify({caseId:getCase().id}),signal:AbortSignal.timeout(15000)});
-      const config=await r.json();
+      note('live-token-response',{status:r.status});const config=await r.json();
       if(!r.ok) throw new Error(config.error||'Live 連線失敗');
       if(id!==generation||state.phase!=='conv') return;
       const c=new SimliSDK.SimliClient(config.session_token,video,audio,null,SimliSDK.LogLevel.ERROR,'livekit');
       c.MAX_RETRY_ATTEMPTS=0; client=c;
       // The SDK's start event confirms a rendered video frame, not just an open socket.
-      c.on('start',()=>{if(id!==generation) return;connected=true;panel.style.display='block';video.play().catch(()=>{});audio.play().catch(()=>message('Live 已連線，請點「播放聲音」允許聲音。'));touch();message('Live 已連線。嘴型隨病人語音；30秒無音訊或離開頁面即斷線。');refresh();});
-      c.on('speaking',()=>{if(id!==generation)return;utteranceStarted=true;busy=true;touch();pauseListening();});
-      c.on('silent',()=>{if(id!==generation||!utteranceStarted)return;utteranceStarted=false;busy=false;touch();if(finishSpeech){const done=finishSpeech;finishSpeech=null;setTimeout(done,600);}});
-      for(const event of ['stop','error','startup_error']) c.on(event,()=>{if(id===generation&&!ending) void disconnect(connected?'Live 影音已中斷，目前使用靜態人物，仍可繼續語音會談。未自動重連。':connectionFailure('Failed to connect'));});
+      c.on('start',()=>{if(id!==generation) return;connected=true;note('live-connected');panel.style.display='block';video.play().catch(()=>{});audio.play().catch(()=>message('Live 已連線，請點「播放聲音」允許聲音。'));touch();message('Live 已連線。嘴型隨病人語音；30秒無音訊或離開頁面即斷線。');refresh();});
+      c.on('speaking',()=>{if(id!==generation)return;utteranceStarted=true;note('live-speaking-event');busy=true;touch();pauseListening();});
+      c.on('silent',()=>{note('live-silent-event');if(id!==generation||!utteranceStarted)return;utteranceStarted=false;busy=false;touch();if(finishSpeech){const done=finishSpeech;finishSpeech=null;setTimeout(done,600);}});
+      for(const event of ['stop','error','startup_error']) c.on(event,()=>{note('live-sdk-event',{event});if(id===generation&&!ending) void disconnect(connected?'Live 影音已中斷，目前使用靜態人物，仍可繼續語音會談。未自動重連。':connectionFailure('Failed to connect'));});
       // Keep the element renderable while waiting for the first frame callback.
       panel.style.display='block';panel.style.opacity='0';
       let timer;
@@ -87,17 +92,35 @@
     for(let i=0;i<samples.length;i++){const x=Math.max(-1,Math.min(1,samples[i]));view.setInt16(i*2,Math.round(x<0?x*32768:x*32767),true);}
     return bytes;
   }
-  async function speak(blobOrObj){
+  function speak(blobOrObj){
+    const requestGeneration=generation;
+    const job=speechQueue.then(()=>{if(requestGeneration!==generation)throw new Error('Live 已停止');return speakOne(blobOrObj);});
+    speechQueue=job.catch(()=>{});return job;
+  }
+  async function speakOne(blobOrObj){
     const id=generation,c=client;if(!connected||!c)throw new Error('Live 未連線');
     busy=true;utteranceStarted=false;touch();pauseListening();
-    const data=await pcm(blobOrObj?.blob||blobOrObj);
+    note('live-decode-start');const data=await pcm(blobOrObj?.blob||blobOrObj);note('live-decode-done',{bytes:data.length,durationMs:Math.round(data.length/32)});
     if(id!==generation)return;
     await new Promise(resolve=>{
-      let done=false,timer;
-      const complete=()=>{if(done)return;done=true;clearTimeout(timer);if(finishSpeech===complete)finishSpeech=null;busy=false;lastSpeakEnd=Date.now();resolve();};
+      let done=false,timer,probe=null,source=null,analyser=null,receivedAt=0,lastEnergyAt=0,monitorContext=null;
+      const complete=()=>{if(done)return;done=true;clearTimeout(timer);clearInterval(probe);try{source?.disconnect();}catch{}try{void monitorContext?.close();}catch{}note('live-playback-complete');if(finishSpeech===complete)finishSpeech=null;busy=false;lastSpeakEnd=Date.now();resolve();};
       finishSpeech=complete;
-      timer=setTimeout(()=>{if(id===generation)void disconnect('Live 語音回傳逾時，已停止連線；未重複播放。');complete();},data.length/32+15000);
-      try{for(let i=0;i<data.length;i+=6000)c.sendAudioData(data.slice(i,i+6000));}catch{void disconnect('Live 傳送失敗，已停止連線；未自動重試。');complete();}
+      // A received audio signal is required. Video frames or wall-clock time alone do not prove playback.
+      const beginProbe=()=>{
+        const stream=audio.srcObject;if(!stream?.getAudioTracks().some(t=>t.readyState==='live'))return;
+        try{monitorContext=new AudioContext();source=monitorContext.createMediaStreamSource(stream);analyser=monitorContext.createAnalyser();analyser.fftSize=512;source.connect(analyser);void monitorContext.resume();}catch{try{void monitorContext?.close();}catch{}monitorContext=null;}
+      };
+      probe=setInterval(()=>{
+        if(done||id!==generation)return;
+        if(!analyser){beginProbe();return;}
+        if(monitorContext.state!=='running'||audio.paused)return;
+        const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);let power=0;for(const v of samples)power+=v*v;
+        const now=Date.now();if(Math.sqrt(power/samples.length)>0.006){if(!receivedAt){receivedAt=now;note('live-audio-received');}lastEnergyAt=now;}
+        if(receivedAt&&now-receivedAt>=data.length/32&&now-lastEnergyAt>=900){note('live-complete-from-audio');touch();complete();}
+      },100);
+      timer=setTimeout(()=>{note('live-playback-timeout',{receivedAudio:!!receivedAt,receivedSpeakingEvent:utteranceStarted,audioPaused:audio.paused});if(id===generation)void disconnect('Live 語音回傳逾時，已停止連線；未重複播放。');complete();},data.length/32+15000);
+      note('live-send-audio',{bytes:data.length});try{for(let i=0;i<data.length;i+=6000)c.sendAudioData(data.slice(i,i+6000));}catch{void disconnect('Live 傳送失敗，已停止連線；未自動重試。');complete();}
     });
   }
   controls.insertAdjacentHTML('beforeend','<button type="button" class="btn btn-outline btn-sm" id="live-patient-unmute">播放聲音</button>');
