@@ -1467,7 +1467,7 @@ function normalizeAiReport(data,pairs){
  const text=x=>typeof x==='string'?x:(x&&typeof x==='object'?[x.text,x.content,x.analysis,x.summary].find(v=>typeof v==='string'):undefined);
  const a=data?.assessment,assessment=Array.isArray(a)?a.map(text):a&&typeof a==='object'?['purpose','strengths','improvements','nextSteps'].map(k=>text(a[k])):null;
  if(!Array.isArray(data?.rows)||!assessment||assessment.length!==4||assessment.some(t=>typeof t!=='string'||!t.trim()))throw new Error('AI整體評估資料不完整。');
- const unfinished=t=>/(?:可能|因為|例如|但是|因此|包括|以及|建議|措施|[-—]{2,}|[…]{1,}|\.{3,})[\s，、：:；;。]*$/.test(t.trim());
+ const unfinished=t=>/(?:可能|因為|例如|但是|因此|包括|以及|[-—]{2,}|[…]{1,}|\.{3,})[\s，、：:；;。]*$/.test(t.trim());
  if(assessment.some(unfinished)||data.rows.some(r=>typeof r?.analysis==='string'&&unfinished(r.analysis)))throw new Error('AI評語未完成，請重新分析。');
  const mapped=new Map();for(const item of data.rows){const turn=Number(item?.turn);if(!Number.isInteger(turn)||turn<1||turn>pairs.length||mapped.has(turn))throw new Error('AI會談輪次資料不完整。');mapped.set(turn,item);}
  const rows=pairs.map((_,i)=>{const row=mapped.get(i+1);const labels=Array.isArray(row?.labels)?row.labels:typeof row?.labels==='string'?row.labels.split(/[、，,]/):null;if(!row||!labels?.length||typeof row.analysis!=='string'||!row.analysis.trim())throw new Error('AI第'+(i+1)+'輪分析資料不完整。');return {analysis:row.analysis,labels:labels.slice(0,2).map(x=>String(x).slice(0,25)),nonverbal:pairs[i].frames?.length&&typeof row.nonverbal==='string'&&row.nonverbal.trim()?conciseNonverbal(row.nonverbal):'未評估'};});
