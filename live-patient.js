@@ -14,7 +14,7 @@
   document.getElementById('stage').before(controls);
   const start=controls.querySelector('#live-patient-start'), stop=controls.querySelector('#live-patient-stop'), status=controls.querySelector('#live-patient-status');
   const video=panel.querySelector('video'), audio=panel.querySelector('audio');
-  const supports=id=>[1,2,3,4,6].includes(id);
+  const supports=id=>[1,2,3,4,5,6].includes(id);
   const readyMessage=()=>`按麥克風開始會談時啟動${getCase()?.name||'病人'}真人影像（每次最多12分鐘）。`;
   const message=t=>{status.textContent=t;};
   function connectionFailure(error){
