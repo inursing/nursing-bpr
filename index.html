@@ -1268,10 +1268,10 @@ function parsePatientReply(raw){
 }
 const CASE_PORTRAITS={1:'wang',2:'li',3:'chen',4:'zhang',5:'lin',6:'wu'};
 function caseCardPortraitUrl(c){const names={1:'wang-65-sketch',2:'li-58-sketch',3:'chen-72-sketch',4:'zhang-live-sketch',5:'lin-78-sketch',6:'wu-daniel-sketch'};return './portraits/'+names[c.id]+'.jpg';}
-function portraitUrl(c){ return c.id===2?'./portraits/li-58-live.png':c.id===1?'./portraits/wang-65-live.jpg':c.id===6?'./portraits/wu-daniel.jpg':c.id===4?'./portraits/zhang-50-live.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
+function portraitUrl(c){ return c.id===3?'./portraits/chen-72-live.png':c.id===2?'./portraits/li-58-live.png':c.id===1?'./portraits/wang-65-live.jpg':c.id===6?'./portraits/wu-daniel.jpg':c.id===4?'./portraits/zhang-50-live.jpg':'./portraits/'+CASE_PORTRAITS[c.id]+'.png'; }
 function loadAvatarFor(c){
   document.getElementById('avatar-loading').classList.add('hidden');
-  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:[1,2,4,6].includes(c.id)});
+  if(window.Avatar3D) Avatar3D.load(portraitUrl(c),{name:c.name,age:c.age,gender:c.gender,photo:[1,2,3,4,6].includes(c.id)});
 }
 
 // ===== SETTINGS / API =====
@@ -2702,7 +2702,7 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./iphone-speech.js?v=android-azure-4"></script>
 <script src="./patient-view.js?v=wu-photo-1"></script>
 <script src="./simli-sdk.js"></script>
-<script src="./live-patient.js?v=li-live-1"></script>
+<script src="./live-patient.js?v=chen-live-1"></script>
 <script src="./interaction-recorder.js?v=live-source-3"></script>
 <script src="./desktop-recording.js?v=live-source-7"></script>
 </body>
