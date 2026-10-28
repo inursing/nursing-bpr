@@ -88,7 +88,7 @@ export default {
       try {
         const r = await fetch('https://api.simli.ai/compose/token', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-simli-api-key': env.SIMLI_KEY },
-          body: JSON.stringify({ faceId: faces[b.caseId], apiVersion: 'v2', handleSilence: true, maxSessionLength: 720, maxIdleTime: 30, audioInputFormat: 'pcm16' }),
+          body: JSON.stringify({ faceId: faces[b.caseId], apiVersion: 'v2', handleSilence: true, maxSessionLength: 720, maxIdleTime: 300, audioInputFormat: 'pcm16' }),
           signal: AbortSignal.timeout(12000),
         });
         const result = await r.json().catch(() => ({}));
