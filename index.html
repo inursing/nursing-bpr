@@ -718,7 +718,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem"><label style="margin:0">說話停頓時間</label><input type="range" id="set-pause" min="0.8" max="4" step="0.1" value="2" style="flex:1;min-width:140px" oninput="document.getElementById('pause-val').textContent=this.value+' 秒'"><span id="pause-val" style="min-width:48px">2 秒</span></div>
       <label class="check-item" style="margin:0"><input type="checkbox" id="set-bargein" disabled hidden> 病人說話時暫停收音</label>
 </div></details>
-      <details id="course-settings"><summary>課程連線設定</summary><div class="settings-section-body">
+      <details id="course-settings"><summary>平台連線設定</summary><div class="settings-section-body">
       <div id="proxy-state" style="font-size:.78rem;line-height:1.6"></div>
       <div><label>AI 供應商（病人對話與 AI 報告）</label>
         <select id="set-ai" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
@@ -727,7 +727,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
         </select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label>課程服務網址</label><input type="text" id="set-proxy" placeholder="https://xxx.workers.dev"></div>
-        <div><label>課程代碼</label><input type="text" id="set-class" placeholder="課程代碼"></div>
+        <div><label>平台連線代碼</label><input type="text" id="set-class" placeholder="老師提供的連線代碼"></div>
       </div>
       <div style="font-size:.78rem;color:var(--text2)"><button class="btn btn-outline btn-sm" type="button" onclick="testProxy()">▶ 測試代理連線</button> <span id="proxy-msg"></span></div>
 
@@ -736,6 +736,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
         <div style="display:grid;gap:8px;margin-top:8px">
           <div><label>教師密語</label><input type="password" id="set-teacher" placeholder="教師密語"></div>
           <div><label for="teacher-classroom-code">本次課堂代碼</label><input id="teacher-classroom-code" type="password" autocomplete="off"></div>
+          <div><label for="teacher-classroom-end">課堂結束時間（台灣時間）</label><input id="teacher-classroom-end" type="datetime-local"></div>
           <div style="display:flex;gap:8px"><button type="button" class="btn btn-outline btn-sm" onclick="teacherClassroom(true)">開啟課堂</button><button type="button" class="btn btn-outline btn-sm" onclick="teacherClassroom(false)">結束課堂</button></div>
           <div id="teacher-classroom-status" style="font-size:.8rem"></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
@@ -1381,7 +1382,7 @@ function openSettings(){
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
   const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:2,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
-  st.practiceMode=getSettings().practiceMode||'homework';st.classroomAccess=getSettings().classroomAccess||'';st.practiceModeVersion=2;st.ownKey=false;st.gKey='';st.homeworkVersion=1;
+  st.practiceMode=getSettings().practiceMode||'homework';st.classroomAccess=getSettings().classroomAccess||'';st.classroomEndsAt=getSettings().classroomEndsAt||null;st.practiceModeVersion=2;st.ownKey=false;st.gKey='';st.homeworkVersion=1;
   if(st.practiceMode!==getSettings().practiceMode){state.sid=null;saveState();}
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
@@ -1396,6 +1397,7 @@ function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st
 // 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
 let sessionJob=null;
 function ensureSession(){
+  if(window.expireClassroomSession)expireClassroomSession();
   if(sessionJob)return sessionJob;
   const job=registerPracticeSession().finally(()=>{if(sessionJob===job)sessionJob=null;});sessionJob=job;return job;
 }
@@ -1405,7 +1407,7 @@ async function registerPracticeSession(){
   const st=getSettings();
   const r=await fetch(st.proxyUrl+'/session/start',{method:'POST',headers:proxyHeaders({'content-type':'application/json'}),body:JSON.stringify({studentId:state.studentId||'',name:state.studentName||''})});
   const j=await r.json().catch(()=>({}));
-  if(!r.ok){ throw Object.assign(new Error(j.error||('登記失敗 '+r.status)),{code:'quota'}); }
+  if(!r.ok){if(j.code==='CLASSROOM_CLOSED'&&window.expireClassroomSession&&expireClassroomSession(true))return registerPracticeSession();throw Object.assign(new Error(j.error||('登記失敗 '+r.status)),{code:'quota'}); }
   state.sid=j.sid; saveState();
   if(j.limited) toast(`課堂練習第 ${j.used} 次（還剩 ${j.remaining} 次）`,4000);
   return true;
@@ -1510,7 +1512,8 @@ async function openaiFetch(messages,opts,stream){
     catch(e){ clearTimeout(timer); lastErr=new Error('OpenAI 逾時（'+model+'）'); continue; }
     if(res.ok){ if(kind!=='report'&&model!==(st.oaModel||OPENAI_CHAT_MODELS[0])){ openaiModelOverride=model; console.warn('OpenAI 改用模型',model); } res.__timer=timer; return res; }
     clearTimeout(timer);
-    let t=''; try{ const j=await res.json(); t=j.error?.message||j.error||''; }catch(e){}
+    let t='',code=''; try{ const j=await res.json(); t=j.error?.message||j.error||'';code=j.code||''; }catch(e){}
+    if(code==='CLASSROOM_CLOSED')throw Object.assign(new Error(t),{code});
     lastErr=new Error('OpenAI 錯誤 '+res.status+' '+t);
     if(res.status===401||res.status===403) break;          // 金鑰問題不用換模型
     if(res.status===429&&/quota|billing|insufficient/i.test(t)) break;   // 沒餘額
@@ -1593,16 +1596,18 @@ async function geminiSampleStream(input,opts={}){
   return {text:full};
 }
 async function apiSample(input,opts={}){
+  if(window.expireClassroomSession)expireClassroomSession();
   if(homeworkMode())return claudeSample(input,opts,false);
   const st=getSettings();
-  if(useOpenAI()){if(proxyConfigured())await ensureSession();return openaiSample(input,opts);}
+  if(useOpenAI()){try{if(proxyConfigured())await ensureSession();if(homeworkMode())return claudeSample(input,opts,false);return await openaiSample(input,opts);}catch(e){if(e.code==='CLASSROOM_CLOSED'&&window.expireClassroomSession){expireClassroomSession(true);return claudeSample(input,opts,false);}throw e;}}
   if(!proxyOn()&&!st.gKey)throw new Error('請先設定課程連線');
   return geminiSample(input,opts);
 }
 async function apiSampleStream(input,opts={}){
+  if(window.expireClassroomSession)expireClassroomSession();
   if(homeworkMode())return claudeSample(input,opts,true);
   const st=getSettings();
-  if(useOpenAI()){if(proxyConfigured()&&!st.oaKey)await ensureSession();return openaiSampleStream(input,opts);}
+  if(useOpenAI()){try{if(proxyConfigured()&&!st.oaKey)await ensureSession();if(homeworkMode())return claudeSample(input,opts,true);return await openaiSampleStream(input,opts);}catch(e){if(e.code==='CLASSROOM_CLOSED'&&window.expireClassroomSession){expireClassroomSession(true);return claudeSample(input,opts,true);}throw e;}}
   if(!proxyOn()&&!st.gKey)throw new Error('請先設定課程連線');
   return geminiSampleStream(input,opts);
 }
@@ -2505,7 +2510,7 @@ function startBackgroundAnalysis(){
   return launchAiAnalysis(key);
 }
 function reportInputKey(){
-  return JSON.stringify(['conversation-summary-v6-visual',getSettings().practiceMode||'classroom',state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),(window.DesktopRecording?.analysisFrames?.()||[]).map(f=>f.ts)]);
+  return JSON.stringify(['conversation-summary-v6-visual',state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),(window.DesktopRecording?.analysisFrames?.()||[]).map(f=>f.ts)]);
 }
 let aiRecordKey=null;
 function updateAiStatusChips(msg){document.querySelectorAll('.ai-status').forEach(el=>{el.textContent=msg;});}
@@ -2709,6 +2714,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./desktop-recording.js?v=live-source-7"></script>
 <script src="teacher-pr.js?v=1"></script>
 <script src="claude-client.js?v=1"></script>
-<script src="practice-mode.js?v=2"></script>
+<script src="practice-mode.js?v=3"></script>
 </body>
 </html>
