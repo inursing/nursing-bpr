@@ -46,6 +46,14 @@ async function teacherClassroom(enabled){
     document.getElementById('teacher-classroom-code').value='';
   }catch(e){out.textContent=e.message;}
 }
+async function loadTeacherClassroomStatus(){
+  if(!getSettings().teacherToken)return;
+  const out=document.getElementById('teacher-classroom-status');
+  try{const r=await fetch(getSettings().proxyUrl+'/admin/classroom',{headers:proxyHeaders()});const j=await r.json();if(!r.ok)throw new Error(j.error||'無法查詢課堂');
+    out.textContent=j.enabled?'課堂開啟中，結束時間：'+classroomEndLabel(j.endsAt):'目前未開啟課堂';
+    if(j.enabled)document.getElementById('teacher-classroom-end').value=taiwanDateTimeInput(j.endsAt);
+  }catch(e){out.textContent=e.message;}
+}
 async function resetAllClassroomCounts(){
   if(!confirm('將所有學生的課堂練習次數歸零？作業與評值資料會保留。'))return;
   saveSettings();openSettings();document.getElementById('teacher-tools').open=true;
@@ -60,3 +68,4 @@ renderPracticeMode();
 document.getElementById('adv-settings').append(document.getElementById('course-settings'));
 document.getElementById('teacher-classroom-end').value=taiwanDateTimeInput(Date.now()+2*3600000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)expireClassroomSession();});
+document.getElementById('teacher-tools').addEventListener('toggle',()=>{if(document.getElementById('teacher-tools').open)loadTeacherClassroomStatus();});
