@@ -703,9 +703,9 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
       <details id="own-key-settings" open>
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem">學生課後練習</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課後可使用自己的 Gemini 金鑰練習，金鑰儲存在此裝置。<a href="./key-guide.html" target="_blank" rel="noopener"><b>📖 取得金鑰的簡易教學</b></a></div>
-          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 使用自己的金鑰</label>
-          <div><label>我的 Gemini API 金鑰</label><input type="text" id="set-gkey" placeholder="AIza…"></div>
+          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課後練習使用 Claude。</div>
+          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 課後練習（Claude）</label>
+          <input type="hidden" id="set-gkey">
           <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
         </div>
       </details>
@@ -1290,6 +1290,7 @@ function getSettings(){
     if(st.chatEconomyVersion!==1){st.oaModel='gpt-6-luna';st.chatEconomyVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.caseVoiceVersion!==1){st.caseVoices={...st.caseVoices,...CASE_VOICE_DEFAULTS};st.caseVoiceVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.pauseTimingVersion!==2){if(!Number.isFinite(Number(st.pauseSec))||Number(st.pauseSec)===2.5||(st.pauseTimingVersion!==1&&Number(st.pauseSec)<=1.6))st.pauseSec=2;st.pauseTimingVersion=2;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    if(st.homeworkVersion!==1){st.practiceMode=st.ownKey?'homework':'classroom';st.ownKey=false;st.gKey='';st.homeworkVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     return st;
   }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
@@ -1297,7 +1298,7 @@ function courseSetupConfig(st){
   let proxy;try{proxy=new URL(st.proxyUrl);}catch(e){throw new Error('請先完成「課程連線設定」，才能分享給學生。');}
   if(proxy.protocol!=='https:'||proxy.username||proxy.password)throw new Error('課程代理必須使用 HTTPS 網址。');
   // Explicit allowlist: API keys and teacher credentials never belong in student links.
-  const cfg={setupVersion:1,proxyUrl:proxy.href.replace(/\/$/,''),classCode:st.classCode||'',ownKey:false,aiProvider:st.aiProvider||'openai'};
+  const cfg={setupVersion:1,proxyUrl:proxy.href.replace(/\/$/,''),classCode:st.classCode||'',ownKey:false,practiceMode:'classroom',aiProvider:st.aiProvider||'openai'};
   for(const k of ['azVM','azVF','avM','avF','gModel','oaModel','oaReport','driveUrl','pauseSec'])if(st[k]!==undefined&&st[k]!=='')cfg[k]=st[k];
   cfg.hands=!!st.hands;
   if(st.caseVoices){cfg.caseVoices={};for(const id of [1,2,3,4,5,6]){const v=st.caseVoices[id];if(v)cfg.caseVoices[id]={name:String(v.name||''),rate:Math.max(.85,Math.min(1.1,Number(v.rate)||1))};}}
@@ -1338,7 +1339,8 @@ function applySetupFromHash(){
     const safe=courseSetupConfig(cfg),st=getSettings();
     // A student's earlier personal-key mode must not override the teacher's course AI.
     if(st.proxyUrl!==safe.proxyUrl)st.teacherToken='';
-    Object.assign(st,safe,{ownKey:false,gKey:'',oaKey:'',azKey:'',azRegion:''});
+    const practiceMode=st.proxyUrl===safe.proxyUrl&&st.classCode===safe.classCode&&st.practiceMode==='homework'?'homework':'classroom';
+    Object.assign(st,safe,{practiceMode,ownKey:false,gKey:'',oaKey:'',azKey:'',azRegion:''});
     localStorage.setItem(SET_KEY,JSON.stringify(st));
     // Keep only the safe course configuration so forwarding the address still works.
     history.replaceState(null,'',location.pathname+location.search+setupHash(safe));
@@ -1357,7 +1359,7 @@ function openSettings(){
   set('set-drive',st.driveUrl||'');
   document.getElementById('set-pause').value=st.pauseSec||2; document.getElementById('pause-val').textContent=(st.pauseSec||2)+' 秒';
   document.getElementById('set-bargein').checked=false;
-  document.getElementById('set-ownkey').checked=!!st.ownKey; set('set-gkey',st.gKey||'');
+  document.getElementById('set-ownkey').checked=st.practiceMode==='homework'; set('set-gkey',st.gKey||'');
   set('set-gmodel',st.gModel||'gemini-3.1-flash-lite'); set('set-oamodel',st.oaModel||''); set('set-oareport',st.oaReport||''); set('set-oakey',st.oaKey||''); document.getElementById('set-ai').value=st.aiProvider||'openai'; set('set-az-vm',st.azVM||''); set('set-az-vf',st.azVF||'');
   set('set-az-key',st.azKey||''); set('set-az-region',st.azRegion||''); set('set-av-m',st.avM||''); set('set-av-f',st.avF||'');
   document.getElementById('set-hands').checked=!!st.hands;
@@ -1369,6 +1371,8 @@ function openSettings(){
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
   const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:2,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
+  st.practiceMode=st.ownKey?'homework':'classroom';st.ownKey=false;st.gKey='';st.homeworkVersion=1;
+  if(st.practiceMode!==getSettings().practiceMode){state.sid=null;saveState();}
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
@@ -1376,8 +1380,8 @@ function saveSettings(){
 }
 function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
 // AI 是否走代理（學生勾選「用自己的金鑰」時不走）；語音只要有代理就一律走代理
-function proxyOn(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return proxyConfigured(); }
-function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||''}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
+function proxyOn(){ return proxyConfigured(); }
+function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||'','X-Practice-Mode':st.practiceMode||'classroom'}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
 // 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
 let sessionJob=null;
 function ensureSession(){
@@ -1409,9 +1413,8 @@ async function teacherQuota(action,studentId,count){
 }
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
   const ps=document.getElementById('proxy-state'); ps.innerHTML=on?'<span style="color:var(--ok,#1a7f37)">✅ 已啟用：AI 與語音都經由代理，這台裝置與學生裝置都不需要金鑰。</span>':'<span style="color:var(--text2)">尚未設定課程代理。教師分享前請先完成課程連線設定。</span>';
-  const own=document.getElementById('set-ownkey').checked, gk=document.getElementById('set-gkey').value.trim();
-  const os=document.getElementById('ownkey-state'); os.innerHTML=own?(gk?'<span style="color:#1a7f37">✅ 使用自己的金鑰（AI 病人與 AI 記錄走你的 Gemini 額度；語音'+(on?'仍由老師代理提供':'用瀏覽器內建聲音')+'）</span>':'<span style="color:var(--danger)">請貼上你的 Gemini 金鑰，或取消勾選</span>'):'';
-  if(own&&gk) ps.innerHTML='<span style="color:var(--text2)">已勾選「使用我自己的金鑰」，AI 不經代理。</span>';
+  const own=document.getElementById('set-ownkey').checked;
+  document.getElementById('ownkey-state').textContent=own?'使用課程提供的 Claude，不需填寫金鑰。':'';
   // Disclosure state is controlled by the student; opening settings shows practice first.
   document.getElementById('link-hint-proxy').classList.toggle('hidden',!on); document.getElementById('link-hint-nokey').classList.toggle('hidden',on); }
 async function testDrive(){
@@ -1438,7 +1441,7 @@ async function testProxy(){
   }catch(e){ msg.textContent='❌ 無法連線：'+e.message; }
 }
 // 使用 OpenAI？（老師選 OpenAI 且學生沒勾「用自己的金鑰」）
-function useOpenAI(){ const st=getSettings(); if(st.ownKey&&st.gKey) return false; return (st.aiProvider||'openai')==='openai'&&(proxyConfigured()||!!st.oaKey); }
+function useOpenAI(){ const st=getSettings(); if(st.practiceMode==='homework') return false; return (st.aiProvider||'openai')==='openai'&&(proxyConfigured()||!!st.oaKey); }
 function aiReady(){ const st=getSettings(); if(useOpenAI()) return true; if(proxyOn()) return true; return !!st.gKey; }
 const OPENAI_USAGE_KEY='bpr-openai-usage-v1';
 function readOpenaiUsage(){try{return JSON.parse(localStorage.getItem(OPENAI_USAGE_KEY)||'[]')}catch(e){return []}}
@@ -1578,43 +1581,18 @@ async function geminiSampleStream(input,opts={}){
   return {text:full};
 }
 async function apiSample(input,opts={}){
+  if(homeworkMode())return claudeSample(input,opts,false);
   const st=getSettings();
-  if(useOpenAI()){ if(proxyOn()||proxyConfigured()) await ensureSession(); return openaiSample(input,opts); }
-  if(proxyOn()||(st.provider||'gemini')==='gemini'){ if(!proxyOn()&&!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰（右上角 ⚙ 設定）'),{code:'no_key'}); return geminiSample(input,opts); }
-  if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰（右上角 ⚙ 設定）'),{code:'no_key'});
-  const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:st.model||'claude-sonnet-5-5',max_tokens:opts.maxTokens||1024,system:opts.system||undefined,messages})
-  });
-  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('API 錯誤 '+res.status+' '+t); }
-  const j=await res.json();
-  return {text:(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')};
+  if(useOpenAI()){if(proxyConfigured())await ensureSession();return openaiSample(input,opts);}
+  if(!proxyOn()&&!st.gKey)throw new Error('請先設定課程連線');
+  return geminiSample(input,opts);
 }
 async function apiSampleStream(input,opts={}){
+  if(homeworkMode())return claudeSample(input,opts,true);
   const st=getSettings();
-  if(useOpenAI()){ if(proxyConfigured()&&!st.oaKey) await ensureSession(); return openaiSampleStream(input,opts); }
-  if(proxyOn()||(st.provider||'gemini')==='gemini'){ if(!proxyOn()&&!st.gKey) throw Object.assign(new Error('尚未設定 Gemini 金鑰'),{code:'no_key'}); return geminiSampleStream(input,opts); }
-  if(!st.apiKey) throw Object.assign(new Error('尚未設定 API 金鑰'),{code:'no_key'});
-  const messages=(typeof input==='string'?[{role:'user',content:input}]:input).map(m=>m.parts?{role:m.role,content:m.parts.map(p=>p.image?{type:'image',source:{type:'base64',media_type:(p.image.match(/^data:([^;]+)/)||[])[1]||'image/jpeg',data:p.image.split(',')[1]}}:{type:'text',text:p.text||''})}:m);
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'content-type':'application/json','x-api-key':st.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:st.model||'claude-sonnet-5-5',max_tokens:opts.maxTokens||400,system:opts.system||undefined,messages,stream:true})
-  });
-  if(!res.ok){ let t=''; try{t=(await res.json()).error?.message||''}catch(e){} throw new Error('API 錯誤 '+res.status+' '+t); }
-  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
-  while(true){
-    const {value,done}=await reader.read(); if(done) break;
-    buf+=dec.decode(value,{stream:true});
-    const lines=buf.split('\n'); buf=lines.pop();
-    for(const line of lines){
-      if(!line.startsWith('data:')) continue;
-      try{ const j=JSON.parse(line.slice(5).trim()); if(j.type==='content_block_delta'&&j.delta&&j.delta.text){ full+=j.delta.text; opts.onDelta&&opts.onDelta(full,j.delta.text); } }catch(e){}
-    }
-  }
-  return {text:full};
+  if(useOpenAI()){if(proxyConfigured()&&!st.oaKey)await ensureSession();return openaiSampleStream(input,opts);}
+  if(!proxyOn()&&!st.gKey)throw new Error('請先設定課程連線');
+  return geminiSampleStream(input,opts);
 }
 function saveBlob(filename,blob){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click();
@@ -1895,7 +1873,7 @@ async function handleNurseSpeech(text){
     window.ConversationDiagnostics?.record('ai-failed',{code:e?.code==='quota'?'quota':'request-failed'});
     console.error(e);
     if(e&&e.code==='quota'){ toast(e.message,8000); bubble.textContent='（'+e.message+'）'; liveEl.querySelector('.bubble-ts').textContent=''; reply.done=true; curReply=null; isSpeaking=false; if(window.__thinkTimer){ clearInterval(window.__thinkTimer); window.__thinkTimer=null; } document.getElementById('mic-btn').classList.remove('waiting'); document.getElementById('mic-btn').textContent='🎤'; setStatus('⚠ '+e.message); state.conversation.pop(); convHistory.pop(); return; }
-    { const m=String(e.message||''); toast(/quota|429/i.test(m)?(useOpenAI()?'OpenAI 額度不足或請求過多，請老師確認儲值':'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費'):/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
+    { const m=String(e.message||''); toast(/quota|429/i.test(m)?(homeworkMode()?'Claude 額度不足或請求過多，請老師確認 API 帳戶':useOpenAI()?'OpenAI 額度不足或請求過多，請老師確認儲值':'Gemini 免費額度今天已用完（或模型忙碌中），請稍後再試或請老師開啟 Gemini 計費'):/location/i.test(m)?'Gemini 暫時無法從此網路使用，請稍後再試':'AI 回應失敗：'+m,6000); }
     window.ConversationDiagnostics?.record('ai-fallback',{reason:'request-failed'});
     response=fallbackPatientResponse(c,text);
   }
@@ -2515,7 +2493,7 @@ function startBackgroundAnalysis(){
   return launchAiAnalysis(key);
 }
 function reportInputKey(){
-  return JSON.stringify(['conversation-summary-v6-visual',state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),(window.DesktopRecording?.analysisFrames?.()||[]).map(f=>f.ts)]);
+  return JSON.stringify(['conversation-summary-v6-visual',getSettings().practiceMode||'classroom',state.caseId,state.goals,state.conversation.map(({frames,...rest})=>rest),(window.DesktopRecording?.analysisFrames?.()||[]).map(f=>f.ts)]);
 }
 let aiRecordKey=null;
 function updateAiStatusChips(msg){document.querySelectorAll('.ai-status').forEach(el=>{el.textContent=msg;});}
@@ -2718,5 +2696,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./interaction-recorder.js?v=live-source-3"></script>
 <script src="./desktop-recording.js?v=live-source-7"></script>
 <script src="teacher-pr.js?v=1"></script>
+<script src="claude-client.js?v=1"></script>
 </body>
 </html>
