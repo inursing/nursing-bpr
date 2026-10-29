@@ -445,6 +445,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
     <div>
       <h1>行為過程紀錄練習平台</h1>
       <div class="sub">iNursing Lab · 練習會談，從反思中成長</div>
+      <div id="practice-mode-badge" style="font-size:.8rem;margin-top:5px">課後練習 · Claude</div>
     </div>
     <button class="btn btn-sm" style="background:rgba(255,255,255,.18);color:#fff" onclick="openSettings()">⚙ 設定</button>
   </div>
@@ -502,6 +503,7 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
     <!-- PHASE 3: CONVERSATION -->
     <div id="phase-conv" class="hidden">
       <div style="max-width:760px;margin:0 auto">
+        <div id="conv-practice-mode" style="font-size:.8rem;color:var(--text2);margin-bottom:6px">課後練習 · Claude</div>
         <div>
           <div class="section-title" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span class="section-icon">🎤</span><h2>語音會談練習</h2></div>
             <button class="btn btn-outline btn-sm" onclick="openModal(state.caseId,true)">查看個案資訊</button></div>
@@ -701,10 +703,13 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
     <h2>平台設定</h2>
     <div class="settings-sections" style="display:grid;gap:12px">
       <details id="own-key-settings" open>
-        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">學生課後練習</summary>
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">練習模式</summary>
         <div style="display:grid;gap:12px;margin-top:10px">
-          <div style="font-size:.78rem;color:var(--text2);line-height:1.6">課後練習使用 Claude。</div>
-          <label class="check-item" style="margin:0"><input type="checkbox" id="set-ownkey" onchange="updateLinkHints()"> 課後練習（Claude）</label>
+          <div id="practice-mode-current">目前：課後練習 · Claude</div>
+          <button class="btn btn-outline" type="button" onclick="useHomeworkPractice()">課後練習</button>
+          <label for="classroom-code">本次課堂代碼</label><input id="classroom-code" type="password" autocomplete="off">
+          <button class="btn btn-outline" type="button" onclick="joinClassroomPractice()">進入課堂練習</button>
+          <input type="checkbox" id="set-ownkey" hidden>
           <input type="hidden" id="set-gkey">
           <div id="ownkey-state" style="font-size:.78rem;line-height:1.6"></div>
         </div>
@@ -730,7 +735,11 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
       <details id="teacher-tools"><summary style="cursor:pointer;font-size:.82rem;color:var(--text2)">教師工具</summary>
         <div style="display:grid;gap:8px;margin-top:8px">
           <div><label>教師密語</label><input type="password" id="set-teacher" placeholder="教師密語"></div>
+          <div><label for="teacher-classroom-code">本次課堂代碼</label><input id="teacher-classroom-code" type="password" autocomplete="off"></div>
+          <div style="display:flex;gap:8px"><button type="button" class="btn btn-outline btn-sm" onclick="teacherClassroom(true)">開啟課堂</button><button type="button" class="btn btn-outline btn-sm" onclick="teacherClassroom(false)">結束課堂</button></div>
+          <div id="teacher-classroom-status" style="font-size:.8rem"></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();openSettings();document.getElementById('teacher-tools').open=true;teacherQuota('list')">📊 查看學生練習次數</button></div>
+          <div><button class="btn btn-outline btn-sm" type="button" onclick="resetAllClassroomCounts()">重設所有課堂次數</button></div>
           <div><button class="btn btn-outline btn-sm" type="button" onclick="saveSettings();TeacherPR.open()">PR 示範範本</button></div>
           <div id="quota-list" style="font-size:.8rem;line-height:1.7"></div>
         </div>
@@ -1291,6 +1300,7 @@ function getSettings(){
     if(st.caseVoiceVersion!==1){st.caseVoices={...st.caseVoices,...CASE_VOICE_DEFAULTS};st.caseVoiceVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.pauseTimingVersion!==2){if(!Number.isFinite(Number(st.pauseSec))||Number(st.pauseSec)===2.5||(st.pauseTimingVersion!==1&&Number(st.pauseSec)<=1.6))st.pauseSec=2;st.pauseTimingVersion=2;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     if(st.homeworkVersion!==1){st.practiceMode=st.ownKey?'homework':'classroom';st.ownKey=false;st.gKey='';st.homeworkVersion=1;localStorage.setItem(SET_KEY,JSON.stringify(st));}
+    if(st.practiceModeVersion!==2){st.practiceMode='homework';st.classroomAccess='';st.practiceModeVersion=2;localStorage.setItem(SET_KEY,JSON.stringify(st));}
     return st;
   }catch(e){return {oaModel:'gpt-6-luna',caseVoices:CASE_VOICE_DEFAULTS}}
 }
@@ -1298,7 +1308,7 @@ function courseSetupConfig(st){
   let proxy;try{proxy=new URL(st.proxyUrl);}catch(e){throw new Error('請先完成「課程連線設定」，才能分享給學生。');}
   if(proxy.protocol!=='https:'||proxy.username||proxy.password)throw new Error('課程代理必須使用 HTTPS 網址。');
   // Explicit allowlist: API keys and teacher credentials never belong in student links.
-  const cfg={setupVersion:1,proxyUrl:proxy.href.replace(/\/$/,''),classCode:st.classCode||'',ownKey:false,practiceMode:'classroom',aiProvider:st.aiProvider||'openai'};
+  const cfg={setupVersion:1,proxyUrl:proxy.href.replace(/\/$/,''),classCode:st.classCode||'',ownKey:false,practiceMode:'homework',aiProvider:st.aiProvider||'openai'};
   for(const k of ['azVM','azVF','avM','avF','gModel','oaModel','oaReport','driveUrl','pauseSec'])if(st[k]!==undefined&&st[k]!=='')cfg[k]=st[k];
   cfg.hands=!!st.hands;
   if(st.caseVoices){cfg.caseVoices={};for(const id of [1,2,3,4,5,6]){const v=st.caseVoices[id];if(v)cfg.caseVoices[id]={name:String(v.name||''),rate:Math.max(.85,Math.min(1.1,Number(v.rate)||1))};}}
@@ -1338,8 +1348,8 @@ function applySetupFromHash(){
     if(!cfg||typeof cfg!=='object'||Array.isArray(cfg))throw new Error('課程設定格式不正確');
     const safe=courseSetupConfig(cfg),st=getSettings();
     // A student's earlier personal-key mode must not override the teacher's course AI.
-    if(st.proxyUrl!==safe.proxyUrl)st.teacherToken='';
-    const practiceMode=st.proxyUrl===safe.proxyUrl&&st.classCode===safe.classCode&&st.practiceMode==='homework'?'homework':'classroom';
+    if(st.proxyUrl!==safe.proxyUrl){st.teacherToken='';st.classroomAccess='';}
+    const practiceMode=st.proxyUrl===safe.proxyUrl&&st.classCode===safe.classCode&&st.practiceMode==='classroom'&&st.classroomAccess?'classroom':'homework';
     Object.assign(st,safe,{practiceMode,ownKey:false,gKey:'',oaKey:'',azKey:'',azRegion:''});
     localStorage.setItem(SET_KEY,JSON.stringify(st));
     // Keep only the safe course configuration so forwarding the address still works.
@@ -1371,17 +1381,18 @@ function openSettings(){
 function saveSettings(){
   const v=id=>(document.getElementById(id).value||'').trim();
   const st={chatEconomyVersion:1,caseVoiceVersion:1,pauseTimingVersion:2,provider:'gemini',aiProvider:document.getElementById('set-ai').value,oaModel:v('set-oamodel'),oaReport:v('set-oareport'),oaKey:v('set-oakey'),gKey:v('set-gkey'),gModel:v('set-gmodel')||'gemini-3.1-flash-lite',avM:v('set-av-m'),avF:v('set-av-f'),azKey:v('set-az-key'),azRegion:v('set-az-region').toLowerCase(),azVM:v('set-az-vm'),azVF:v('set-az-vf'),hands:document.getElementById('set-hands').checked,backchannel:false,bargeIn:document.getElementById('set-bargein').checked,pauseSec:parseFloat(document.getElementById('set-pause').value)||2,ownKey:document.getElementById('set-ownkey').checked,driveUrl:v('set-drive'),teacherToken:v('set-teacher'),proxyUrl:v('set-proxy').replace(/\/+$/,''),classCode:v('set-class')};
-  st.practiceMode=st.ownKey?'homework':'classroom';st.ownKey=false;st.gKey='';st.homeworkVersion=1;
+  st.practiceMode=getSettings().practiceMode||'homework';st.classroomAccess=getSettings().classroomAccess||'';st.practiceModeVersion=2;st.ownKey=false;st.gKey='';st.homeworkVersion=1;
   if(st.practiceMode!==getSettings().practiceMode){state.sid=null;saveState();}
   st.caseVoices=readCaseVoiceSettings();
   try{localStorage.setItem(SET_KEY,JSON.stringify(st))}catch(e){}
   document.getElementById('settings-modal').classList.add('hidden');
   toast('設定已儲存');
+  if(window.renderPracticeMode)renderPracticeMode();
 }
 function proxyConfigured(){ const st=getSettings(); return /^https?:\/\//.test(st.proxyUrl||''); }
 // AI 是否走代理（學生勾選「用自己的金鑰」時不走）；語音只要有代理就一律走代理
 function proxyOn(){ return proxyConfigured(); }
-function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||'','X-Practice-Mode':st.practiceMode||'classroom'}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; return Object.assign(h,extra||{}); }
+function proxyHeaders(extra){ const st=getSettings(); const h={'X-Class-Code':st.classCode||'','X-Practice-Mode':st.practiceMode||'homework'}; if(state.sid) h['X-Session']=state.sid; if(st.teacherToken) h['X-Teacher-Token']=st.teacherToken; if(st.classroomAccess)h['X-Classroom-Access']=st.classroomAccess;return Object.assign(h,extra||{}); }
 // 課堂金鑰的練習次數：第一次開口時向代理登記一次練習
 let sessionJob=null;
 function ensureSession(){
@@ -1407,8 +1418,8 @@ async function teacherQuota(action,studentId,count){
     else r=await fetch(st.proxyUrl+'/admin/quota',{headers:proxyHeaders()});
     const j=await r.json(); if(!r.ok) throw new Error(j.error||r.status);
     if(action==='reset'){ toast('已重設'); return teacherQuota('list'); }
-    const rows=(j.students||[]).sort((a,b)=>a.studentId.localeCompare(b.studentId));
-    out.innerHTML=rows.length?`<div style="margin-bottom:4px">上限 ${j.max||'不限'} 次／人，共 ${rows.length} 位學生</div>`+rows.map(r=>`<div style="display:flex;gap:8px;align-items:center;padding:2px 0"><code>${escHtml(r.studentId)}</code> 已用 ${r.used} 次 <button class="btn btn-outline btn-sm" type="button" onclick="teacherQuota('reset','${escHtml(r.studentId)}',0)">重設為 0</button></div>`).join(''):'還沒有學生使用課堂金鑰。';
+    const rows=(j.students||[]).filter(r=>r.used>0).sort((a,b)=>a.studentId.localeCompare(b.studentId));
+    out.innerHTML=rows.length?`<div style="margin-bottom:4px">上限 ${j.max||'不限'} 次／人，共 ${rows.length} 位學生</div>`+rows.map(r=>`<div style="display:flex;gap:8px;align-items:center;padding:2px 0"><code>${escHtml(r.studentId)}</code> 已用 ${r.used} 次 <button class="btn btn-outline btn-sm" type="button" onclick="teacherQuota('reset','${escHtml(r.studentId)}',0)">重設為 0</button></div>`).join(''):'目前沒有課堂練習次數。';
   }catch(e){ out.textContent='❌ '+e.message; }
 }
 function updateLinkHints(){ const on=/^https?:\/\//.test(document.getElementById('set-proxy').value.trim());
@@ -1429,6 +1440,7 @@ async function testProxy(){
   if(!proxyConfigured()){ msg.textContent='請先填代理網址'; return; }
   msg.textContent='測試中…';
   try{
+    if(homeworkMode()){await claudeSample('回覆「好」一個字',{maxTokens:50},false);msg.textContent='✅ Claude 課後練習連線正常';return;}
     const r=await fetch(st.proxyUrl+'/azure/token',{headers:proxyHeaders()}); const j=await r.json().catch(()=>({}));
     if(r.status===401){ msg.textContent='❌ 課程代碼錯誤'; return; }
     if(!r.ok){ msg.textContent='❌ '+(j.error||('HTTP '+r.status)); return; }
@@ -2697,5 +2709,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="./desktop-recording.js?v=live-source-7"></script>
 <script src="teacher-pr.js?v=1"></script>
 <script src="claude-client.js?v=1"></script>
+<script src="practice-mode.js?v=2"></script>
 </body>
 </html>
