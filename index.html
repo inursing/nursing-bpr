@@ -539,7 +539,6 @@ body.desktop-practice #phase-conv .stage-box{height:clamp(320px,58dvh,640px)}
             <input type="text" id="text-input" placeholder="輸入訊息" onkeydown="if(event.key==='Enter'){sendTextInput()}">
             <button class="btn btn-outline btn-sm" onclick="sendTextInput()">送出</button>
           </div>
-          <div id="qr-big" class="modal-overlay hidden" onclick="this.classList.add('hidden')" style="z-index:9999;background:#fff;display:grid;place-items:center;cursor:pointer"><div style="text-align:center"><div id="qr-big-img" style="line-height:0"></div><div style="margin-top:14px;font-size:1.1rem;color:#333">掃描 QR Code 開啟課程 · 點一下關閉</div></div></div>
 <div id="end-confirm" class="modal-overlay hidden" onclick="if(event.target.id==='end-confirm')this.classList.add('hidden')">
             <div class="modal" style="max-width:420px;text-align:center">
               <h3 style="margin-bottom:10px">要結束會談嗎？</h3>
@@ -2715,5 +2714,6 @@ if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>wind
 <script src="teacher-pr.js?v=1"></script>
 <script src="claude-client.js?v=1"></script>
 <script src="practice-mode.js?v=4"></script>
+<div id="qr-big" class="modal-overlay hidden" onclick="this.classList.add('hidden')" style="z-index:9999;background:#fff;display:grid;place-items:center;cursor:pointer"><div style="text-align:center"><div id="qr-big-img" style="line-height:0"></div><div style="margin-top:14px;font-size:1.1rem;color:#333">掃描 QR Code 開啟課程 · 點一下關閉</div></div></div>
 </body>
 </html>
